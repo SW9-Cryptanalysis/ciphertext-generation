@@ -86,10 +86,3 @@ class Cipher:
 			str: A string containing the plaintext, difficulty, key, and ciphertext.
 		"""
 		return f"Cipher(Plaintext: \"{self.plaintext}\"\nDifficulty: {self.difficulty}\nKey: {self.key}\nCiphertext: \"{self.ciphertext}\")"
-
-if __name__ == "__main__":
-	cipher = Cipher('thisisatestplaintextthatneedstobeencrypteditisjustarandomstringoflowercaselettersthatshouldworkfineanditislong'
-                 'enoughtotestthecipherwiththelengthshouldbeoverfourhundredcharactersmaybeevenfivehundredduetothistweneedtoensurethecipherworksas'
-                 'expectedandcanhandlelargerinputswithoutanyissuesandthatthistextisextremelylongsoitcanbeusedtotesttheperformanceofthecipher'
-                 'generationprocess')
-	print(cipher)
