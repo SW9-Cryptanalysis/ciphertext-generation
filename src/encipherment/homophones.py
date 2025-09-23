@@ -34,6 +34,8 @@ def adjust_homophones(cipher_symbols, homophones_dict) -> dict[str, int]:
 		dict[str, int]: The adjusted dictionary of homophone counts.
  	"""
 	import random
+	if cipher_symbols < 26:
+		raise ValueError("cipher_symbols must be at least 26 to cover all letters.")
 
 	while sum(homophones_dict.values()) > cipher_symbols:
 		letter = random.choice(
