@@ -7,10 +7,10 @@ class Fetcher:
 	def __init__(self):
 		self.books_metadata = []
 
-	def fetch_random_book_text(self):
+	def fetch_random_book_text(self) -> str | None:
+		"""Fetch metadata for a random book from Gutendex and return its text content."""
 
 		url = GUTENDEX_BASE_URL
-		all_metadata = []
 
 		book_ids = [
 			"84", # Frankenstein
@@ -71,29 +71,7 @@ class Fetcher:
 			print(f"Error fetching book data: {e}")
 			return None
 
-	def display_book_metadata(self):
-		"""Display the first 100 books' metadata"""
-		if not self.books_metadata:
-			self.fetch_book_metadata()
-		
-		print(f"\nDisplaying metadata for first {len(self.books_metadata)} books:")
-		print("=" * 80)
-		
-		for i, book_metadata in enumerate(self.books_metadata, 1):
-			title = book_metadata.get('title', 'Unknown')
-			authors = [author.get('name', 'Unknown') for author in book_metadata.get('authors', [])]
-			download_count = book_metadata.get('download_count', 0)
-			languages = book_metadata.get('languages', [])
-			book_id = book_metadata.get('id', 'Unknown')
-			
-			print(f"{i:3d}. {title}")
-			print(f"     Authors: {', '.join(authors) if authors else 'Unknown'}")
-			print(f"     Downloads: {download_count:,}")
-			print(f"     Languages: {', '.join(languages)}")
-			print(f"     ID: {book_id}")
-			print()
-	
-	def get_random_book_slice(self, book_text, min_len=100, max_len=5000):
+	def get_random_book_slice(self, book_text: str, min_len: int = 100, max_len: int = 5000) -> str | None:
 		"""Extract a random slice from the provided book text."""
 		if not book_text:
 			print("No book text provided.")
@@ -112,7 +90,7 @@ class Fetcher:
 		
 		return slice_text
 		
-	def format_text(self, text):
+	def format_text(self, text: str) -> list[str]:
 		return [c.upper() for c in text if c.isalpha()]
 		
 
