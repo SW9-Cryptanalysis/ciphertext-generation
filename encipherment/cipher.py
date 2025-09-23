@@ -1,4 +1,5 @@
 from decimal import Decimal
+from homophones import extract_homophones
 import random
 
 class Cipher:
@@ -13,99 +14,82 @@ class Cipher:
 		if not pattern.match(plaintext):
 			raise ValueError("Plaintext must contain only lowercase letters with no punctuation or spaces.")
 		self.plaintext = plaintext
-		self.difficulty = generate_difficulty()
-		self.ciphertext = None
+		self.difficulty = self.generate_difficulty()
 		self.key = self.generate_key()
+		self.ciphertext = self.encipher()
 		
 	def generate_key(self) -> dict:
 		"""Generate a homophonic substitution cipher key based on the given difficulty level.
+  
+		Key is a dictionary mapping each letter to a list of its homophones. 
+		Each letter is assigned a number of homophones proportional to its frequency in English text,
+		with some random noise added to create variability.
+  
+		Each homophone is represented by a unique, randomly sampled number from 1 to the total number 
+  		of cipher symbols. 
 
 		Returns:
 			dict: A dictionary mapping each letter to a list of its homophones.
 		"""
 		cipher_symbols: int = round(len(self.plaintext) / self.difficulty)
 
-		ideal_homophones: list[Decimal] = [cipher_symbols * (freq / 100) for freq in frequencies.values()]
-		homophones_dict: dict[str, int] = dict(zip(frequencies.keys(), add_noise(ideal_homophones)))
+		homophones_dict: dict[str, int] = extract_homophones(cipher_symbols)
 
-		homophones_dict = adjust_homophones(cipher_symbols, homophones_dict)
-  
-		return homophones_dict
+		homophone_numbers: list[int] = list(range(1, cipher_symbols + 1))
+		random.shuffle(homophone_numbers)
+		key: dict[str, list[int]] = {}
+		for letter, count in homophones_dict.items():
+			key[letter] = homophone_numbers[:count]
+			homophone_numbers = homophone_numbers[count:]
+		return key
 
-def adjust_homophones(cipher_symbols, homophones_dict) -> dict[str, int]:
-	"""Adjust the homophone counts to ensure the total matches the desired number of cipher symbols."""
-	import random
+	def encipher(self) -> str:
+		"""Encipher the plaintext using the generated homophonic substitution cipher key.
 
-	while sum(homophones_dict.values()) > cipher_symbols:
-		letter = random.choice(list(homophones_dict.keys()))
-		if homophones_dict[letter] > 1:
-			homophones_dict[letter] -= 1
+		Returns:
+			str: The resulting ciphertext as a string of numbers separated by spaces.
+		"""
+		ciphertext_numbers: list[str] = []
+		for char in self.plaintext:
+			homophones = self.key[char]
+			ciphertext_numbers.append(str(random.choice(homophones)))
+		return ' '.join(ciphertext_numbers)
+
+	def generate_difficulty(self) -> int:
+		"""Generate a difficulty level for the cipher based on the average occurences of each homophone.
+			Difficulty levels range from 4-10, with 4 being the most difficult.
 	
-	while sum(homophones_dict.values()) < cipher_symbols:
-		letter = random.choice(list(homophones_dict.keys()))
-		homophones_dict[letter] += 1
-	return homophones_dict
-   
-			
-   
+		Returns:
+			int: Difficulty level (4-10)
+		"""
+	
+		import random
+		return random.randint(4, 10)
 
+	def __json__(self) -> dict:
+		"""Return a JSON-serializable representation of the Cipher object.
 
-def add_noise(ideal_homophones: list[Decimal], k: int = 2) -> list[int]:
-	"""Add random noise to the ideal homophone counts to create variability.
+		Returns:
+			dict: A dictionary containing the plaintext, difficulty, key, and ciphertext.
+		"""
+		return {
+			"plaintext": self.plaintext,
+			"difficulty": self.difficulty,
+			"key": self.key,
+			"ciphertext": self.ciphertext
+		}
+  
+	def __str__(self) -> str:
+		"""Return a string representation of the Cipher object.
 
-	Noise is added by a uniform random integer value between -k and k
+		Returns:
+			str: A string containing the plaintext, difficulty, key, and ciphertext.
+		"""
+		return f"Cipher(Plaintext: \"{self.plaintext}\"\nDifficulty: {self.difficulty}\nKey: {self.key}\nCiphertext: \"{self.ciphertext}\")"
 
-	Args:
-		ideal_homophones (list[Decimal]): List of ideal homophone counts for each letter.
-
-	Returns:
-		list[int]: List of rounded homophone counts with added noise.
-	"""
-
-	import random
-	noisy_homophones = []
-	for count in ideal_homophones:
-		noise = random.randint(-k, k)
-		noisy_count = max(1, count + noise)  # Ensure at least one homophone
-		noisy_homophones.append(round(noisy_count))
-	return noisy_homophones
-
-def generate_difficulty() -> int:
-	"""Generate a difficulty level for the cipher based on the average occurences of each homophone.
-		Difficulty levels range from 4-10, with 4 being the most difficult.
- 
-	Returns:
-		int: Difficulty level (4-10)
-	"""
- 
-	import random
-	return random.randint(4, 10)
-
-frequencies = {
-	'e': Decimal('12.03'),
-	't': Decimal('9.10'),
-	'a': Decimal('8.12'),
-	'o': Decimal('7.68'),
-	'i': Decimal('7.31'),
-	'n': Decimal('6.95'),
-	's': Decimal('6.28'),
-	'r': Decimal('6.02'),
-	'h': Decimal('5.92'),
-	'd': Decimal('4.32'),
-	'l': Decimal('3.98'),
-	'u': Decimal('2.88'),
-	'c': Decimal('2.71'),
-	'm': Decimal('2.61'),
-	'f': Decimal('2.30'),
-	'y': Decimal('2.11'),
-	'w': Decimal('2.09'),
-	'g': Decimal('2.03'),
-	'p': Decimal('1.82'),
-	'b': Decimal('1.49'),
-	'v': Decimal('1.11'),
-	'k': Decimal('0.69'),
-	'x': Decimal('0.17'),
-	'q': Decimal('0.11'),
-	'j': Decimal('0.10'),
-	'z': Decimal('0.07')
-}
+if __name__ == "__main__":
+	cipher = Cipher('thisisatestplaintextthatneedstobeencrypteditisjustarandomstringoflowercaselettersthatshouldworkfineanditislong'
+                 'enoughtotestthecipherwiththelengthshouldbeoverfourhundredcharactersmaybeevenfivehundredduetothistweneedtoensurethecipherworksas'
+                 'expectedandcanhandlelargerinputswithoutanyissuesandthatthistextisextremelylongsoitcanbeusedtotesttheperformanceofthecipher'
+                 'generationprocess')
+	print(cipher)
