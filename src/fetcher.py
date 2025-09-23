@@ -91,7 +91,8 @@ class Fetcher:
 		return slice_text
 		
 	def format_text(self, text: str) -> list[str]:
-		return [c.upper() for c in text if c.isalpha()]
+		""" Format text by filtering to alphabetic characters and converting to lowercase."""
+		return [c.lower() for c in text if c.isalpha()]
 		
 
 # Example usage
