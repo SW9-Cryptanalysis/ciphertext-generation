@@ -4,9 +4,6 @@ import random
 GUTENDEX_BASE_URL = "https://gutendex.com/books"
 
 class Fetcher:
-	def __init__(self):
-		self.books_metadata = []
-
 	def fetch_random_book_text(self) -> str | None:
 		"""Fetch metadata for a random book from Gutendex and return its text content."""
 
@@ -39,7 +36,6 @@ class Fetcher:
 			r = requests.get(f"{url}/{random_id}")
 			r.raise_for_status()
 			book_metadata = r.json()
-			self.books_metadata = [book_metadata]  # Store as a single-item list
 			print(f"Fetched metadata for book ID {random_id}: {book_metadata.get('title', 'Unknown')}")
 			
 			# Now fetch the actual text
