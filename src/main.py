@@ -1,6 +1,3 @@
-from text_fetching.fetcher import Fetcher
-
-
 def main():
     pass
 
