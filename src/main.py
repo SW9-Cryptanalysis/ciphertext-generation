@@ -1,4 +1,4 @@
-from fetcher.fetcher import Fetcher
+from text_fetching.fetcher import Fetcher
 
 def main():
 	print("Hello from ciphertext-generation!")

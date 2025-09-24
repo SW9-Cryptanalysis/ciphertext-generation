@@ -67,55 +67,30 @@ class Fetcher:
 			print(f"Error fetching book data: {e}")
 			return None
 
-	def get_random_book_slice(self, book_text: str, min_len: int = 100, max_len: int = 5000) -> str | None:
+	def get_random_book_slice(self, book_text: str, min_len: int = 100, max_len: int = 5000) -> str | ValueError:
 		"""Extract a random slice from the provided book text."""
 		if not book_text:
-			print("No book text provided.")
-			return None
+			raise ValueError(
+				"book_text must be a string"
+			)
+			
 			
 		if len(book_text) < min_len:
-			print(f"Book text is shorter than minimum length requirement ({min_len}).")
-			return None
+			raise ValueError(
+				"Length of book_text must be equal to or greater than min_len"
+			)
 			
 		# Get random slice
 		start_idx = random.randint(0, max(0, len(book_text) - min_len))
 		end_idx = min(len(book_text), start_idx + random.randint(min_len, max_len))
 		slice_text = book_text[start_idx:end_idx]
 		
-		print(f"Extracted slice from position {start_idx} to {end_idx} ({len(slice_text)} characters)")
-		
 		return slice_text
 		
-	def format_text(self, text: str) -> list[str]:
+	def format_text(self, text: str) -> str:
+		if not isinstance(text, str):
+			raise ValueError(
+				"text must a string"
+			)
 		""" Format text by filtering to alphabetic characters and converting to lowercase."""
-		return [c.lower() for c in text if c.isalpha()]
-		
-
-# Example usage
-if __name__ == "__main__":
-	fetcher = Fetcher()
-
-	# Fetch random book text
-	print("Fetching random book text from Gutendx...")
-	book_text = fetcher.fetch_random_book_text()
-	
-	if not book_text:
-		print("Failed to fetch book text")
-		exit(1)
-	
-	print("\n" + "="*50)
-	print("Getting a random book slice...")
-	
-	text_slice = fetcher.get_random_book_slice(book_text)
-	
-	if text_slice:
-		print(f"\n--- Random slice ---")
-		print(text_slice)
-		print("--- End of slice ---")
-	else:
-		print("Failed to get book slice")
-		exit(1)
-
-	formatted = fetcher.format_text(text_slice)
-	print(f"Formatted text length (alphabetic chars only): {len(formatted)}")
-	print(f"First 100 characters of formatted text: {''.join(formatted[:100])}")
+		return "".join([c.lower() for c in text if c.isalpha()])
