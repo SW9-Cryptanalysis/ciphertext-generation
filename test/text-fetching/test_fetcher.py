@@ -42,7 +42,7 @@ def test_format_notext(no_text):
     with pytest.raises(ValueError) as excinfo:
         fetcher.format_text(no_text)
     assert (
-        "argument must be a string"
+        "Argument must be a string"
         in str(excinfo.value)
     )
 
