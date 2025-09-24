@@ -12,35 +12,12 @@ jobs:
         uses: Ilshidur/action-discord@master
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-          DISCORD_USERNAME: "GitHub Actions"
         with:
-          args: >
-            {"embeds":[
-              {
-                "title":"📢 New Pull Request Ready for Review!",
-                "url":"${{ github.event.pull_request.html_url }}",
-                "color":5814783,
-                "author":{
-                  "name":"${{ github.event.pull_request.user.login }}",
-                  "url":"${{ github.event.pull_request.user.html_url }}",
-                  "icon_url":"${{ github.event.pull_request.user.avatar_url }}"
-                },
-                "fields":[
-                  {
-                    "name":"Title",
-                    "value":"${{ github.event.pull_request.title }}"
-                  },
-                  {
-                    "name":"Branch",
-                    "value":"${{ github.event.pull_request.head.ref }}",
-                    "inline":true
-                  },
-                  {
-                    "name":"Base",
-                    "value":"${{ github.event.pull_request.base.ref }}",
-                    "inline":true
-                  }
-                ],
-                "timestamp":"${{ github.event.pull_request.created_at }}"
-              }
-            ]}
+          args: |
+            📢 **New Pull Request Ready for Review!**
+            • **Title:** ${{ github.event.pull_request.title }}
+            • **Author:** ${{ github.event.pull_request.user.login }}
+            • **Branch:** `${{ github.event.pull_request.head.ref }}`
+            • **Base:** `${{ github.event.pull_request.base.ref }}`
+
+            🔗 ${{ github.event.pull_request.html_url }}
