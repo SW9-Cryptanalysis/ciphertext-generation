@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["pytest", "pytest-cov"]
+dependencies = []
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
@@ -13,5 +13,7 @@ addopts = "-v --tb=short --cov=src --cov-report=term-missing"
 
 [dependency-groups]
 dev = [
+    "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
     "ruff>=0.13.1",
 ]

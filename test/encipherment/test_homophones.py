@@ -5,7 +5,7 @@ import encipherment.homophones
 
 
 @pytest.fixture
-def homphone_dict():
+def homophone_dict():
     # Return a dictionary of letters to homophone counts that is near expected frequencies, startng with e, t, a...
     return {
         "e": 7,
@@ -72,22 +72,22 @@ def test_add_noise():
     )  # Ensure no count is less than 1
 
 
-def test_adjust_homophones(homphone_dict):
-    total_homophones = [sum(homphone_dict.values()), 150]
+def test_adjust_homophones(homophone_dict):
+    total_homophones = [sum(homophone_dict.values()), 150]
     for total in total_homophones:
         adjusted_dict = encipherment.homophones.adjust_homophones(
-            total, homphone_dict.copy()
+            total, homophone_dict.copy()
         )
         adjusted_total = sum(adjusted_dict.values())
         assert adjusted_total == total
         assert all(count >= 1 for count in adjusted_dict.values())
 
 
-def test_adjust_homophones_invalid(homphone_dict):
+def test_adjust_homophones_invalid(homophone_dict):
     invalid_totals = [0, 10, 25]  # Must be at least 26 to cover all letters
     for total in invalid_totals:
         with pytest.raises(ValueError) as excinfo:
-            encipherment.homophones.adjust_homophones(total, homphone_dict.copy())
+            encipherment.homophones.adjust_homophones(total, homophone_dict.copy())
         assert "cipher_symbols must be at least 26 to cover all letters." in str(
             excinfo.value
         )
