@@ -6,7 +6,11 @@ GUTENDEX_BASE_URL = "https://gutendex.com/books"
 
 class Fetcher:
     def fetch_random_book_text(self) -> str | None:
-        """Fetch metadata for a random book from Gutendex and return its text content."""
+        """Fetch metadata for a random book from Gutendex and return its text content.
+
+        Returns:
+            str: The full contents of a random book from Project Gutenberg.
+        """
 
         url = GUTENDEX_BASE_URL
 
@@ -64,7 +68,16 @@ class Fetcher:
             return None
 
     def get_random_book_slice(self, book_text: str, min_len: int = 100, max_len: int = 5000) -> str | ValueError:
-        """Extract a random slice from the provided book text."""
+        """Extract a random slice from the provided book text.
+
+        Args:
+            book_text (str): The entire contents of a book in string format.
+            min_len (int, optional): The minimum length of the text slice. Defaults to 100.
+            max_len (int, optional): The maximum length of the text slice. Defaults to 5000.
+
+        Returns:
+            str | ValueError: A random slice of text of a random length or an error if the maximum length exceeds the length of the book.
+        """
         if not book_text:
             raise ValueError(
                 "book_text must be a string"
@@ -83,9 +96,16 @@ class Fetcher:
         return slice_text
 
     def format_text(self, text: str) -> str:
+        """Format text by filtering to alphabetic characters and converting to lowercase.
+
+        Args:
+            text (str): A slice of text from a book
+
+        Returns:
+            str: The text slice converted to lowercase keeping only alphabetic characters.
+        """
         if not isinstance(text, str):
             raise ValueError(
-                "argument must be a string"
+                "Argument must be a string"
             )
-        """ Format text by filtering to alphabetic characters and converting to lowercase."""
         return "".join([c.lower() for c in text if c.isalpha()])
