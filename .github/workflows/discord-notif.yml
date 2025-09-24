@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Send embed notification to Discord
-        uses: Ilshidur/action-discord@v2
+        uses: Ilshidur/action-discord@master
         with:
           args: |
             {
