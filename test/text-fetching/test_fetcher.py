@@ -1,6 +1,4 @@
 import pytest
-import random
-import string
 
 from text_fetching.fetcher import Fetcher
 
