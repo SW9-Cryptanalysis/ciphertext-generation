@@ -32,36 +32,31 @@ class Fetcher:
         ]
 
         random_id = random.choice(book_ids)
-        print(f"Fetching metadata for book ID: {random_id}")
+
         try:
             r = requests.get(f"{url}/{random_id}")
             r.raise_for_status()
             book_metadata = r.json()
-            print(f"Fetched metadata for book ID {random_id}: {book_metadata.get('title', 'Unknown')}")
 
             # Now fetch the actual text
             formats = book_metadata.get('formats', {})
-            print(f"Available formats: {list(formats.keys())}")
 
             text_url = None
             # Try different text format keys based on what we see in the API response
             for fmt in ['text/plain; charset=utf-8', 'text/plain; charset=us-ascii', 'text/plain']:
                 if fmt in formats:
                     text_url = formats[fmt]
-                    print(f"Using format: {fmt}")
+
                     break
 
             if not text_url:
-                print("No suitable text format found for the selected book.")
-                print(f"Available formats were: {list(formats.keys())}")
-                return None
+                raise RuntimeError(
+                    f"No suitable text format found for book ID {random_id}. Available formats: {list(formats.keys())}")
 
-            print(f"Downloading text from: {text_url}")
             text_response = requests.get(text_url)
             text_response.raise_for_status()
             book_text = text_response.text
 
-            print(f"Downloaded {len(book_text)} characters")
             return book_text
 
         except requests.RequestException as e:
