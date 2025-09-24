@@ -85,7 +85,7 @@ class Fetcher:
     def format_text(self, text: str) -> str:
         if not isinstance(text, str):
             raise ValueError(
-                "text must a string"
+                "argument must be a string"
             )
         """ Format text by filtering to alphabetic characters and converting to lowercase."""
         return "".join([c.lower() for c in text if c.isalpha()])
