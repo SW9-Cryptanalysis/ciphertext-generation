@@ -51,9 +51,9 @@ def test_slicing_text(long_text):
     fetcher = Fetcher()
     sliced_text = fetcher.get_random_book_slice(
         book_text=long_text, min_len=100, max_len=5000)
+    assert isinstance(sliced_text, str)
     assert len(sliced_text) <= 5000
     assert len(sliced_text) >= 100
-    assert isinstance(sliced_text, str)
 
 
 def test_slicing_no_text(no_text):
