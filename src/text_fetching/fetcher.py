@@ -1,5 +1,6 @@
 import requests
 import random
+from unidecode import unidecode
 
 GUTENDEX_BASE_URL = "https://gutendex.com/books"
 
@@ -106,4 +107,4 @@ class Fetcher:
             raise ValueError(
                 "Argument must be a string"
             )
-        return "".join([c.lower() for c in text if c.isalpha()])
+        return unidecode("".join([c.lower() for c in text if c.isalpha()]))
