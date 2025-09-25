@@ -5,7 +5,7 @@ GUTENDEX_BASE_URL = "https://gutendex.com/books"
 
 
 class Fetcher:
-    def fetch_random_book_text(self) -> str | None:
+    def fetch_random_book_text(self) -> str:
         """Fetch metadata for a random book from Gutendex and return its text content.
 
         Returns:
@@ -50,7 +50,6 @@ class Fetcher:
             for fmt in ['text/plain; charset=utf-8', 'text/plain; charset=us-ascii', 'text/plain']:
                 if fmt in formats:
                     text_url = formats[fmt]
-
                     break
 
             if not text_url:
@@ -64,8 +63,7 @@ class Fetcher:
             return book_text
 
         except requests.RequestException as e:
-            print(f"Error fetching book data: {e}")
-            return None
+            raise RuntimeError(f"Error fetching book data: {e}") from e
 
     def get_random_book_slice(self, book_text: str, min_len: int = 100, max_len: int = 5000) -> str | ValueError:
         """Extract a random slice from the provided book text.
