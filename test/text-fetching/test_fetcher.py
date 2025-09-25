@@ -27,7 +27,7 @@ def no_text():
 
 @pytest.fixture
 def accented_text():
-    return "kožušček François æåø äö"
+    return "kožušček François æåø äö êèéêñ"
 
 def test_format_text(sample_text_book):
     fetcher = Fetcher()
@@ -51,7 +51,7 @@ def test_format_notext(no_text):
 def test_format_regional_text(accented_text):
     fetcher = Fetcher()
     formatted_text = fetcher.format_text(accented_text)
-    assert(formatted_text == "kozuscekfrancoisaeaoao")
+    assert(formatted_text == "kozuscekfrancoisaeaoaoeeeen")
 
 
 def test_slicing_text(long_text):
