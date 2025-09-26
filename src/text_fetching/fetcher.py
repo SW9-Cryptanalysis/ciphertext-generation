@@ -86,6 +86,8 @@ class Fetcher:
             raise ValueError(
                 "Length of book_text must be equal to or greater than min_len"
             )
+        
+        book_text = self.format_text(book_text)
 
         # Get random slice
         start_idx = random.randint(0, max(0, len(book_text) - min_len))
