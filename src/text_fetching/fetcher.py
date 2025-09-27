@@ -67,16 +67,20 @@ class Fetcher:
 		except requests.RequestException as e:
 			raise RuntimeError(f"Error fetching book data: {e}") from e
 
-	def get_random_book_slice(self, book_text: str, min_len: int = 100, max_len: int = 5000) -> str | ValueError:
+	def get_random_book_slice(self, book_text: str, min_len: int = 100, max_len: int = 5000) -> str:
 		"""Extract a random slice from the provided book text.
 
-		Args:
-			book_text (str): The entire contents of a book in string format.
-			min_len (int, optional): The minimum length of the text slice. Defaults to 100.
-			max_len (int, optional): The maximum length of the text slice. Defaults to 5000.
+		:param book_text: The full text of a book.
+		:type book_text: str
+		:param min_len: The minimum length of the text slice.
+		:type min_len: int
+		:param max_len: The maximum length of the text slice.
+		:type max_len: int
 
-		Returns:
-			str | ValueError: A random slice of text of a random length or an error if the maximum length exceeds the length of the book.
+		:return: A random slice of the book text with length between min_len and max_len.
+		:rtype: str
+
+		:raises ValueError: If book_text is not a string or is shorter than min_len.
 		"""
 		if not book_text:
 			raise ValueError(
