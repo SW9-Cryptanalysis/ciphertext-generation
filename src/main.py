@@ -1,8 +1,7 @@
 def generate_cipher(length: int | None):
 	"""Generate a cipher from a random book slice and save it to a JSON file.
-
-	:param length: The length of the text slice to fetch. If None, a random length between 500 and 5000 will be used.
-	:type length: int | None
+	Args:
+		length (int | None): The length of the text slice to fetch. If None, a random length between 500 and 5000 will be used.
 	"""
 	from text_fetching.fetcher import Fetcher
 	from encipherment.cipher import Cipher

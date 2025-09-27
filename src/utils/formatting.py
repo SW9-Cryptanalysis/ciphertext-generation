@@ -1,11 +1,11 @@
 def numbers_to_words(text: str) -> str:
 	"""Convert all numbers in the input text to their word representations.
+ 
+	Args:
+		text (str): The input text containing numbers.
 
-	:param text: The input text containing numbers.
-	:type text: str
-
-	:return: The text with numbers converted to words.
-	:rtype: str
+	Returns:
+		str: The text with numbers converted to words.
 	"""
 	from num2words import num2words
 	import re
