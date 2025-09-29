@@ -6,8 +6,8 @@ class Cipher:
     def __init__(self, plaintext: str) -> None:
         """Initialize the Cipher object with the given plaintext.
 
-        :param plaintext: The plaintext to be enciphered. Must contain only lowercase letters with no punctuation or spaces.
-		:type plaintext: str
+        Args:
+                plaintext (str): The lowercase plaintext to be encrypted with no punctuation or spaces.
         """
         import re
 
@@ -23,6 +23,7 @@ class Cipher:
 
     def generate_key(self) -> dict:
         """Generate a homophonic substitution cipher key based on the given difficulty level.
+
         Key is a dictionary mapping each letter to a list of its homophones.
         Each letter is assigned a number of homophones proportional to its frequency in English text,
         with some random noise added to create variability.
@@ -30,8 +31,8 @@ class Cipher:
         Each homophone is represented by a unique, randomly sampled number from 1 to the total number
         of cipher symbols.
 
-        :return: A dictionary mapping each letter to a list of its homophones.
-        :rtype: dict
+        Returns:
+                dict: A dictionary mapping each letter to a list of its homophones.
         """
         cipher_symbols: int = round(len(self.plaintext) / self.difficulty)
 
@@ -48,8 +49,8 @@ class Cipher:
     def encipher(self) -> str:
         """Encipher the plaintext using the generated homophonic substitution cipher key.
 
-        :return: The resulting ciphertext as a string of numbers separated by spaces.
-        :rtype: str
+        Returns:
+                str: The resulting ciphertext as a string of numbers separated by spaces.
         """
         ciphertext_numbers: list[str] = []
         for char in self.plaintext:
@@ -61,8 +62,8 @@ class Cipher:
         """Generate a difficulty level for the cipher based on the average occurences of each homophone.
                 Difficulty levels range from 4-10, with 4 being the most difficult.
 
-        :return: An integer representing the difficulty level of the cipher.
-        :rtype: int
+        Returns:
+                int: Difficulty level (4-10)
         """
 
         import random
@@ -72,8 +73,8 @@ class Cipher:
     def __json__(self) -> dict:
         """Return a JSON-serializable representation of the Cipher object.
 
-        :return: A dictionary containing the plaintext, difficulty, key, and ciphertext.
-        :rtype: dict
+        Returns:
+                dict: A dictionary containing the plaintext, difficulty, key, and ciphertext.
         """
         return {
             "plaintext": self.plaintext,
@@ -85,7 +86,7 @@ class Cipher:
     def __str__(self) -> str:
         """Return a string representation of the Cipher object.
 
-        :return: A string representation of the Cipher object.
-		:rtype: str
+        Returns:
+                str: A string containing the plaintext, difficulty, key, and ciphertext.
         """
         return f'Cipher(Plaintext: "{self.plaintext}"\nDifficulty: {self.difficulty}\nKey: {self.key}\nCiphertext: "{self.ciphertext}")'
