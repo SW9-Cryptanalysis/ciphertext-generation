@@ -1,7 +1,8 @@
-def generate_cipher(length: int | None):
+def generate_cipher(length: int | None, filename: str) -> None:
 	"""Generate a cipher from a random book slice and save it to a JSON file.
 	Args:
 		length (int | None): The length of the text slice to fetch. If None, a random length between 500 and 5000 will be used.
+		filename (str): The name of the file to save the cipher.
 	"""
 	from text_fetching.fetcher import Fetcher
 	from encipherment.cipher import Cipher
@@ -20,10 +21,10 @@ def generate_cipher(length: int | None):
 	cipher = Cipher(formatted_text)
 
 	# Save to json file in ciphers folder
-	with open("ciphers/cipher-1.json", "w") as f:
+	with open(filename, "w") as f:
 		json.dump(cipher.__json__(), f, indent=2)
 
 
 if __name__ == "__main__": # pragma: no cover
 	import sys 
-	generate_cipher(int(sys.argv[1]) if len(sys.argv) > 1 else None)
+	generate_cipher(int(sys.argv[1]) if len(sys.argv) > 1 else None, "ciphers/cipher-1.json")

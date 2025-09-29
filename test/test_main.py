@@ -19,14 +19,18 @@ def test_generate_cipher(mocker, book_text):
 	# Test with a specific length
 	mocker = mocker.patch('text_fetching.fetcher.Fetcher.fetch_random_book_text', return_value="".join(book_text))
  
-	generate_cipher(1000)
-	with open("ciphers/cipher-1.json", "r") as f:
+	generate_cipher(1000, "test_cipher.json")
+	with open("test_cipher.json", "r") as f:
 		data = f.read()
 		assert len(data) > 0  # Ensure the file is not empty
 
 	# Test with default length (random between 500 and 5000)
-	generate_cipher(None)
-	with open("ciphers/cipher-1.json", "r") as f:
+	generate_cipher(None, "test_cipher.json")
+	with open("test_cipher.json", "r") as f:
 		data = f.read()
 		assert len(data) > 0  # Ensure the file is not empty
   
+	# Clean up
+	import os
+	if os.path.exists("test_cipher.json"):
+		os.remove("test_cipher.json")
