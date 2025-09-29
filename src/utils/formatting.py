@@ -10,6 +10,14 @@ def numbers_to_words(text: str) -> str:
 	from num2words import num2words
 	import re
 	def replace_number(match):
+		"""Replace a number in the text with its word representation.
+
+		Args:
+			match (re.Match): The regex match object containing the number.
+
+		Returns:
+			str: The word representation of the number.
+		"""
 		number_str = match.group()
 		number_float = float(number_str)
 		return num2words(number_float)
