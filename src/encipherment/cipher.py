@@ -1,9 +1,10 @@
 from .homophones import extract_homophones
+from .frequency import frequencies
 import random
 
 
 class Cipher:
-    def __init__(self, plaintext: str) -> None:
+    def __init__(self, plaintext: str, difficulty: int | None = None) -> None:
         """Initialize the Cipher object with the given plaintext.
 
         Args:
@@ -17,7 +18,10 @@ class Cipher:
                 "Plaintext must contain only lowercase letters with no punctuation or spaces."
             )
         self.plaintext = plaintext
-        self.difficulty = self.generate_difficulty()
+        if not difficulty:
+            self.difficulty = self.generate_difficulty()
+        else: 
+            self.difficulty = difficulty
         self.key = self.generate_key()
         self.ciphertext = self.encipher()
 
@@ -35,10 +39,12 @@ class Cipher:
                 dict: A dictionary mapping each letter to a list of its homophones.
         """
         cipher_symbols: int = round(len(self.plaintext) / self.difficulty)
+        
+        letter_frequencies = frequencies(self.plaintext)
 
-        homophones_dict: dict[str, int] = extract_homophones(cipher_symbols)
+        homophones_dict: dict[str, int] = extract_homophones(cipher_symbols, letter_frequencies)
 
-        homophone_numbers: list[int] = list(range(1, cipher_symbols + 1))
+        homophone_numbers: list[int] = list(range(1, sum(homophones_dict.values()) + 1))
         random.shuffle(homophone_numbers)
         key: dict[str, list[int]] = {}
         for letter, count in homophones_dict.items():
