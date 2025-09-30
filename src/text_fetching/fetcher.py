@@ -43,7 +43,7 @@ class Fetcher:
 			"1080", # A Modest Proposal   
 			"174", # The Picture of Dorian Gray
 			"98",  # A Tale of Two Cities
-			"23",  # The Scarlet Letter
+			"25344",  # The Scarlet Letter
 			"7370", # Second Treatise of Government
 			"2148", # The Works of Edgar Allan Poe - Volume 2
 			"76", # The Adventures of Huckleberry Finn
@@ -100,6 +100,14 @@ class Fetcher:
 			"5740", # Tractatus Logico-Philosophicus
 			"4351", # The English Constitution
 			"236", # The Jungle Book
+			"56517", # The Philosophy of Auguste Comte
+			"52621", # Society in America, Vol. 1
+			"1228", # On the Origin of Species by Means of Natural Selection
+			"18269", # Pascal's Penseés
+			"2814", # Dubliners
+			"10554", # Right Ho, Jeeves
+			"10007", # Carmilla
+			"33944", # How to Observe: Morals and Manners
 		]
 
 		random_id = random.choice(book_ids)
