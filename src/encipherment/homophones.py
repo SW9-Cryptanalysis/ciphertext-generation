@@ -8,7 +8,7 @@ def extract_homophones(cipher_symbols):
 		cipher_symbols (int): The total number of cipher symbols to distribute among letters. Must be at least 26.
 
 	Returns:
-		dict[str, int]: A dictionary mapping each letter to its number of homophones.
+		(dict[str, int]): A dictionary mapping each letter to its number of homophones.
 	"""
 	
 	if cipher_symbols < 26:
@@ -31,8 +31,8 @@ def adjust_homophones(cipher_symbols, homophones_dict) -> dict[str, int]:
 		cipher_symbols (int): The desired total number of cipher symbols.
 		homophones_dict (dict[str, int]): The initial dictionary of homophone counts.
 	Returns:
-		dict[str, int]: The adjusted dictionary of homophone counts.
- 	"""
+		(dict[str, int]): The adjusted dictionary of homophone counts.
+	"""
 	import random
 	if cipher_symbols < 26:
 		raise ValueError("cipher_symbols must be at least 26 to cover all letters.")
