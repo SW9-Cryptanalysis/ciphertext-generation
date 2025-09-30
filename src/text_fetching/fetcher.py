@@ -19,22 +19,87 @@ class Fetcher:
 		book_ids = [
 			"84",  # Frankenstein
 			"2701",  # Moby Dick
-			"1513",  # Romeo and Juliet
 			"1342",  # Pride and Prejudice
 			"11",  # Alice's Adventures in Wonderland
-			"1232",  # The Prince
-			"98",  # A Tale of Two Cities
-			"74",  # The Adventures of Tom Sawyer
-			"1400",  # Great Expectations
-			"16328",  # Beowulf
-			"55",  # The Wonderful Wizard of Oz
+			"2641", # A Room with a View
+			"145", # Middlemarch
+			"37106",  # Little Women; Or, Meg, Jo, Beth, and Amy
+			"7241",  # Fables of La Fontaine
+			"67979", # The Blue Castle
+			"43", # The Strange Case of Dr. Jekyll and Mr. Hyde
+			"1260", # Jane Eyre
+			"16389", # The Enchanted April
+			"394", # Cranford
+			"6761", # The Adventures of Ferdinand Count Fathom
 			"345",  # Dracula
-			"46",  # The Jungle Book
+			"1259", # Twenty Years After
+			"2160", # The Expedition of Humphry Clinker
+			"4085", # The Adventures of Roderick Random
+			"5197", # My Life - Volume 1
+			"6593", # History of Tom Jones, a Foundling
+			"1232",  # The Prince
+			"3207", # Leviathan
+			"2554", # Crime and Punishment
+			"1080", # A Modest Proposal   
+			"174", # The Picture of Dorian Gray
+			"98",  # A Tale of Two Cities
 			"23",  # The Scarlet Letter
-			"135",  # The Count of Monte Cristo
-			"174",  # The Picture of Dorian Gray
-			"1080",  # A Modest Proposal
+			"7370", # Second Treatise of Government
+			"2148", # The Works of Edgar Allan Poe - Volume 2
+			"76", # The Adventures of Huckleberry Finn
+			"1952", # The Yellow Wallpaper
+			"2591", # Grimm's Fairy Tales
+			"2600", # War and Peace
+			"41", # The Legend of Sleepy Hollow
+			"844", # The Importance of Being Earnest: A Trivial Comedy for Serious People
+			"46", # A Christmas Carol in Prose; Being a Ghost Story of Christmas
+			"1661", # The Adventures of Sherlock Holmes
+			"3296", # The Confessions of St. Augustine
+			"408", # The Souls of Black Folk
+			"5200", # Metamorphosis
+			"26184", # Simple Sabotage Field Manual
+			"205", # Walden, and On The Duty Of Civil Disobedience
+			"1497", # The Republic
+			"64317", # The Great Gatsby
+			"1998", # Thus Spake Zarathustra
+			"23", # Narrative of the Life of Frederick Douglass, an American Slave
 			"768",  # Wuthering Heights
+			"28054", # The Brothers Karamazov
+			"2542", # A Doll's House
+			"45", # Anne of Green Gables
+			"34901", # On Liberty
+			"219", # Heart of Darkness
+			"20203", # Autobiography of Benjamin Franklin
+			"76939", # The laws of contrast of color
+			"1184", # The Count of Monte Cristo
+			"15399", # The Interesting Narrative of the Life of Olaudah Equiano, Or Gustavus Vassa, The African
+			"1400", # Great Expectations
+			"74",  # The Adventures of Tom Sawyer
+			"36034", # White Nights and Other Stories
+			"8438", # The Ethics of Aristotle
+			"815", # Democracy in America
+			"76938", # Stubborn People
+			"4300", # Ulysses
+			"26659", # The Will to Believe, and Other Essays in Popular Philosophy
+			"1023", # Bleak House
+			"4363", # Beyond Good and Evil
+			"2852", # The Hound of the Baskervilles
+			"34450", # The Nature of Animal Light
+			"36", # War of the Worlds
+			"55",  # The Wonderful Wizard of Oz
+			"3300", # An Inquiry into the Nature and Causes of the Wealth of Nations
+			"135", # les Misérables
+			"2680", # Meditations
+			"829", # Gulliver's Travels into Several Remote Nations of the World
+			"120", # Treasure Island
+			"12", # Through the Looking-Glass
+			"16", # Peter Pan
+			"60976", # Rip Van Winkle
+			"140", # The Jungle
+			"1399", # Anna Karenina
+			"5740", # Tractatus Logico-Philosophicus
+			"4351", # The English Constitution
+			"236", # The Jungle Book
 		]
 
 		random_id = random.choice(book_ids)
