@@ -30,7 +30,6 @@ def generate_cipher(length: int | None, difficulty: int | None, filename: str) -
 
 
 if __name__ == "__main__": # pragma: no cover
-	import sys
 	import random
 	for i in range(0,1000):
 		length = random.randint(4000, 10000)
