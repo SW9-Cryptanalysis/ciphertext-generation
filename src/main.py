@@ -9,6 +9,7 @@ def generate_cipher(length: int | None, filename: str) -> None:
 	import json
 	# import timing library to measure execution time
 	import time
+	from utils.files import save_cipher
  
 	fetcher = Fetcher()
 	start_time = time.time()
@@ -20,11 +21,9 @@ def generate_cipher(length: int | None, filename: str) -> None:
 
 	cipher = Cipher(formatted_text)
 
-	# Save to json file in ciphers folder
-	with open(filename, "w") as f:
-		json.dump(cipher.__json__(), f, indent=2)
+	save_cipher(cipher_data=cipher, filename=filename)
 
 
 if __name__ == "__main__": # pragma: no cover
 	import sys 
-	generate_cipher(int(sys.argv[1]) if len(sys.argv) > 1 else None, "ciphers/cipher-1.json")
+	generate_cipher(int(sys.argv[1]) if len(sys.argv) > 1 else None, "cipher-1.json")
