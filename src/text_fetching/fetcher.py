@@ -78,7 +78,6 @@ class Fetcher:
 			"36034", # White Nights and Other Stories
 			"8438", # The Ethics of Aristotle
 			"815", # Democracy in America
-			"76938", # Stubborn People
 			"4300", # Ulysses
 			"26659", # The Will to Believe, and Other Essays in Popular Philosophy
 			"1023", # Bleak House
@@ -97,7 +96,6 @@ class Fetcher:
 			"60976", # Rip Van Winkle
 			"140", # The Jungle
 			"1399", # Anna Karenina
-			"5740", # Tractatus Logico-Philosophicus
 			"4351", # The English Constitution
 			"236", # The Jungle Book
 			"56517", # The Philosophy of Auguste Comte
