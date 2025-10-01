@@ -50,7 +50,6 @@ def test_get_cached_book_not_found():
   
 def test_save_cipher(tmp_path, sample_cipher):
 	from utils.files import save_cipher
-	from encipherment.cipher import Cipher
 	filename = "test_cipher.json"
 	save_cipher(sample_cipher, filename)
 	saved_file = tmp_path / "ciphers" / filename
