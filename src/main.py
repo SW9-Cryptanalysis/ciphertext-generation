@@ -24,7 +24,9 @@ def generate_cipher(length: int | None, difficulty: int | None, filename: str) -
 
 	# Save to json file in ciphers folder
 	# Create directory if it doesn't exist
-	os.makedirs(os.path.dirname(filename), exist_ok=True)
+	dirname = os.path.dirname(filename)
+	if dirname:  # Only create directory if it's not empty
+		os.makedirs(dirname, exist_ok=True)
 	with open(filename, "w") as f:
 		json.dump(cipher.__json__(), f, indent=2)
 
