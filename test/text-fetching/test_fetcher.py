@@ -137,6 +137,7 @@ def test_fetch_book_cached(mocker):
 	assert mock_get.call_count == 0  # Ensure no HTTP requests were made
 
 def test_fetch_book_no_format(mocker):
+    mocker.patch("text_fetching.fetcher.book_is_cached", return_value=False)
     fetcher = Fetcher()
     # Mock the metadata response without suitable text formats
     mock_metadata_resp = mocker.Mock()
