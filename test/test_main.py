@@ -25,7 +25,7 @@ def test_generate_cipher(mocker, book_text):
 		assert len(data) > 0  # Ensure the file is not empty
 
 	# Test with default length (random between 500 and 5000)
-	generate_cipher(None, "test_cipher.json")
+	generate_cipher(None, None, "test_cipher.json")
 	with open("test_cipher.json", "r") as f:
 		data = f.read()
 		assert len(data) > 0  # Ensure the file is not empty
