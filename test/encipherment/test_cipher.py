@@ -41,6 +41,11 @@ def test_illegal_plaintext(sample_texts_illegal):
             "Plaintext must contain only lowercase letters with no punctuation or spaces."
             in str(excinfo.value)
         )
+        
+def test_defined_difficulty(sample_text_legal):
+	for difficulty in range(4, 11):
+		cipher = Cipher(sample_text_legal, difficulty=difficulty)
+		assert cipher.difficulty == difficulty
 
 
 def test_key_homophones_count(sample_text_legal):
