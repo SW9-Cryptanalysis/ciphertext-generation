@@ -1,6 +1,7 @@
-from .homophones import extract_homophones
+from .homophones import extract_homophones, get_homophones
 from .frequency import frequencies
 import random
+from collections import Counter
 
 
 class Cipher:
@@ -58,10 +59,18 @@ class Cipher:
         Returns:
                 str: The resulting ciphertext as a string of numbers separated by spaces.
         """
+        counts = Counter(ch for ch in self.plaintext if ch in self.key)
+
+        homophones: dict[str, list[int]] = {}
+        ptr: dict[str, int] = {}
+        for letter, count in counts.items():
+            homophones[letter] = get_homophones(self.key[letter], count)
+            ptr[letter] = 0
+
         ciphertext_numbers: list[str] = []
         for char in self.plaintext:
-            homophones = self.key[char]
-            ciphertext_numbers.append(str(random.choice(homophones)))
+            ciphertext_numbers.append(str(homophones[char][ptr[char]]))
+            ptr[char] += 1
         return " ".join(ciphertext_numbers)
 
     def generate_difficulty(self) -> int:
