@@ -1,3 +1,4 @@
+from tqdm import tqdm
 def generate_cipher(length: int | None, filename: str) -> None:
 	"""Generate a cipher from a random book slice and save it to a JSON file.
 	Args:
@@ -10,10 +11,7 @@ def generate_cipher(length: int | None, filename: str) -> None:
 	from utils.files import save_cipher
  
 	fetcher = Fetcher()
-	start_time = time.time()
 	book_text = fetcher.fetch_random_book_text()
-	book_fetch_time = time.time() - start_time
-	print(f"Fetched book text in {book_fetch_time:.2f} seconds.")
 	sliced_text = fetcher.get_random_book_slice(book_text, min_len=length if length else 500, max_len=length if length else 5000)
 	formatted_text = fetcher.format_text(sliced_text)
 
@@ -23,5 +21,5 @@ def generate_cipher(length: int | None, filename: str) -> None:
 
 
 if __name__ == "__main__": # pragma: no cover
-	for i in range(0, 10000):
+	for i in tqdm(range(10000)):
 		generate_cipher(5000, f"cipher-{i}.json")
