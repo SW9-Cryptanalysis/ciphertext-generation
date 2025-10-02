@@ -31,6 +31,14 @@ def test_legal_plaintext(sample_text_legal):
     assert all(isinstance(v, list) for v in cipher.key.values())
     assert isinstance(cipher.ciphertext, str)
     assert all(num.isdigit() for num in cipher.ciphertext.split())
+    
+def test_all_homophones_used(sample_text_legal):
+	cipher = Cipher(sample_text_legal)
+	used_homophones = set(int(num) for num in cipher.ciphertext.split())
+	all_homophones = set()
+	for homophones in cipher.key.values():
+		all_homophones.update(homophones)
+	assert used_homophones == all_homophones, f"Used homophones {used_homophones} do not match all homophones {all_homophones}"
 
 
 def test_illegal_plaintext(sample_texts_illegal):
