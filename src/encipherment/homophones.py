@@ -1,4 +1,5 @@
 from decimal import Decimal
+import random
 
 
 def extract_homophones(cipher_symbols, frequencies):
@@ -23,3 +24,24 @@ def extract_homophones(cipher_symbols, frequencies):
 	)
 
 	return homophones_dict
+
+def get_homophones(homophones: list[int], letter_occurrences: int) -> list[int]:
+	"""Get a list of homophones for a letter generated from the list of available homophones.
+	It ensures that all homophones are used at least once if letter_occurrences is greater than the number of available homophones.
+	Args:
+		homophones (list[int]): A list of available homophones.
+		letter_occurrences (int): The number of homophones to select for the letter.
+
+	Returns:
+		list[int]: A list of selected homophones.
+	"""
+	if letter_occurrences < len(homophones):
+		return random.sample(homophones, letter_occurrences) # Impossible to use all homophones, so just sample
+
+	selected_homophones = homophones.copy()
+ 
+	for _ in range(letter_occurrences - len(homophones)):
+		selected_homophones.append(random.choice(homophones))
+
+	random.shuffle(selected_homophones)
+	return selected_homophones
