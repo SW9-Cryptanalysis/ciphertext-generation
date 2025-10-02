@@ -7,7 +7,6 @@ def generate_cipher(length: int | None, filename: str) -> None:
 	"""
 	from text_fetching.fetcher import Fetcher
 	from encipherment.cipher import Cipher
-	import time
 	from utils.files import save_cipher
  
 	fetcher = Fetcher()
