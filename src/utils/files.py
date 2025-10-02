@@ -13,7 +13,7 @@ def save_book(book_id: str, book_text: str) -> None:
 	import os
 	if not os.path.exists("books"):
 		os.makedirs("books")
-	with open(f"books/{book_id}.txt", "w") as f:
+	with open(f"books/{book_id}.txt", "w", encoding="utf-8") as f:
 		f.write(book_text)
 
 def book_is_cached(book_id: str) -> bool:
@@ -41,7 +41,7 @@ def get_cached_book(book_id: str) -> str:
 	import os
 	if not os.path.exists(f"books/{book_id}.txt"):
 		raise FileNotFoundError(f"Book with ID {book_id} is not cached.")
-	with open(f"books/{book_id}.txt", "r") as f:
+	with open(f"books/{book_id}.txt", "r", encoding="utf-8") as f:
 		return f.read()
    
    
@@ -56,5 +56,5 @@ def save_cipher(cipher_data: Cipher, filename: str) -> None:
 	import os
 	if not os.path.exists("ciphers"):
 		os.makedirs("ciphers")
-	with open(f"ciphers/{filename}", "w") as f:
+	with open(f"ciphers/{filename}", "w", encoding="utf-8") as f:
 		json.dump(cipher_data.__json__(), f, indent=2)
