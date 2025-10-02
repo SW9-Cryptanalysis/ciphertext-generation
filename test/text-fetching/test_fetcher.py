@@ -93,8 +93,6 @@ def test_fetch_book_success(mocker):
         "formats": {"text/plain; charset=utf-8": "http://example.com/book.txt"}
     }
 
-    mocker.patch("text_fetching.fetcher.save_book")  # Mock save_book to avoid file I/O
-
     # Mock cached book check to return False
     mocker.patch(
 		"text_fetching.fetcher.book_is_cached", return_value=False

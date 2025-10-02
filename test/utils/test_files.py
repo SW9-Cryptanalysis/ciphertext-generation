@@ -1,4 +1,5 @@
 import pytest
+from utils.files import save_book, book_is_cached, get_cached_book, save_cipher
 
 @pytest.fixture
 def sample_cipher():
@@ -11,7 +12,6 @@ def run_around_tests(tmp_path, monkeypatch):
 	yield # Cleanup: Nothing needed as tmp_path is automatically cleaned up
 
 def test_save_book(tmp_path):
-	from utils.files import save_book
 	book_id = "test_book"
 	book_text = "This is a test book."
 	save_book(book_id, book_text)
@@ -20,14 +20,12 @@ def test_save_book(tmp_path):
 	assert saved_file.read_text() == book_text
  
 def test_save_book_empty_text():
-	from utils.files import save_book
 	book_id = "empty_book"
 	book_text = ""
 	with pytest.raises(ValueError):
 		save_book(book_id, book_text)
   
 def test_book_is_cached(tmp_path):
-	from utils.files import save_book, book_is_cached
 	book_id = "cached_book"
 	book_text = "This book is cached."
 	assert not book_is_cached(book_id)
@@ -35,7 +33,6 @@ def test_book_is_cached(tmp_path):
 	assert book_is_cached(book_id)
  
 def test_get_cached_book(tmp_path):
-	from utils.files import save_book, get_cached_book
 	book_id = "cached_book"
 	book_text = "This book is cached."
 	save_book(book_id, book_text)
@@ -43,13 +40,11 @@ def test_get_cached_book(tmp_path):
 	assert retrieved_text == book_text
  
 def test_get_cached_book_not_found():
-	from utils.files import get_cached_book
 	book_id = "nonexistent_book"
 	with pytest.raises(FileNotFoundError):
 		get_cached_book(book_id)
   
 def test_save_cipher(tmp_path, sample_cipher):
-	from utils.files import save_cipher
 	filename = "test_cipher.json"
 	save_cipher(sample_cipher, filename)
 	saved_file = tmp_path / "ciphers" / filename
