@@ -23,5 +23,5 @@ def generate_cipher(length: int | None, filename: str) -> None:
 
 
 if __name__ == "__main__": # pragma: no cover
-	import sys 
-	generate_cipher(int(sys.argv[1]) if len(sys.argv) > 1 else None, "cipher-1.json")
+	for i in range(0, 10000):
+		generate_cipher(5000, f"cipher-{i}.json")
