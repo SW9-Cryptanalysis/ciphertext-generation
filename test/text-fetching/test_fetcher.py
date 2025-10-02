@@ -10,6 +10,9 @@ def sample_text_book():
 		Who said—“Two vast and trunkless legs of stone
 		Stand in the desert. . . ."""
 
+@pytest.fixture(autouse=True)
+def mock_save_book(mocker):
+	mocker.patch('text_fetching.fetcher.save_book')
 
 @pytest.fixture
 def long_text():
@@ -90,6 +93,11 @@ def test_fetch_book_success(mocker):
         "formats": {"text/plain; charset=utf-8": "http://example.com/book.txt"}
     }
 
+    # Mock cached book check to return False
+    mocker.patch(
+		"text_fetching.fetcher.book_is_cached", return_value=False
+    )
+
     # Second response: actual book text
     mock_text_resp = mocker.Mock()
     mock_text_resp.raise_for_status.return_value = None
@@ -105,8 +113,29 @@ def test_fetch_book_success(mocker):
     assert isinstance(book_text, str)
     assert mock_get.call_count == 2
 
+def test_fetch_book_cached(mocker):
+	fetcher = Fetcher()
+	# Mock cached book check to return True
+	# Mock get_cached_book to return specific text
+ 
+	mocker.patch(
+		"text_fetching.fetcher.book_is_cached", return_value=True)
+	mocker.patch(
+		"text_fetching.fetcher.get_cached_book", return_value="Cached book content."
+	)
+
+	# Mock requests.get to ensure it's not called
+	mock_get = mocker.patch(
+		"text_fetching.fetcher.requests.get"
+	)
+	book_text = fetcher.fetch_random_book_text()
+	assert book_text is not None
+	assert book_text == "Cached book content."
+	assert isinstance(book_text, str)
+	assert mock_get.call_count == 0  # Ensure no HTTP requests were made
 
 def test_fetch_book_no_format(mocker):
+    mocker.patch("text_fetching.fetcher.book_is_cached", return_value=False)
     fetcher = Fetcher()
     # Mock the metadata response without suitable text formats
     mock_metadata_resp = mocker.Mock()

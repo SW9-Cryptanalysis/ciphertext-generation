@@ -209,3 +209,7 @@ __marimo__/
 
 # Cipher 
 /ciphers
+
+# Books
+/books
+.DS_Store

@@ -2,6 +2,7 @@ import requests
 import random
 from unidecode import unidecode
 from utils.formatting import numbers_to_words
+from utils.files import save_book, book_is_cached, get_cached_book
 
 GUTENDEX_BASE_URL = "https://gutendex.com/books"
 
@@ -78,7 +79,6 @@ class Fetcher:
 			"36034", # White Nights and Other Stories
 			"8438", # The Ethics of Aristotle
 			"815", # Democracy in America
-			"76938", # Stubborn People
 			"4300", # Ulysses
 			"26659", # The Will to Believe, and Other Essays in Popular Philosophy
 			"1023", # Bleak House
@@ -97,7 +97,6 @@ class Fetcher:
 			"60976", # Rip Van Winkle
 			"140", # The Jungle
 			"1399", # Anna Karenina
-			"5740", # Tractatus Logico-Philosophicus
 			"4351", # The English Constitution
 			"236", # The Jungle Book
 			"56517", # The Philosophy of Auguste Comte
@@ -111,6 +110,9 @@ class Fetcher:
 		]
 
 		random_id = random.choice(book_ids)
+
+		if book_is_cached(random_id):
+			return get_cached_book(random_id)
 
 		try:
 			r = requests.get(f"{url}/{random_id}")
@@ -134,6 +136,8 @@ class Fetcher:
 			text_response = requests.get(text_url)
 			text_response.raise_for_status()
 			book_text = text_response.text
+   
+			save_book(random_id, book_text)
 
 			return book_text
 
