@@ -2,6 +2,7 @@ from .homophones import extract_homophones, get_homophones
 from .frequency import frequencies
 import random
 from collections import Counter
+import re
 
 
 class Cipher:
@@ -11,7 +12,6 @@ class Cipher:
         Args:
                 plaintext (str): The lowercase plaintext to be encrypted with no punctuation or spaces.
         """
-        import re
 
         pattern = re.compile(r"^[a-z]+$")
         if not pattern.match(plaintext):
@@ -80,8 +80,6 @@ class Cipher:
         Returns:
                 int: Difficulty level (4-10)
         """
-
-        import random
 
         return random.randint(4, 10)
 

@@ -1,3 +1,5 @@
+import re
+
 def numbers_to_words(text: str) -> str:
 	"""Convert all numbers in the input text to their word representations.
  
@@ -8,7 +10,6 @@ def numbers_to_words(text: str) -> str:
 		str: The text with numbers converted to words.
 	"""
 	from num2words import num2words
-	import re
 	def replace_number(match):
 		"""Replace a number in the text with its word representation.
 
