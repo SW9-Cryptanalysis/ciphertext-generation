@@ -11,11 +11,17 @@ def save_book(book_id: str, book_text: str) -> None:
 	"""
 	if not book_text:
 		raise ValueError("book_text must be a non-empty string")
-	
-	if not os.path.exists("books"):
-		os.makedirs("books")
-	with open(f"books/{book_id}.txt", "w", encoding="utf-8") as f:
-		f.write(book_text)
+
+	try:
+		os.makedirs("books", exist_ok=True)
+	except OSError as e:
+		raise RuntimeError(f"Error creating books directory: {e}") from e
+
+	try:
+		with open(f"books/{book_id}.txt", "w", encoding="utf-8") as f:
+			f.write(book_text)
+	except (OSError, PermissionError) as e:
+		raise RuntimeError(f"Error saving book {book_id}: {e}") from e
 
 def book_is_cached(book_id: str) -> bool:
 	"""Check if a book with the given ID exists in the local cache.
