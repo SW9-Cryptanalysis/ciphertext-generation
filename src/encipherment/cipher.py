@@ -6,6 +6,9 @@ import re
 
 
 class Cipher:
+    
+    PLAINTEXT_PATTERN = re.compile(r"^[a-z]+$")
+    
     def __init__(self, plaintext: str, difficulty: int | None = None) -> None:
         """Initialize the Cipher object with the given plaintext.
 
@@ -13,8 +16,7 @@ class Cipher:
                 plaintext (str): The lowercase plaintext to be encrypted with no punctuation or spaces.
         """
 
-        pattern = re.compile(r"^[a-z]+$")
-        if not pattern.match(plaintext):
+        if not self.PLAINTEXT_PATTERN.match(plaintext):
             raise ValueError(
                 "Plaintext must contain only lowercase letters with no punctuation or spaces."
             )
