@@ -157,14 +157,19 @@ class Fetcher:
 		Raises:
 			ValueError: If book_text is not a string or is shorter than min_len.
 		"""
-		if not book_text:
+		if not book_text or not isinstance(book_text, str):
 			raise ValueError(
-				"book_text must be a string"
+				"book_text must be a non-empty string"
 			)
-
-		if len(book_text) < min_len:
+   
+		if min_len < 1 or max_len < 1 or min_len > max_len:
 			raise ValueError(
-				"Length of book_text must be equal to or greater than min_len"
+				"min_len and max_len must be positive integers with min_len <= max_len"
+			)
+   
+		if len(book_text) < max_len:
+			raise ValueError(
+				"book_text is shorter than the specified max_len"
 			)
 		
 		book_text = self.format_text(book_text)
