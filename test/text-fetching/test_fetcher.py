@@ -1,4 +1,5 @@
 import pytest
+import requests
 
 from text_fetching.fetcher import Fetcher
 from utils.formatting import format_text
@@ -149,3 +150,71 @@ def test_fetch_book_request_exception(mocker):
         fetcher.fetch_random_book_text()
     assert "Error fetching book data: Network Error" in str(excinfo.value)
     assert mock_get.call_count == 1
+
+
+def test_fetch_book_invalid_id(mocker):
+    mocker.patch("text_fetching.fetcher.book_is_cached", return_value=False)
+    fetcher = Fetcher()
+    # Mock requests.get to raise a RequestException for invalid book ID
+    mock_get = mocker.patch(
+        "text_fetching.fetcher.requests.get",
+        side_effect=requests.RequestException("404 Client Error: Not Found for url"),
+    )
+    with pytest.raises(RuntimeError) as excinfo:
+        fetcher.fetch_random_book_text()
+    assert "Error fetching book data: 404 Client Error: Not Found for url" in str(
+        excinfo.value
+    )
+    assert mock_get.call_count == 1
+
+
+def test_fetch_book_empty_response(mocker):
+    fetcher = Fetcher()
+    # Mock the metadata response with empty formats
+    mock_metadata_resp = mocker.Mock()
+    mock_metadata_resp.raise_for_status.return_value = None
+    mock_metadata_resp.json.return_value = {"formats": {}}
+
+    mocker.patch("text_fetching.fetcher.book_is_cached", return_value=False)
+
+    mock_get = mocker.patch(
+        "text_fetching.fetcher.requests.get",
+        return_value=mock_metadata_resp,
+    )
+    with pytest.raises(RuntimeError) as excinfo:
+        fetcher.fetch_random_book_text()
+    assert "No suitable text format found" in str(excinfo.value)
+    assert mock_get.call_count == 1
+
+
+def test_book_slice_min_greater_than_max(long_text):
+    fetcher = Fetcher()
+    with pytest.raises(ValueError) as excinfo:
+        fetcher.get_random_book_slice(book_text=long_text, min_len=200, max_len=100)
+    assert (
+        "min_len and max_len must be positive integers with min_len <= max_len"
+        in str(excinfo.value)
+    )
+
+
+def test_book_slice_negative_lengths(long_text):
+    fetcher = Fetcher()
+    with pytest.raises(ValueError) as excinfo:
+        fetcher.get_random_book_slice(book_text=long_text, min_len=-50, max_len=100)
+    assert (
+        "min_len and max_len must be positive integers with min_len <= max_len"
+        in str(excinfo.value)
+    )
+    with pytest.raises(ValueError) as excinfo:
+        fetcher.get_random_book_slice(book_text=long_text, min_len=50, max_len=-100)
+    assert (
+        "min_len and max_len must be positive integers with min_len <= max_len"
+        in str(excinfo.value)
+    )
+
+
+def test_book_slice_length_smaller_than_max(long_text):
+    fetcher = Fetcher()
+    with pytest.raises(ValueError) as excinfo:
+        fetcher.get_random_book_slice(book_text=long_text, min_len=50, max_len=20000)
+    assert "book_text is shorter than the specified max_len" in str(excinfo.value)

@@ -2,107 +2,143 @@ from .homophones import extract_homophones, get_homophones
 from .frequency import frequencies
 import random
 from collections import Counter
+import re
 
 
 class Cipher:
-    def __init__(self, plaintext: str, difficulty: int | None = None) -> None:
-        """Initialize the Cipher object with the given plaintext.
+	PLAINTEXT_PATTERN = re.compile(r"^[a-z]+$")
 
-        Args:
-                plaintext (str): The lowercase plaintext to be encrypted with no punctuation or spaces.
-        """
-        import re
+	def __init__(self, plaintext: str, difficulty: int | None = None) -> None:
+		"""Initialize the Cipher object with the given plaintext.
 
-        pattern = re.compile(r"^[a-z]+$")
-        if not pattern.match(plaintext):
-            raise ValueError(
-                "Plaintext must contain only lowercase letters with no punctuation or spaces. Plaintext was: " + 
-                plaintext
-            )
-        self.plaintext = plaintext
-        if not difficulty:
-            self.difficulty = self.generate_difficulty()
-        else: 
-            self.difficulty = difficulty
-        self.key = self.generate_key()
-        self.ciphertext = self.encipher()
+		Args:
+						plaintext (str): The lowercase plaintext to be encrypted with no punctuation or spaces.
+		"""
+  
+		self.plaintext = self._validate_plaintext(plaintext)
+		if not difficulty and difficulty != 0:
+			self.difficulty = self.generate_difficulty()
+		else:
+			self.difficulty = self._validate_difficulty(difficulty)
+		self.key = self.generate_key()
+		self.ciphertext = self.encipher()
 
-    def generate_key(self) -> dict:
-        """Generate a homophonic substitution cipher key based on the given difficulty level.
+	def _validate_plaintext(self, plaintext: str) -> str:
+		"""Validate the plaintext to ensure it contains only lowercase letters with no punctuation or spaces.
 
-        Key is a dictionary mapping each letter to a list of its homophones.
-        Each letter is assigned a number of homophones proportional to its frequency in English text,
-        with some random noise added to create variability.
+		Args:
+				plaintext (str): The plaintext to validate.
 
-        Each homophone is represented by a unique, randomly sampled number from 1 to the total number
-        of cipher symbols.
+		Returns:
+				str: The validated plaintext.
 
-        Returns:
-                dict: A dictionary mapping each letter to a list of its homophones.
-        """
-        cipher_symbols: int = round(len(self.plaintext) / self.difficulty)
-        
-        letter_frequencies = frequencies(self.plaintext)
+		Raises:
+				ValueError: If the plaintext contains invalid characters.
+		"""
+		if not isinstance(plaintext, str):
+			raise ValueError("Plaintext must be a string.")
+		if not plaintext:
+			raise ValueError("Plaintext must be a non-empty string.")
+		if not self.PLAINTEXT_PATTERN.match(plaintext):
+			raise ValueError(
+				"Plaintext must contain only lowercase letters with no punctuation or spaces."
+			)
+		return plaintext
+	
+	def _validate_difficulty(self, difficulty: int) -> int:
+		"""Validate the difficulty level to ensure it is between 4 and 20.
 
-        homophones_dict: dict[str, int] = extract_homophones(cipher_symbols, letter_frequencies)
+		Args:
+				difficulty (int): The difficulty level to validate.
 
-        homophone_numbers: list[int] = list(range(1, sum(homophones_dict.values()) + 1))
-        random.shuffle(homophone_numbers)
-        key: dict[str, list[int]] = {}
-        for letter, count in homophones_dict.items():
-            key[letter] = homophone_numbers[:count]
-            homophone_numbers = homophone_numbers[count:]
-        return key
+		Returns:
+				int: The validated difficulty level.
 
-    def encipher(self) -> str:
-        """Encipher the plaintext using the generated homophonic substitution cipher key.
+		Raises:
+				ValueError: If the difficulty level is not between 4 and 10.
+		"""
+		if not isinstance(difficulty, int):
+			raise ValueError("Difficulty must be an integer.")
+		if difficulty < 4 or difficulty > 20:
+			raise ValueError("Difficulty must be between 4 and 20.")
+		return difficulty
 
-        Returns:
-                str: The resulting ciphertext as a string of numbers separated by spaces.
-        """
-        counts = Counter(ch for ch in self.plaintext if ch in self.key)
+	def generate_key(self) -> dict:
+		"""Generate a homophonic substitution cipher key based on the given difficulty level.
 
-        homophones: dict[str, list[int]] = {}
-        ptr: dict[str, int] = {}
-        for letter, count in counts.items():
-            homophones[letter] = get_homophones(self.key[letter], count)
-            ptr[letter] = 0
+		Key is a dictionary mapping each letter to a list of its homophones.
+		Each letter is assigned a number of homophones proportional to its frequency in English text,
+		with some random noise added to create variability.
 
-        ciphertext_numbers: list[str] = []
-        for char in self.plaintext:
-            ciphertext_numbers.append(str(homophones[char][ptr[char]]))
-            ptr[char] += 1
-        return " ".join(ciphertext_numbers)
+		Each homophone is represented by a unique, randomly sampled number from 1 to the total number
+		of cipher symbols.
 
-    def generate_difficulty(self) -> int:
-        """Generate a difficulty level for the cipher based on the average occurences of each homophone.
-                Difficulty levels range from 4-10, with 4 being the most difficult.
+		Returns:
+						dict: A dictionary mapping each letter to a list of its homophones.
+		"""
+		cipher_symbols: int = round(len(self.plaintext) / self.difficulty)
 
-        Returns:
-                int: Difficulty level (4-10)
-        """
+		letter_frequencies = frequencies(self.plaintext)
 
-        import random
+		homophones_dict: dict[str, int] = extract_homophones(
+			cipher_symbols, letter_frequencies
+		)
 
-        return random.randint(4, 10)
+		homophone_numbers: list[int] = list(range(1, sum(homophones_dict.values()) + 1))
+		random.shuffle(homophone_numbers)
+		key: dict[str, list[int]] = {}
+		for letter, count in homophones_dict.items():
+			key[letter] = homophone_numbers[:count]
+			homophone_numbers = homophone_numbers[count:]
+		return key
 
-    def __json__(self) -> dict:
-        """Return a JSON-serializable representation of the Cipher object.
+	def encipher(self) -> str:
+		"""Encipher the plaintext using the generated homophonic substitution cipher key.
 
-        Returns:
-                dict: A dictionary containing the plaintext, difficulty, key, and ciphertext.
-        """
-        return {
-            "plaintext": self.plaintext,
-            "difficulty": self.difficulty,
-            "key": self.key,
-            "ciphertext": self.ciphertext,
-        }
+		Returns:
+						str: The resulting ciphertext as a string of numbers separated by spaces.
+		"""
+		counts = Counter(ch for ch in self.plaintext if ch in self.key)
 
-    def __str__(self) -> str:
-        """Return a string representation of the Cipher object.
+		homophones: dict[str, list[int]] = {}
+		ptr: dict[str, int] = {}
+		for letter, count in counts.items():
+			homophones[letter] = get_homophones(self.key[letter], count)
+			ptr[letter] = 0
 
-        Returns:
-                str: A string containing the plaintext, difficulty, key, and ciphertext.
-        """
-        return f'Cipher(Plaintext: "{self.plaintext}"\nDifficulty: {self.difficulty}\nKey: {self.key}\nCiphertext: "{self.ciphertext}")'
+		ciphertext_numbers: list[str] = []
+		for char in self.plaintext:
+			ciphertext_numbers.append(str(homophones[char][ptr[char]]))
+			ptr[char] += 1
+		return " ".join(ciphertext_numbers)
+
+	def generate_difficulty(self) -> int:
+		"""Generate a difficulty level for the cipher based on the average occurences of each homophone.
+						Difficulty levels range from 4-10, with 4 being the most difficult.
+
+		Returns:
+						int: Difficulty level (4-10)
+		"""
+
+		return random.randint(4, 10)
+
+	def __json__(self) -> dict:
+		"""Return a JSON-serializable representation of the Cipher object.
+
+		Returns:
+						dict: A dictionary containing the plaintext, difficulty, key, and ciphertext.
+		"""
+		return {
+			"plaintext": self.plaintext,
+			"difficulty": self.difficulty,
+			"key": self.key,
+			"ciphertext": self.ciphertext,
+		}
+
+	def __str__(self) -> str:
+		"""Return a string representation of the Cipher object.
+
+		Returns:
+						str: A string containing the plaintext, difficulty, key, and ciphertext.
+		"""
+		return f'Cipher(Plaintext: "{self.plaintext}"\nDifficulty: {self.difficulty}\nKey: {self.key}\nCiphertext: "{self.ciphertext}")'
