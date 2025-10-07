@@ -16,7 +16,8 @@ class Cipher:
         pattern = re.compile(r"^[a-z]+$")
         if not pattern.match(plaintext):
             raise ValueError(
-                "Plaintext must contain only lowercase letters with no punctuation or spaces."
+                "Plaintext must contain only lowercase letters with no punctuation or spaces. Plaintext was: " + 
+                plaintext
             )
         self.plaintext = plaintext
         if not difficulty:
