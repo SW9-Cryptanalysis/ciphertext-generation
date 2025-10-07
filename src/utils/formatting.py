@@ -1,4 +1,5 @@
 from unidecode import unidecode
+import re
 
 
 def numbers_to_words(text: str) -> str:
@@ -41,4 +42,6 @@ def format_text(text: str) -> str:
     if not isinstance(text, str):
         raise ValueError("Argument must be a string")
     text = numbers_to_words(text)
-    return unidecode("".join([c.lower() for c in text if c.isalpha()]))
+    text = numbers_to_words(text)
+    text = unidecode(text.lower())
+    return "".join([c for c in text if c.isalpha()])
