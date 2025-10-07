@@ -1,23 +1,14 @@
 import requests
 import random
-from unidecode import unidecode
-from utils.formatting import numbers_to_words
+from utils.formatting import format_text
 from utils.files import save_book, book_is_cached, get_cached_book
 
 GUTENDEX_BASE_URL = "https://gutendex.com/books"
 
 
 class Fetcher:
-	def fetch_random_book_text(self) -> str:
-		"""Fetch metadata for a random book from Gutendex and return its text content.
 
-		Returns:
-			str: The full contents of a random book from Project Gutenberg.
-		"""
-
-		url = GUTENDEX_BASE_URL
-
-		book_ids = [
+	BOOK_IDS = [
 			"84",  # Frankenstein
 			"2701",  # Moby Dick
 			"1342",  # Pride and Prejudice
@@ -108,14 +99,25 @@ class Fetcher:
 			"10007", # Carmilla
 			"33944", # How to Observe: Morals and Manners
 		]
+	
+	def __init__(self):
+		self.book_id = random.choice(self.BOOK_IDS)
+		self.is_cached = book_is_cached(self.book_id)
 
-		random_id = random.choice(book_ids)
+	def fetch_random_book_text(self) -> str:
+		"""Fetch metadata for a random book from Gutendex and return its text content.
 
-		if book_is_cached(random_id):
-			return get_cached_book(random_id)
+		Returns:
+			str: The full contents of a random book from Project Gutenberg.
+		"""
+
+		url = GUTENDEX_BASE_URL
+  
+		if self.is_cached:
+			return get_cached_book(self.book_id)
 
 		try:
-			r = requests.get(f"{url}/{random_id}")
+			r = requests.get(f"{url}/{self.book_id}")
 			r.raise_for_status()
 			book_metadata = r.json()
 
@@ -131,26 +133,27 @@ class Fetcher:
 
 			if not text_url:
 				raise RuntimeError(
-					f"No suitable text format found for book ID {random_id}. Available formats: {list(formats.keys())}")
+					f"No suitable text format found for book ID {self.book_id}. Available formats: {list(formats.keys())}")
 
 			text_response = requests.get(text_url)
 			text_response.raise_for_status()
 			book_text = text_response.text
-   
-			save_book(random_id, book_text)
 
-			return book_text
+			formatted_text = format_text(book_text)
+			save_book(self.book_id, formatted_text)
+
+			return formatted_text
 
 		except requests.RequestException as e:
 			raise RuntimeError(f"Error fetching book data: {e}") from e
 
-	def get_random_book_slice(self, book_text: str, min_len: int = 100, max_len: int = 5000) -> str:
+	def get_random_book_slice(self, book_text: str, min_len: int, max_len: int) -> str:
 		"""Extract a random slice from the provided book text.
 
 		Args:
 			book_text (str): The entire contents of a book in string format.
-			min_len (int, optional): The minimum length of the text slice. Defaults to 100.
-			max_len (int, optional): The maximum length of the text slice. Defaults to 5000.
+			min_len (int): The minimum length of the text slice.
+			max_len (int): The maximum length of the text slice.
 
 		Returns:
 			str: A random slice of text of a random length or an error if the maximum length exceeds the length of the book.
@@ -171,28 +174,10 @@ class Fetcher:
 			raise ValueError(
 				"book_text is shorter than the specified max_len"
 			)
-		
-		book_text = self.format_text(book_text)
-
+  
 		# Get random slice
 		start_idx = random.randint(0, max(0, len(book_text) - min_len))
 		end_idx = min(len(book_text), start_idx + random.randint(min_len, max_len))
 		slice_text = book_text[start_idx:end_idx]
 
 		return slice_text
-
-	def format_text(self, text: str) -> str:
-		"""Format text by filtering to alphabetic characters and converting to lowercase.
-
-		Args:
-			text (str): A slice of text from a book
-
-		Returns:
-			str: The text slice converted to lowercase keeping only alphabetic characters.
-		"""
-		if not isinstance(text, str):
-			raise ValueError(
-				"Argument must be a string"
-			)
-		text = numbers_to_words(text)
-		return unidecode("".join([c.lower() for c in text if c.isalpha()]))
