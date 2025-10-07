@@ -16,7 +16,7 @@ class Cipher:
 		"""
   
 		self.plaintext = self._validate_plaintext(plaintext)
-		if not difficulty:
+		if not difficulty and difficulty != 0:
 			self.difficulty = self.generate_difficulty()
 		else:
 			self.difficulty = self._validate_difficulty(difficulty)
