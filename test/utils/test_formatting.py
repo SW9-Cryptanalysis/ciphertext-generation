@@ -51,3 +51,10 @@ def test_format_text_only_numbers():
         format_text("2024 100 3.14")
         == "twothousandandtwentyfouronehundredthreepointonefour"
     )
+
+
+def test_format_text_all_non_alpha():
+    assert (
+        format_text("1234!@#$%^&'*()’_+-=[]{}’|;:',.<>?/`~")
+        == "onethousandtwohundredandthirtyfour"
+    )
