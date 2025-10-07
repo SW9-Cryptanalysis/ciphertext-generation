@@ -1,4 +1,5 @@
 from tqdm import tqdm
+from utils.constants import MIN_PLAINTEXT_LENGTH, MAX_PLAINTEXT_LENGTH
 
 
 def generate_cipher(min_len: int, max_len, filename: str) -> None:
@@ -25,4 +26,4 @@ def generate_cipher(min_len: int, max_len, filename: str) -> None:
 
 if __name__ == "__main__":  # pragma: no cover
     for i in tqdm(range(10000)):
-        generate_cipher(4000, 6000, f"cipher-{i}.json")
+        generate_cipher(MIN_PLAINTEXT_LENGTH, MAX_PLAINTEXT_LENGTH, f"cipher-{i}.json")
