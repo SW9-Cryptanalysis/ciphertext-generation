@@ -43,3 +43,20 @@ def test_generate_cipher(mocker, book_text):
 
     if os.path.exists("ciphers/test_cipher.json"):
         os.remove("ciphers/test_cipher.json")
+
+def test_generate_cipher_fails_cipher(mocker, book_text):
+	# Test with a specific length
+	mocker = mocker.patch(
+		"text_fetching.fetcher.Fetcher.fetch_random_book_text",
+		return_value="".join(book_text),
+	)
+
+	with pytest.raises(ValueError) as excinfo:
+		generate_cipher(1000, 5000, "test_cipher.json")
+	assert "Plaintext must contain only lowercase letters" in str(excinfo.value)
+
+	# Clean up
+	import os
+
+	if os.path.exists("ciphers/test_cipher.json"):
+		os.remove("ciphers/test_cipher.json")

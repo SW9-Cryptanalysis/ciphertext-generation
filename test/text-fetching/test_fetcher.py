@@ -51,7 +51,7 @@ def test_slicing_no_text(no_text):
     fetcher = Fetcher()
     with pytest.raises(ValueError) as excinfo:
         fetcher.get_random_book_slice(no_text, min_len=100, max_len=200)
-    assert "book_text must be a string" in str(excinfo.value)
+    assert "book_text must be a non-empty string" in str(excinfo.value)
 
 
 def test_slicing_short_text(short_text):
@@ -62,7 +62,7 @@ def test_slicing_short_text(short_text):
         fetcher.get_random_book_slice(
             book_text=short_text, min_len=min_len, max_len=200
         )
-    assert "Length of book_text must be equal to or greater than min_len" in str(
+    assert "book_text is shorter than the specified max_le" in str(
         excinfo.value
     )
 
@@ -169,13 +169,13 @@ def test_fetch_book_invalid_id(mocker):
 
 
 def test_fetch_book_empty_response(mocker):
-    fetcher = Fetcher()
     # Mock the metadata response with empty formats
     mock_metadata_resp = mocker.Mock()
     mock_metadata_resp.raise_for_status.return_value = None
     mock_metadata_resp.json.return_value = {"formats": {}}
 
     mocker.patch("text_fetching.fetcher.book_is_cached", return_value=False)
+    fetcher = Fetcher()
 
     mock_get = mocker.patch(
         "text_fetching.fetcher.requests.get",
