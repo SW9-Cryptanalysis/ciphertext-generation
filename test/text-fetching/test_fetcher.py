@@ -96,7 +96,6 @@ def test_fetch_book_success(mocker):
 
 
 def test_fetch_book_cached(mocker):
-    fetcher = Fetcher()
     # Mock cached book check to return True
     # Mock get_cached_book to return specific text
 
@@ -104,6 +103,8 @@ def test_fetch_book_cached(mocker):
     mocker.patch(
         "text_fetching.fetcher.get_cached_book", return_value="Cached book content."
     )
+    
+    fetcher = Fetcher()
 
     # Mock requests.get to ensure it's not called
     mock_get = mocker.patch("text_fetching.fetcher.requests.get")
