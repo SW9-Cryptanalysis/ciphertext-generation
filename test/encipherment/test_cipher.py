@@ -1,6 +1,7 @@
 import pytest
 
 from encipherment.cipher import Cipher
+from utils.constants import MIN_DIFFICULTY, MAX_DIFFICULTY
 
 
 @pytest.fixture
@@ -26,7 +27,7 @@ def sample_texts_illegal():
 def test_legal_plaintext(sample_text_legal):
     cipher = Cipher(sample_text_legal)
     assert cipher.plaintext == sample_text_legal
-    assert 4 <= cipher.difficulty <= 10
+    assert MIN_DIFFICULTY <= cipher.difficulty <= MAX_DIFFICULTY
     assert isinstance(cipher.key, dict)
     assert all(isinstance(v, list) for v in cipher.key.values())
     assert isinstance(cipher.ciphertext, str)
