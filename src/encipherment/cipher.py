@@ -3,6 +3,7 @@ from .frequency import frequencies
 import random
 from collections import Counter
 import re
+from utils.constants import MIN_DIFFICULTY, MAX_DIFFICULTY
 
 
 class Cipher:
@@ -59,8 +60,8 @@ class Cipher:
 		"""
 		if not isinstance(difficulty, int):
 			raise ValueError("Difficulty must be an integer.")
-		if difficulty < 4 or difficulty > 20:
-			raise ValueError("Difficulty must be between 4 and 20.")
+		if difficulty < MIN_DIFFICULTY or difficulty > MAX_DIFFICULTY:
+			raise ValueError(f"Difficulty must be between {MIN_DIFFICULTY} and {MAX_DIFFICULTY}.")
 		return difficulty
 
 	def generate_key(self) -> dict:
@@ -120,7 +121,7 @@ class Cipher:
 						int: Difficulty level (4-10)
 		"""
 
-		return random.randint(4, 10)
+		return random.randint(MIN_DIFFICULTY, MAX_DIFFICULTY)
 
 	def __json__(self) -> dict:
 		"""Return a JSON-serializable representation of the Cipher object.
