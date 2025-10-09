@@ -3,12 +3,14 @@ import os
 import json
 import re
 
+
 def save_book(book_id: str, book_text: str) -> None:
 	"""Save the fetched book text to a local file for caching.
 
 	Args:
 		book_id (str): The ID of the book.
 		book_text (str): The entire contents of a book in string format.
+
 	"""
 	if not book_text:
 		raise ValueError("book_text must be a non-empty string")
@@ -24,6 +26,7 @@ def save_book(book_id: str, book_text: str) -> None:
 	except (OSError, PermissionError) as e:
 		raise RuntimeError(f"Error saving book {book_id}: {e}") from e
 
+
 def book_is_cached(book_id: str) -> bool:
 	"""Check if a book with the given ID exists in the local cache.
 
@@ -32,42 +35,49 @@ def book_is_cached(book_id: str) -> bool:
 
 	Returns:
 		bool: True if the book file exists, False otherwise.
+
 	"""
 	return os.path.exists(f"books/{book_id}.txt")
+
 
 def get_cached_book(book_id: str) -> str:
 	"""Retrieve the cached book text from a local file.
 
 	Args:
 		book_id (str): The ID of the book.
+
 	Returns:
 		str: The entire contents of the cached book in string format.
+
 	Raises:
 		FileNotFoundError: If the book file does not exist.
+
 	"""
 	if not os.path.exists(f"books/{book_id}.txt"):
 		raise FileNotFoundError(f"Book with ID {book_id} is not cached.")
-	with open(f"books/{book_id}.txt", "r", encoding="utf-8") as f:
+	with open(f"books/{book_id}.txt", encoding="utf-8") as f:
 		return f.read()
-   
-   
+
+
 def save_cipher(cipher_data: Cipher, filename: str) -> None:
 	"""Save the cipher data to a JSON file.
 
 	Args:
 		cipher_data (dict): The cipher data to save.
 		filename (str): The name of the file to save the cipher.
+
 	"""
 	if not os.path.exists("ciphers"):
 		os.makedirs("ciphers")
 	with open(f"ciphers/{filename}", "w", encoding="utf-8") as f:
 		cipher_json = cipher_data.__json__()
-		formatted_json = json.dumps(cipher_json, indent=2) # Standard formatting
+		formatted_json = json.dumps(cipher_json, indent=2)  # Standard formatting
 
-		pattern = r'\[\s*\n\s*(\d+(?:,\s*\n\s*\d+)*)\s*\n\s*\]' # Matches arrays with numbers spanning multiple lines
-  
+		# Matches arrays with numbers spanning multiple lines
+		pattern = r"\[\s*\n\s*(\d+(?:,\s*\n\s*\d+)*)\s*\n\s*\]"
+
 		def replace_multiline_numbers(match: re.Match) -> str:
-			return '[' + re.sub(r',\s*\n\s*', ', ', match.group(1)) + ']'
+			return "[" + re.sub(r",\s*\n\s*", ", ", match.group(1)) + "]"
 
 		formatted_json = re.sub(pattern, replace_multiline_numbers, formatted_json)
 
