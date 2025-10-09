@@ -65,7 +65,10 @@ def save_cipher(cipher_data: Cipher, filename: str) -> None:
 		formatted_json = json.dumps(cipher_json, indent=2) # Standard formatting
 
 		pattern = r'\[\s*\n\s*(\d+(?:,\s*\n\s*\d+)*)\s*\n\s*\]' # Matches arrays with numbers spanning multiple lines
-		replacement = lambda m: '[' + re.sub(r',\s*\n\s*', ', ', m.group(1)) + ']'
-		formatted_json = re.sub(pattern, replacement, formatted_json)
-		
+  
+		def replace_multiline_numbers(match: re.Match) -> str:
+			return '[' + re.sub(r',\s*\n\s*', ', ', match.group(1)) + ']'
+
+		formatted_json = re.sub(pattern, replace_multiline_numbers, formatted_json)
+
 		f.write(formatted_json)
