@@ -138,7 +138,6 @@ class Cipher:
 		for number in ciphertext_numbers:
 			if number not in encountered_symbols:
 				encountered_symbols[number] = len(encountered_symbols) + 1
-				print(f"Encountered new symbol: {number} assigned to {encountered_symbols[number]}")
 			recurrence_encoding.append(str(encountered_symbols[number]))
 
 		return " ".join(recurrence_encoding)
