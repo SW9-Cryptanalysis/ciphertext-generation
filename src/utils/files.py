@@ -1,6 +1,7 @@
 from encipherment.cipher import Cipher
 import os
 import json
+import re
 
 def save_book(book_id: str, book_text: str) -> None:
 	"""Save the fetched book text to a local file for caching.
@@ -60,4 +61,11 @@ def save_cipher(cipher_data: Cipher, filename: str) -> None:
 	if not os.path.exists("ciphers"):
 		os.makedirs("ciphers")
 	with open(f"ciphers/{filename}", "w", encoding="utf-8") as f:
-		json.dump(cipher_data.__json__(), f, indent=2)
+		cipher_json = cipher_data.__json__()
+		formatted_json = json.dumps(cipher_json, indent=2) # Standard formatting
+
+		pattern = r'\[\s*\n\s*(\d+(?:,\s*\n\s*\d+)*)\s*\n\s*\]' # Matches arrays with numbers spanning multiple lines
+		replacement = lambda m: '[' + re.sub(r',\s*\n\s*', ', ', m.group(1)) + ']'
+		formatted_json = re.sub(pattern, replacement, formatted_json)
+		
+		f.write(formatted_json)
