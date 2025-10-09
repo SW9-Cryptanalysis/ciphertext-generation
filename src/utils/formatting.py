@@ -32,4 +32,5 @@ def format_text(text: str) -> str:
 	text = numbers_to_words(text)
 	text = numbers_to_words(text)
 	text = unidecode(text.lower())
+	text = re.sub(r"[A-Z]", "", text)
 	return "".join([c for c in text if c.isalpha()])
