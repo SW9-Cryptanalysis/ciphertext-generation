@@ -74,7 +74,7 @@ class Cipher:
 		if not self.PLAINTEXT_PATTERN.match(plaintext):
 			raise ValueError(
 				"Plaintext must contain only lowercase letters with no punctuation"
-				"or spaces.",
+				" or spaces.",
 			)
 		return plaintext
 
