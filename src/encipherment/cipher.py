@@ -23,6 +23,7 @@ class Cipher:
 			self.difficulty = self._validate_difficulty(difficulty)
 		self.key = self.generate_key()
 		self.ciphertext = self.encipher()
+		self.recurrence_encoding = self._generate_recurrence_encoding()
 
 	def _validate_plaintext(self, plaintext: str) -> str:
 		"""Validate the plaintext to ensure it contains only lowercase letters with no punctuation or spaces.
@@ -123,6 +124,25 @@ class Cipher:
 
 		return random.randint(MIN_DIFFICULTY, MAX_DIFFICULTY)
 
+	def _generate_recurrence_encoding(self) -> str:
+		"""Generate a recurrence encoding for the ciphertext based on the homophones used.
+		Each homophone is represented by a unique symbol, and the encoder gives the next number
+		each time a new symbol is encountered.
+		Example: "83 45 12 123 45" -> "1 2 3 4 2"
+		"""
+
+		ciphertext_numbers = self.ciphertext.split()
+		recurrence_encoding = []
+		encountered_symbols = {}
+
+		for number in ciphertext_numbers:
+			if number not in encountered_symbols:
+				encountered_symbols[number] = len(encountered_symbols) + 1
+				print(f"Encountered new symbol: {number} assigned to {encountered_symbols[number]}")
+			recurrence_encoding.append(str(encountered_symbols[number]))
+
+		return " ".join(recurrence_encoding)
+
 	def __json__(self) -> dict:
 		"""Return a JSON-serializable representation of the Cipher object.
 
@@ -134,6 +154,7 @@ class Cipher:
 			"difficulty": self.difficulty,
 			"key": self.key,
 			"ciphertext": self.ciphertext,
+			"recurrence_encoding": self.recurrence_encoding
 		}
 
 	def __str__(self) -> str:
@@ -142,4 +163,4 @@ class Cipher:
 		Returns:
 						str: A string containing the plaintext, difficulty, key, and ciphertext.
 		"""
-		return f'Cipher(Plaintext: "{self.plaintext}"\nDifficulty: {self.difficulty}\nKey: {self.key}\nCiphertext: "{self.ciphertext}")'
+		return f'Cipher(Plaintext: "{self.plaintext}"\nDifficulty: {self.difficulty}\nKey: {self.key}\nCiphertext: "{self.ciphertext}"\nRecurrence Encoding: "{self.recurrence_encoding}")'

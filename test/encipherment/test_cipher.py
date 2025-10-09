@@ -96,7 +96,7 @@ def test_json_serialization(sample_text_legal):
     assert json_data["difficulty"] == cipher.difficulty
     assert json_data["key"] == cipher.key
     assert json_data["ciphertext"] == cipher.ciphertext
-
+    assert json_data["recurrence_encoding"] == cipher.recurrence_encoding
 
 def test_str_representation(sample_text_legal):
     cipher = Cipher(sample_text_legal)
@@ -106,6 +106,7 @@ def test_str_representation(sample_text_legal):
     assert f"Difficulty: {cipher.difficulty}" in str_repr
     assert f"Key: {cipher.key}" in str_repr
     assert f'Ciphertext: "{cipher.ciphertext}"' in str_repr
+    assert f'Recurrence Encoding: "{cipher.recurrence_encoding}"' in str_repr
 
 
 def test_invalid_difficulty(sample_text_legal):
@@ -149,3 +150,22 @@ def test_plaintext_with_non_english_letters():
             "Plaintext must contain only lowercase letters with no punctuation or spaces."
             in str(excinfo.value)
         )
+
+def test_recurrence_encoding(sample_text_legal):
+	cipher = Cipher(sample_text_legal)
+	encoding = cipher.recurrence_encoding
+	assert isinstance(encoding, str)
+	assert len(encoding.split()) == len(sample_text_legal)
+	
+	# Check that the encoding uses numbers starting from 1
+	encoding_numbers = list(map(int, encoding.split()))
+	assert all(num >= 1 for num in encoding_numbers)
+	assert set(encoding_numbers) == set(range(1, max(encoding_numbers) + 1))
+	# Check that the same symbol in ciphertext maps to the same number in encoding
+	ciphertext_numbers = cipher.ciphertext.split()
+	mapping = {}
+	for ct_num, enc_num in zip(ciphertext_numbers, encoding_numbers):
+		if ct_num not in mapping:
+			mapping[ct_num] = enc_num
+		else:
+			assert mapping[ct_num] == enc_num, "Inconsistent mapping in recurrence encoding"
