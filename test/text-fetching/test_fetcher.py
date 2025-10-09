@@ -62,7 +62,7 @@ def test_slicing_short_text(short_text):
         fetcher.get_random_book_slice(
             book_text=short_text, min_len=min_len, max_len=200
         )
-    assert "book_text is shorter than the specified max_le" in str(
+    assert "book_text is shorter than the specified max_len" in str(
         excinfo.value
     )
 
