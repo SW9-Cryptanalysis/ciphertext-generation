@@ -1,6 +1,7 @@
 from unidecode import unidecode
 import re
 from num2words import num2words
+from .validator import validate, strongly_typed
 
 
 def numbers_to_words(text: str) -> str:
@@ -22,6 +23,7 @@ def numbers_to_words(text: str) -> str:
 	return re.sub(r"\d+(\.\d+)?+", replace_number, text)
 
 
+@validate(text=strongly_typed)
 def format_text(text: str) -> str:
 	"""Format text by filtering to alphabetic characters and converting to lowercase.
 
@@ -33,8 +35,6 @@ def format_text(text: str) -> str:
 				keeping only alphabetic characters.
 
 	"""
-	if not isinstance(text, str):
-		raise ValueError("Argument must be a string")
 	text = numbers_to_words(text)
 	text = numbers_to_words(text)
 	text = unidecode(text.lower())
