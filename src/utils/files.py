@@ -2,8 +2,10 @@ from encipherment.cipher import Cipher
 import os
 import json
 import re
+from .validator import validate, non_blank_string, strongly_typed
 
 
+@validate(book_id=non_blank_string, book_text=non_blank_string)
 def save_book(book_id: str, book_text: str) -> None:
 	"""Save the fetched book text to a local file for caching.
 
@@ -12,9 +14,6 @@ def save_book(book_id: str, book_text: str) -> None:
 		book_text (str): The entire contents of a book in string format.
 
 	"""
-	if not book_text:
-		raise ValueError("book_text must be a non-empty string")
-
 	try:
 		os.makedirs("books", exist_ok=True)
 	except OSError as e:
