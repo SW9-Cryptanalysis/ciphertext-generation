@@ -2,6 +2,7 @@ import requests
 import random
 from utils.formatting import format_text
 from utils.files import save_book, book_is_cached, get_cached_book
+from utils.validator import validate, non_negative, non_blank_string
 
 GUTENDEX_BASE_URL = "https://gutendex.com/books"
 
@@ -171,6 +172,7 @@ class Fetcher:
 		except requests.RequestException as e:
 			raise RuntimeError(f"Error fetching book data: {e}") from e
 
+	@validate(book_text=non_blank_string, min_len=non_negative, max_len=non_negative)
 	def get_random_book_slice(self, book_text: str, min_len: int, max_len: int) -> str:
 		"""Extract a random slice from the provided book text.
 
@@ -187,10 +189,7 @@ class Fetcher:
 			ValueError: If book_text is not a string or is shorter than min_len.
 
 		"""
-		if not book_text or not isinstance(book_text, str):
-			raise ValueError("book_text must be a non-empty string")
-
-		if min_len < 1 or max_len < 1 or min_len > max_len:
+		if min_len > max_len:
 			raise ValueError(
 				"min_len and max_len must be positive integers with min_len <= max_len",
 			)
@@ -198,8 +197,7 @@ class Fetcher:
 		if len(book_text) < max_len:
 			raise ValueError("book_text is shorter than the specified max_len")
 
-		# Get random slice
-		start_idx = random.randint(0, max(0, len(book_text) - min_len))
+		start_idx = random.randint(0, max(0, len(book_text) - max_len))
 		end_idx = min(len(book_text), start_idx + random.randint(min_len, max_len))
 		slice_text = book_text[start_idx:end_idx]
 
