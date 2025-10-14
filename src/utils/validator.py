@@ -56,9 +56,12 @@ def non_negative(value: Any, /, *, name: str, **_kwargs: Any) -> None:
 def non_blank_string(value: Any, /, *, name: str, **_kwargs: Any) -> None:
 	"""Validate that value is a non-empty string."""
 	if not isinstance(value, str):
-		raise TypeError(f"Parameter '{name}' must be `str`, got `{value.__class__.__name__}`.")
+		raise TypeError(
+			f"Parameter '{name}' must be `str`, got `{value.__class__.__name__}`.",
+		)
 	if not value.strip():
 		raise ValueError(f"Parameter `{name}` cannot be blank nor empty.")
+
 
 # ## --- The Decorator Factory --- ##
 

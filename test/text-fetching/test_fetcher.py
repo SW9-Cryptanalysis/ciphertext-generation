@@ -56,7 +56,7 @@ def test_slicing_empty_text(empty_text):
 	with pytest.raises(ValueError) as excinfo:
 		fetcher.get_random_book_slice(empty_text, min_len=100, max_len=200)
 	assert "Parameter `book_text` cannot be blank nor empty" in str(excinfo.value)
- 
+
 def test_slicing_no_text(no_text):
 	fetcher = Fetcher()
 	with pytest.raises(TypeError) as excinfo:
