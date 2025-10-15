@@ -38,7 +38,7 @@ def strongly_typed(value: Any, /, *, name: str, type_hint: type | None) -> None:
 		)
 
 
-def non_negative(value: Any, /, *, name: str, **_kwargs: Any) -> None:
+def non_negative(value: Any, /, *, name: str, **_: Any) -> None:
 	"""Ensure a numerical argument is not negative."""
 	try:
 		if value < 0:
@@ -53,7 +53,7 @@ def non_negative(value: Any, /, *, name: str, **_kwargs: Any) -> None:
 		) from e
 
 
-def non_blank_string(value: Any, /, *, name: str, **_kwargs: Any) -> None:
+def non_blank_string(value: Any, /, *, name: str, **_: Any) -> None:
 	"""Validate that value is a non-empty string."""
 	if not isinstance(value, str):
 		raise TypeError(
