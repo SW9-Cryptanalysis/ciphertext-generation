@@ -67,11 +67,11 @@ class TestHomophonicCipher:
 		# Assert that the total number of homophones is reasonable
 		# At minimum, we need one homophone per unique letter in the text
 		unique_letters = len(set(sample_text_legal))
-		
+
 		assert total_homophones >= unique_letters, (
 			f"Total homophones {total_homophones} is less than unique letters {unique_letters}"
 		)
-		
+
 		# For high difficulties, expected homophones might be very low, so we allow more flexibility
 		expected_range = max(15, expected_homophones)  # Allow more range for high difficulties
 		assert abs(total_homophones - expected_homophones) <= expected_range, (
@@ -180,15 +180,15 @@ class TestMonoalphabeticCipher:
 
 	def test_key_structure(self, sample_text_short):
 		cipher = MonoalphabeticCipher(sample_text_short)
-		
+
 		# Test that all 26 letters have exactly one homophone
 		assert len(cipher.key) == 26
-		for letter in 'abcdefghijklmnopqrstuvwxyz':
+		for letter in "abcdefghijklmnopqrstuvwxyz":
 			assert letter in cipher.key
 			assert len(cipher.key[letter]) == 1
-		
+
 		# Test that numbers 1-26 are used exactly once
-		all_numbers = [cipher.key[letter][0] for letter in 'abcdefghijklmnopqrstuvwxyz']
+		all_numbers = [cipher.key[letter][0] for letter in "abcdefghijklmnopqrstuvwxyz"]
 		assert sorted(all_numbers) == list(range(1, 27))
 		assert len(set(all_numbers)) == 26  # All unique
 
@@ -196,11 +196,11 @@ class TestMonoalphabeticCipher:
 		"""Test that different instances generate different random mappings."""
 		cipher1 = MonoalphabeticCipher(sample_text_short)
 		cipher2 = MonoalphabeticCipher(sample_text_short)
-		
+
 		# Keys should be different (randomized)
-		key1_numbers = [cipher1.key[letter][0] for letter in 'abcde']
-		key2_numbers = [cipher2.key[letter][0] for letter in 'abcde']
-		
+		key1_numbers = [cipher1.key[letter][0] for letter in "abcde"]
+		key2_numbers = [cipher2.key[letter][0] for letter in "abcde"]
+
 		# It's extremely unlikely that the first 5 letters map to the same numbers
 		assert key1_numbers != key2_numbers, "Keys should be randomized"
 
@@ -208,9 +208,9 @@ class TestMonoalphabeticCipher:
 		"""Test that same letters consistently map to same numbers within one cipher."""
 		plaintext = "aabbccdd"
 		cipher = MonoalphabeticCipher(plaintext)
-		
+
 		ciphertext_numbers = [int(x) for x in cipher.ciphertext.split()]
-		
+
 		# Same letters should map to same numbers
 		assert ciphertext_numbers[0] == ciphertext_numbers[1]  # Both 'a's
 		assert ciphertext_numbers[2] == ciphertext_numbers[3]  # Both 'b's
@@ -272,7 +272,7 @@ class TestMonoalphabeticCipher:
 		# in which unique cipher symbols first appeared
 		encoding_numbers = list(map(int, encoding.split()))
 		assert all(num >= 1 for num in encoding_numbers)
-		
+
 		# Check consistency: same ciphertext number should map to same encoding number
 		ciphertext_numbers = cipher.ciphertext.split()
 		mapping = {}

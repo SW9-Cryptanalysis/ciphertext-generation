@@ -1,4 +1,4 @@
-from encipherment.cipher import Cipher
+from encipherment.cipher import SubstitutionCipher
 import os
 import json
 import re
@@ -59,7 +59,7 @@ def get_cached_book(book_id: str) -> str:
 		return f.read()
 
 
-def save_cipher(cipher_data: Cipher, filename: str) -> None:
+def save_cipher(cipher_data: SubstitutionCipher, filename: str) -> None:
 	"""Save the cipher data to a JSON file.
 
 	Args:
