@@ -4,10 +4,11 @@ import random
 from collections import Counter
 import re
 from utils.constants import MIN_DIFFICULTY, MAX_DIFFICULTY
+from abc import ABC, abstractmethod
 
 
-class Cipher:
-	"""A class representing a homophonic substitution cipher.
+class Cipher(ABC):
+	"""A base class for ciphers.
 
 	Attributes:
 		plaintext (str): The lowercase plaintext to be encrypted with no punctuation
@@ -35,24 +36,19 @@ class Cipher:
 
 	PLAINTEXT_PATTERN = re.compile(r"^[a-z]+$")
 
-	def __init__(self, plaintext: str, difficulty: int | None = None) -> None:
-		"""Initialize the Cipher object with the given plaintext.
-
-		Args:
-			plaintext (str): The lowercase plaintext to be encrypted with no
-				punctuation or spaces.
-			difficulty (int | None): The difficulty level of the cipher (4-20). If None,
-				a random difficulty will be generated.
-
-		"""
+	def __init__(
+		self,
+		plaintext: str,
+		*,
+		difficulty: int | None = None,
+		cipher_type: str = "homophonic",
+	) -> None:  # pragma: no cover
 		self.plaintext = self._validate_plaintext(plaintext)
-		if not difficulty and difficulty != 0:
-			self.difficulty = self.generate_difficulty()
-		else:
-			self.difficulty = self._validate_difficulty(difficulty)
-		self.key = self.generate_key()
-		self.ciphertext = self.encipher()
-		self.recurrence_encoding = self._generate_recurrence_encoding()
+		self.difficulty = difficulty
+		self.key = {}
+		self.ciphertext = ""
+		self.recurrence_encoding = ""
+		raise NotImplementedError("This is an abstract base class.")
 
 	def _validate_plaintext(self, plaintext: str) -> str:
 		"""Validate the plaintext to ensure it contains only lowercase letters.
@@ -79,7 +75,7 @@ class Cipher:
 		return plaintext
 
 	def _validate_difficulty(self, difficulty: int) -> int:
-		"""Validate the difficulty level to ensure it is between 4 and 20.
+		"""Validate the difficulty level to ensure it is between MIN_DIFFICULTY and MAX_DIFFICULTY.
 
 		Args:
 				difficulty (int): The difficulty level to validate.
@@ -88,7 +84,7 @@ class Cipher:
 				int: The validated difficulty level.
 
 		Raises:
-				ValueError: If the difficulty level is not between 4 and 10.
+				ValueError: If the difficulty level is not valid.
 
 		"""
 		if not isinstance(difficulty, int):
@@ -98,6 +94,112 @@ class Cipher:
 				f"Difficulty must be between {MIN_DIFFICULTY} and {MAX_DIFFICULTY}.",
 			)
 		return difficulty
+
+	def _generate_recurrence_encoding(self) -> str:
+		"""Generate recurrence encoding for the ciphertext based on the homophones used.
+
+		Each homophone is represented by a unique symbol, and the encoder gives the next
+		number each time a new symbol is encountered.
+
+		Example:
+			`83 45 12 123 45 -> 1 2 3 4 2`
+
+		"""
+		ciphertext_numbers = self.ciphertext.split()
+		recurrence_encoding = []
+		encountered_symbols = {}
+
+		for number in ciphertext_numbers:
+			if number not in encountered_symbols:
+				encountered_symbols[number] = len(encountered_symbols) + 1
+			recurrence_encoding.append(str(encountered_symbols[number]))
+
+		return " ".join(recurrence_encoding)
+
+	def __json__(self) -> dict:
+		"""Return a JSON-serializable representation of the Cipher object.
+
+		Returns:
+			dict: A dictionary containing the Cipher object's attributes.
+
+		"""
+		return {
+			"plaintext": self.plaintext,
+			"difficulty": self.difficulty,
+			"key": self.key,
+			"ciphertext": self.ciphertext,
+			"recurrence_encoding": self.recurrence_encoding,
+		}
+
+	def __str__(self) -> str:
+		"""Return a string representation of the Cipher object.
+
+		Returns:
+			str: A string representation of the Cipher object.
+
+		"""
+		class_name = self.__class__.__name__
+		return f'''{class_name}(Plaintext: "{self.plaintext}"
+			Difficulty: {self.difficulty}
+			Key: {self.key}
+			Ciphertext: "{self.ciphertext}"
+			Recurrence Encoding: "{self.recurrence_encoding}")
+			'''
+   
+	@abstractmethod
+	def generate_key(self) -> dict: # pragma: no cover
+		pass
+	@abstractmethod
+	def encipher(self) -> str: # pragma: no cover
+		pass
+
+
+class HomophonicCipher(Cipher):
+	"""A class representing a homophonic substitution cipher.
+
+	Attributes:
+		plaintext (str): The lowercase plaintext to be encrypted with no punctuation
+			or spaces.
+		difficulty (int): The difficulty level of the cipher (4-20).
+		key (dict): A dictionary mapping each letter to a list of its homophones.
+		ciphertext (str): The resulting ciphertext as a string of numbers separated
+			by spaces.
+		recurrence_encoding (str): A string representing the recurrence encoding of
+			the ciphertext.
+
+	Methods:
+		generate_key(): Generate a homophonic substitution cipher key based on a
+			difficulty level.
+		encipher(): Encipher the plaintext using the generated key.
+		generate_difficulty(): Generate a difficulty level for the cipher.
+		__json__(): Return a JSON-serializable representation of the Cipher object.
+		__str__(): Return a string representation of the Cipher object.
+		_validate_plaintext(): Validate the plaintext to ensure it contains only
+			lowercase letters with no punctuation or spaces.
+		_validate_difficulty(): Validate the difficulty level to ensure it is
+			between 4 and 20.
+
+	"""
+
+	def __init__(self, plaintext: str, *, difficulty: int | None = None) -> None:
+		"""Initialize the Cipher object with the given plaintext.
+
+		Args:
+			plaintext (str): The lowercase plaintext to be encrypted with no
+				punctuation or spaces.
+			difficulty (int | None): The difficulty level of the cipher (4-20). If None,
+				a random difficulty will be generated.
+			cipher_type (str): The type of cipher to generate ("homophonic" or "monoalphabetic").
+
+		"""
+		self.plaintext = self._validate_plaintext(plaintext)
+		if not difficulty and difficulty != 0:
+			self.difficulty = self.generate_difficulty()
+		else:
+			self.difficulty = self._validate_difficulty(difficulty)
+		self.key = self.generate_key()
+		self.ciphertext = self.encipher()
+		self.recurrence_encoding = self._generate_recurrence_encoding()
 
 	def generate_key(self) -> dict:
 		"""Generate a homophonic substitution cipher key based on a difficulty level.
@@ -163,52 +265,44 @@ class Cipher:
 		"""
 		return random.randint(MIN_DIFFICULTY, MAX_DIFFICULTY)
 
-	def _generate_recurrence_encoding(self) -> str:
-		"""Generate recurrence encoding for the ciphertext based on the homophones used.
 
-		Each homophone is represented by a unique symbol, and the encoder gives the next
-		number each time a new symbol is encountered.
+class MonoalphabeticCipher(Cipher):
+	def __init__(self, plaintext: str, *, _=None) -> None:
+		self.plaintext = self._validate_plaintext(plaintext)
+		self.key = self.generate_key()
+		self.difficulty = 1
+		self.ciphertext = self.encipher()
+		self.recurrence_encoding = self._generate_recurrence_encoding()
 
-		Example:
-			`83 45 12 123 45 -> 1 2 3 4 2`
+	def generate_key(self) -> dict[str, list[int]]:
+		"""Generate a random monoalphabetic substitution key.
 
-		"""
-		ciphertext_numbers = self.ciphertext.split()
-		recurrence_encoding = []
-		encountered_symbols = {}
-
-		for number in ciphertext_numbers:
-			if number not in encountered_symbols:
-				encountered_symbols[number] = len(encountered_symbols) + 1
-			recurrence_encoding.append(str(encountered_symbols[number]))
-
-		return " ".join(recurrence_encoding)
-
-	def __json__(self) -> dict:
-		"""Return a JSON-serializable representation of the Cipher object.
+		Each letter maps to exactly one unique random number.
 
 		Returns:
-			dict: A dictionary containing the Cipher object's attributes.
-
+			dict: A dictionary mapping each letter to a list containing one random number.
 		"""
-		return {
-			"plaintext": self.plaintext,
-			"difficulty": self.difficulty,
-			"key": self.key,
-			"ciphertext": self.ciphertext,
-			"recurrence_encoding": self.recurrence_encoding,
-		}
+		# Create a list of numbers 1-26 and shuffle them randomly
+		cipher_numbers = list(range(1, 27))
+		random.shuffle(cipher_numbers)
 
-	def __str__(self) -> str:
-		"""Return a string representation of the Cipher object.
+		key = {}
+		for i, letter in enumerate("abcdefghijklmnopqrstuvwxyz"):
+			key[letter] = [cipher_numbers[i]]
+
+		return key
+
+	def encipher(self) -> str:
+		"""Encipher the plaintext using the monoalphabetic substitution key.
 
 		Returns:
-			str: A string representation of the Cipher object.
-
+			str: The resulting ciphertext as a string of numbers separated by spaces.
 		"""
-		return f'''Cipher(Plaintext: "{self.plaintext}"
-			Difficulty: {self.difficulty}
-			Key: {self.key}
-			Ciphertext: "{self.ciphertext}"
-			Recurrence Encoding: "{self.recurrence_encoding}")
-			'''
+		ciphertext_numbers = []
+		for char in self.plaintext:
+			if char in self.key:
+				ciphertext_numbers.append(
+					str(self.key[char][0])
+				)  # Each letter has exactly one number
+
+		return " ".join(ciphertext_numbers)
