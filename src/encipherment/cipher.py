@@ -2,8 +2,7 @@ from .homophones import extract_homophones, get_homophones
 from .frequency import frequencies
 import random
 from collections import Counter
-import re
-from utils.constants import MIN_DIFFICULTY, MAX_DIFFICULTY
+from utils.constants import ALPHABET, MIN_DIFFICULTY, MAX_DIFFICULTY
 from abc import ABC, abstractmethod
 
 
@@ -34,8 +33,6 @@ class SubstitutionCipher(ABC):
 			between 4 and 20.
 
 	"""
-
-	PLAINTEXT_PATTERN = re.compile(r"^[a-z]+$")
 
 	@abstractmethod
 	def __init__(
@@ -70,7 +67,7 @@ class SubstitutionCipher(ABC):
 			raise ValueError("Plaintext must be a string.")
 		if not plaintext:
 			raise ValueError("Plaintext must be a non-empty string.")
-		if not self.PLAINTEXT_PATTERN.match(plaintext):
+		if not all(c in ALPHABET for c in plaintext):
 			raise ValueError(
 				"Plaintext must contain only lowercase letters with no punctuation"
 				" or spaces.",
@@ -345,6 +342,6 @@ class MonoalphabeticCipher(SubstitutionCipher):
 			if char in self.key:
 				ciphertext_numbers.append(
 					str(self.key[char][0]),
-				)  # Each letter has exactly one number
+				)
 
 		return " ".join(ciphertext_numbers)
