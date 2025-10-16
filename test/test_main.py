@@ -33,7 +33,7 @@ def test_generate_cipher(mocker, book_text):
 		return_value="".join(format_text(book_text)),
 	)
 
-	generate_cipher(1000, 5000, "test_cipher.json")
+	generate_cipher(1000, 5000, "test_cipher.json", difficulty=10)
 	with open("ciphers/test_cipher.json", encoding="utf-8") as f:
 		data = f.read()
 		assert len(data) > 0  # Ensure the file is not empty
@@ -53,7 +53,7 @@ def test_generate_cipher_fails_cipher(mocker, book_text):
 	)
 
 	with pytest.raises(ValueError) as excinfo:
-		generate_cipher(1000, 5000, "test_cipher.json")
+		generate_cipher(1000, 5000, "test_cipher.json", 10)
 	assert "Plaintext must contain only lowercase letters" in str(excinfo.value)
 
 	# Clean up
