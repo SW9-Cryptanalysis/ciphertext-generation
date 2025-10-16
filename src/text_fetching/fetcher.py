@@ -2,7 +2,7 @@ import requests
 import random
 from utils.formatting import format_text
 from utils.files import save_book, book_is_cached, get_cached_book
-from utils.validator import validate, non_negative, non_blank_string
+from parameter_validator import parameter_validator, non_negative, non_blank_string
 
 GUTENDEX_BASE_URL = "https://gutendex.com/books"
 
@@ -172,7 +172,7 @@ class Fetcher:
 		except requests.RequestException as e:
 			raise RuntimeError(f"Error fetching book data: {e}") from e
 
-	@validate(book_text=non_blank_string, min_len=non_negative, max_len=non_negative)
+	@parameter_validator(book_text=non_blank_string, min_len=non_negative, max_len=non_negative)
 	def get_random_book_slice(self, book_text: str, min_len: int, max_len: int) -> str:
 		"""Extract a random slice from the provided book text.
 

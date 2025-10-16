@@ -2,10 +2,10 @@ from encipherment.cipher import Cipher
 import os
 import json
 import re
-from .validator import validate, non_blank_string, strongly_typed
+from parameter_validator import parameter_validator, non_blank_string
 
 
-@validate(book_id=non_blank_string, book_text=non_blank_string)
+@parameter_validator(book_id=non_blank_string, book_text=non_blank_string)
 def save_book(book_id: str, book_text: str) -> None:
 	"""Save the fetched book text to a local file for caching.
 

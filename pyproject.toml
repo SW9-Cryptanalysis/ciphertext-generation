@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "num2words>=0.5.14",
-    "parameters-validation>=1.2.0",
+    "parameter-validator",
     "requests>=2.32.5",
     "tqdm>=4.67.1",
     "typing-extensions>=4.15.0",
@@ -54,3 +54,6 @@ ignore = [
 ]
 [tool.ruff.format]
 indent-style = "tab"
+
+[tool.uv.sources]
+parameter-validator = { git = "https://github.com/jatewo/parameter-validator.git" }
