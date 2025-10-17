@@ -201,9 +201,9 @@ class HomophonicCipher(SubstitutionCipher):
 			self.difficulty = self.generate_difficulty()
 		else:
 			self.difficulty = self._validate_difficulty(difficulty)
-		self.key = self.generate_key()
-		self.ciphertext = self.encipher()
-		self.recurrence_encoding = self._generate_recurrence_encoding()
+		self.key: dict[str, list[int]] = {}
+		self.ciphertext: str = ""
+		self.recurrence_encoding: str = ""
 
 	def generate_key(self) -> dict:
 		"""Generate a homophonic substitution cipher key based on a difficulty level.
@@ -234,6 +234,7 @@ class HomophonicCipher(SubstitutionCipher):
 		for letter, count in homophones_dict.items():
 			key[letter] = homophone_numbers[:count]
 			homophone_numbers = homophone_numbers[count:]
+		self.key = key
 		return key
 
 	def encipher(self) -> str:
@@ -255,7 +256,9 @@ class HomophonicCipher(SubstitutionCipher):
 		for char in self.plaintext:
 			ciphertext_numbers.append(str(homophones[char][ptr[char]]))
 			ptr[char] += 1
-		return " ".join(ciphertext_numbers)
+		self.ciphertext = " ".join(ciphertext_numbers)
+		self.recurrence_encoding = self._generate_recurrence_encoding()
+		return self.ciphertext
 
 	def generate_difficulty(self) -> int:
 		"""Generate a difficulty level for the cipher.

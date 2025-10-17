@@ -3,6 +3,7 @@ import pytest
 from encipherment.cipher import HomophonicCipher, MonoalphabeticCipher
 from utils.constants import MIN_DIFFICULTY, MAX_DIFFICULTY
 
+
 @pytest.fixture(scope="module")
 def sample_text_legal():
 	return (
@@ -12,9 +13,11 @@ def sample_text_legal():
 		"theperformanceoftheciphergenerationprocess"
 	)
 
+
 @pytest.fixture(scope="module")
 def sample_text_short():
 	return "abcdefghijklmnopqrstuvwxyz"
+
 
 @pytest.fixture(scope="module")
 def sample_texts_illegal():
@@ -25,9 +28,13 @@ def sample_texts_illegal():
 		"this.text.has.punctuation!",
 	]
 
+
 class TestHomophonicCipher:
 	def test_legal_plaintext(self, sample_text_legal):
 		cipher = HomophonicCipher(sample_text_legal)
+		cipher.generate_key()
+		cipher.encipher()
+
 		assert cipher.plaintext == sample_text_legal
 		assert MIN_DIFFICULTY <= cipher.difficulty <= MAX_DIFFICULTY
 		assert isinstance(cipher.key, dict)
@@ -61,6 +68,7 @@ class TestHomophonicCipher:
 
 	def test_key_homophones_count(self, sample_text_legal):
 		cipher = HomophonicCipher(sample_text_legal)
+		cipher.generate_key()
 		total_homophones = sum(len(v) for v in cipher.key.values())
 		expected_homophones = round(len(sample_text_legal) / cipher.difficulty)
 
@@ -73,7 +81,9 @@ class TestHomophonicCipher:
 		)
 
 		# For high difficulties, expected homophones might be very low, so we allow more flexibility
-		expected_range = max(15, expected_homophones)  # Allow more range for high difficulties
+		expected_range = max(
+			15, expected_homophones
+		)  # Allow more range for high difficulties
 		assert abs(total_homophones - expected_homophones) <= expected_range, (
 			f"Total homophones {total_homophones} not within acceptable range of expected {expected_homophones} ± {expected_range}"
 		)
@@ -86,6 +96,8 @@ class TestHomophonicCipher:
 
 	def test_ciphertext_length(self, sample_text_legal):
 		cipher = HomophonicCipher(sample_text_legal)
+		cipher.generate_key()
+		cipher.encipher()
 		ciphertext_numbers = cipher.ciphertext.split()
 		assert len(ciphertext_numbers) == len(sample_text_legal)
 
@@ -113,9 +125,10 @@ class TestHomophonicCipher:
 		for invalid_difficulty in [3, 31, -1, 0]:
 			with pytest.raises(ValueError) as excinfo:
 				HomophonicCipher(sample_text_legal, difficulty=invalid_difficulty)
-			assert f"Difficulty must be between {MIN_DIFFICULTY} and {MAX_DIFFICULTY}." in str(excinfo.value), (
-				f"Failed for difficulty {invalid_difficulty}"
-			)
+			assert (
+				f"Difficulty must be between {MIN_DIFFICULTY} and {MAX_DIFFICULTY}."
+				in str(excinfo.value)
+			), f"Failed for difficulty {invalid_difficulty}"
 
 	def test_non_integer_difficulty(self, sample_text_legal):
 		for non_integer in [5.5, "ten"]:
@@ -149,6 +162,8 @@ class TestHomophonicCipher:
 
 	def test_recurrence_encoding(self, sample_text_legal):
 		cipher = HomophonicCipher(sample_text_legal)
+		cipher.generate_key()
+		cipher.encipher()
 		encoding = cipher.recurrence_encoding
 		assert isinstance(encoding, str)
 		assert len(encoding.split()) == len(sample_text_legal)
@@ -283,4 +298,3 @@ class TestMonoalphabeticCipher:
 				assert mapping[ct_num] == enc_num, (
 					"Inconsistent mapping in recurrence encoding"
 				)
-
