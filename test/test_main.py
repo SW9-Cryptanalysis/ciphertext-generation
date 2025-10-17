@@ -1,6 +1,6 @@
 import pytest
 
-from main import generate_cipher
+from main import generate_cipher, generate_monoalphabetic_cipher
 from utils.formatting import format_text
 
 
@@ -33,7 +33,7 @@ def test_generate_cipher(mocker, book_text):
 		return_value="".join(format_text(book_text)),
 	)
 
-	generate_cipher(1000, 5000, "test_cipher.json")
+	generate_cipher(1000, 5000, "test_cipher.json", difficulty=10)
 	with open("ciphers/test_cipher.json", encoding="utf-8") as f:
 		data = f.read()
 		assert len(data) > 0  # Ensure the file is not empty
@@ -53,7 +53,7 @@ def test_generate_cipher_fails_cipher(mocker, book_text):
 	)
 
 	with pytest.raises(ValueError) as excinfo:
-		generate_cipher(1000, 5000, "test_cipher.json")
+		generate_cipher(1000, 5000, "test_cipher.json", 10)
 	assert "Plaintext must contain only lowercase letters" in str(excinfo.value)
 
 	# Clean up
@@ -61,3 +61,38 @@ def test_generate_cipher_fails_cipher(mocker, book_text):
 
 	if os.path.exists("ciphers/test_cipher.json"):
 		os.remove("ciphers/test_cipher.json")
+
+def test_generate_monoalphabetic_cipher(mocker, book_text):
+	# Test with a specific length
+	mocker = mocker.patch(
+		"text_fetching.fetcher.Fetcher.fetch_random_book_text",
+		return_value="".join(format_text(book_text)),
+	)
+
+	generate_monoalphabetic_cipher(1000, 5000, "test_mono_cipher.json")
+	with open("ciphers/test_mono_cipher.json", encoding="utf-8") as f:
+		data = f.read()
+		assert len(data) > 0  # Ensure the file is not empty
+
+	# Clean up
+	import os
+
+	if os.path.exists("ciphers/test_mono_cipher.json"):
+		os.remove("ciphers/test_mono_cipher.json")
+
+def test_generate_monoalphabetic_cipher_fails(mocker, book_text):
+	# Test with a specific length
+	mocker = mocker.patch(
+		"text_fetching.fetcher.Fetcher.fetch_random_book_text",
+		return_value="".join(book_text),
+	)
+
+	with pytest.raises(ValueError) as excinfo:
+		generate_monoalphabetic_cipher(1000, 5000, "test_mono_cipher.json")
+	assert "Plaintext must contain only lowercase letters" in str(excinfo.value)
+
+	# Clean up
+	import os
+
+	if os.path.exists("ciphers/test_mono_cipher.json"):
+		os.remove("ciphers/test_mono_cipher.json")

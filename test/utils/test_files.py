@@ -1,12 +1,11 @@
 import pytest
+from encipherment.cipher import HomophonicCipher
 from utils.files import save_book, book_is_cached, get_cached_book, save_cipher
 
 
 @pytest.fixture
 def sample_cipher():
-	from encipherment.cipher import Cipher
-
-	return Cipher("thisisatestcipher", 12)
+	return HomophonicCipher("thisisatestcipher", difficulty=10)
 
 
 @pytest.fixture(autouse=True)
