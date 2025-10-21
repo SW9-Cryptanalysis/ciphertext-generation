@@ -222,8 +222,8 @@ wheels = [
 
 [[package]]
 name = "parameter-validator"
-version = "0.1.0"
-source = { git = "https://github.com/jatewo/parameter-validator.git#a1984b67150858ff3ad2840eead4bbf2a00b43a9" }
+version = "0.1.1"
+source = { git = "https://github.com/jatewo/parameter-validator.git#be174b2ee5123799c4f78c16b3a124f49926caa5" }
 dependencies = [
     { name = "typing-extensions" },
 ]
