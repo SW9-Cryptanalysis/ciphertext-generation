@@ -172,7 +172,9 @@ class Fetcher:
 		except requests.RequestException as e:
 			raise RuntimeError(f"Error fetching book data: {e}") from e
 
-	@parameter_validator(book_text=non_blank_string, min_len=non_negative, max_len=non_negative)
+	@parameter_validator(
+		book_text=non_blank_string, min_len=non_negative, max_len=non_negative,
+	)
 	def get_random_book_slice(self, book_text: str, min_len: int, max_len: int) -> str:
 		"""Extract a random slice from the provided book text.
 
