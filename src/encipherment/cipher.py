@@ -2,8 +2,15 @@ from .homophones import extract_homophones, get_homophones
 from .frequency import frequencies
 import random
 from collections import Counter
-from utils.constants import ALPHABET, MIN_DIFFICULTY, MAX_DIFFICULTY
+from utils.constants import MIN_DIFFICULTY, MAX_DIFFICULTY
 from abc import ABC, abstractmethod
+from parameter_validator import parameter_validator, all_of
+
+from utils.validators import (
+	in_range,
+	strongly_typed_optional,
+	lower_case_no_spaces_alpha_string,
+)
 
 
 class SubstitutionCipher(ABC):
@@ -41,59 +48,14 @@ class SubstitutionCipher(ABC):
 		*,
 		difficulty: int | None = None,
 		cipher_type: str = "homophonic",
-	) -> None: # pragma: no cover
+	) -> None:  # pragma: no cover
 		"""Initialize the Cipher object with the given plaintext."""
-		self.plaintext = self._validate_plaintext(plaintext)
+		self.plaintext = plaintext
 		self.difficulty = difficulty
 		self.key = {}
 		self.ciphertext = ""
 		self.recurrence_encoding = ""
 		raise NotImplementedError("This is an abstract base class.")
-
-	def _validate_plaintext(self, plaintext: str) -> str:
-		"""Validate the plaintext to ensure it contains only lowercase letters.
-
-		Args:
-				plaintext (str): The plaintext to validate.
-
-		Returns:
-				str: The validated plaintext.
-
-		Raises:
-				ValueError: If the plaintext contains invalid characters.
-
-		"""
-		if not isinstance(plaintext, str):
-			raise ValueError("Plaintext must be a string.")
-		if not plaintext:
-			raise ValueError("Plaintext must be a non-empty string.")
-		if not all(c in ALPHABET for c in plaintext):
-			raise ValueError(
-				"Plaintext must contain only lowercase letters with no punctuation"
-				" or spaces.",
-			)
-		return plaintext
-
-	def _validate_difficulty(self, difficulty: int) -> int:
-		"""Validate the difficulty level to ensure it is within range.
-
-		Args:
-				difficulty (int): The difficulty level to validate.
-
-		Returns:
-				int: The validated difficulty level.
-
-		Raises:
-				ValueError: If the difficulty level is not valid.
-
-		"""
-		if not isinstance(difficulty, int):
-			raise ValueError("Difficulty must be an integer.")
-		if difficulty < MIN_DIFFICULTY or difficulty > MAX_DIFFICULTY:
-			raise ValueError(
-				f"Difficulty must be between {MIN_DIFFICULTY} and {MAX_DIFFICULTY}.",
-			)
-		return difficulty
 
 	def _generate_recurrence_encoding(self) -> str:
 		"""Generate recurrence encoding for the ciphertext based on the homophones used.
@@ -152,7 +114,7 @@ class SubstitutionCipher(ABC):
 		pass
 
 	@abstractmethod
-	def encipher(self) -> str: # pragma: no cover
+	def encipher(self) -> str:  # pragma: no cover
 		"""Encipher the plaintext using the generated key."""
 		pass
 
@@ -184,6 +146,12 @@ class HomophonicCipher(SubstitutionCipher):
 
 	"""
 
+	@parameter_validator(
+		plaintext=lower_case_no_spaces_alpha_string,
+		difficulty=all_of(
+			in_range(MIN_DIFFICULTY, MAX_DIFFICULTY), strongly_typed_optional,
+		),
+	)
 	def __init__(self, plaintext: str, *, difficulty: int | None = None) -> None:
 		"""Initialize the Cipher object with the given plaintext.
 
@@ -196,11 +164,11 @@ class HomophonicCipher(SubstitutionCipher):
 				("homophonic" or "monoalphabetic").
 
 		"""
-		self.plaintext = self._validate_plaintext(plaintext)
-		if not difficulty and difficulty != 0:
+		self.plaintext = plaintext
+		if not difficulty:
 			self.difficulty = self.generate_difficulty()
 		else:
-			self.difficulty = self._validate_difficulty(difficulty)
+			self.difficulty = difficulty
 		self.key: dict[str, list[int]] = {}
 		self.ciphertext: str = ""
 		self.recurrence_encoding: str = ""
@@ -299,6 +267,7 @@ class MonoalphabeticCipher(SubstitutionCipher):
 
 	"""
 
+	@parameter_validator(plaintext=lower_case_no_spaces_alpha_string)
 	def __init__(self, plaintext: str) -> None:
 		"""Initialize the MonoalphabeticCipher with the given plaintext.
 
@@ -307,7 +276,7 @@ class MonoalphabeticCipher(SubstitutionCipher):
 				punctuation or spaces.
 
 		"""
-		self.plaintext = self._validate_plaintext(plaintext)
+		self.plaintext = plaintext
 		self.key = self.generate_key()
 		self.difficulty = 1
 		self.ciphertext = self.encipher()
