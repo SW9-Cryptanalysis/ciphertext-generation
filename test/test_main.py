@@ -54,7 +54,7 @@ def test_generate_cipher_fails_cipher(mocker, book_text):
 
 	with pytest.raises(ValueError) as excinfo:
 		generate_cipher(1000, 5000, "test_cipher.json", 10)
-	assert "Plaintext must contain only lowercase letters" in str(excinfo.value)
+	assert "Parameter `plaintext` must be a lowercase alphabetic string with no spaces." in str(excinfo.value)
 
 	# Clean up
 	import os
@@ -89,7 +89,7 @@ def test_generate_monoalphabetic_cipher_fails(mocker, book_text):
 
 	with pytest.raises(ValueError) as excinfo:
 		generate_monoalphabetic_cipher(1000, 5000, "test_mono_cipher.json")
-	assert "Plaintext must contain only lowercase letters" in str(excinfo.value)
+	assert "Parameter `plaintext` must be a lowercase alphabetic string with no spaces." in str(excinfo.value)
 
 	# Clean up
 	import os

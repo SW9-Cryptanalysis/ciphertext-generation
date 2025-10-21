@@ -6,8 +6,10 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "num2words>=0.5.14",
+    "parameter-validator",
     "requests>=2.32.5",
     "tqdm>=4.67.1",
+    "typing-extensions>=4.15.0",
     "unidecode>=1.4.0",
 ]
 
@@ -37,6 +39,8 @@ ignore = [
 	"D100",  # Missing docstring in public module
 	"D203",  # incorrect-blank-line-before-class
 	"D213",  # multi-line-summary-second-line
+	"UP035", # Import from `collections.abc`instead: ...
+	"ANN401",# Dynamically typed expressions (typing.Any) are disallowed 
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -50,3 +54,6 @@ ignore = [
 ]
 [tool.ruff.format]
 indent-style = "tab"
+
+[tool.uv.sources]
+parameter-validator = { git = "https://github.com/jatewo/parameter-validator.git" }

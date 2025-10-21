@@ -42,8 +42,8 @@ def test_format_text():
 	assert format_text("") == ""
 	try:
 		format_text(12345)  # type: ignore
-	except ValueError as e:
-		assert str(e) == "Argument must be a string"
+	except TypeError as e:
+		assert str(e) == "Parameter 'text' requires type 'str' but received type 'int'."
 
 
 def test_format_text_only_numbers():

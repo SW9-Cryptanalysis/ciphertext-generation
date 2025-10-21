@@ -57,7 +57,7 @@ class TestHomophonicCipher:
 			with pytest.raises(ValueError) as excinfo:
 				HomophonicCipher(text)
 			assert (
-				"Plaintext must contain only lowercase letters with no punctuation or spaces."
+				"Parameter `plaintext` must be a lowercase alphabetic string with no spaces."
 				in str(excinfo.value)
 			)
 
@@ -126,26 +126,26 @@ class TestHomophonicCipher:
 			with pytest.raises(ValueError) as excinfo:
 				HomophonicCipher(sample_text_legal, difficulty=invalid_difficulty)
 			assert (
-				f"Difficulty must be between {MIN_DIFFICULTY} and {MAX_DIFFICULTY}."
+				f"Parameter `difficulty` must be between {MIN_DIFFICULTY} and {MAX_DIFFICULTY}."
 				in str(excinfo.value)
 			), f"Failed for difficulty {invalid_difficulty}"
 
 	def test_non_integer_difficulty(self, sample_text_legal):
 		for non_integer in [5.5, "ten"]:
-			with pytest.raises(ValueError) as excinfo:
+			with pytest.raises(TypeError) as excinfo:
 				HomophonicCipher(sample_text_legal, difficulty=non_integer)
-			assert "Difficulty must be an integer." in str(excinfo.value)
+			assert "Parameter `difficulty` must be of type int, or None." in str(excinfo.value)
 
 	def test_non_string_plaintext(self):
 		for non_string in [12345, None, 5.67, ["list"], {"dict": "value"}]:
-			with pytest.raises(ValueError) as excinfo:
+			with pytest.raises(TypeError) as excinfo:
 				HomophonicCipher(non_string)
-			assert "Plaintext must be a string." in str(excinfo.value)
+			assert "Parameter `plaintext` must be of type str." in str(excinfo.value)
 
 	def test_empty_string_plaintext(self):
 		with pytest.raises(ValueError) as excinfo:
-			HomophonicCipher("")
-		assert "Plaintext must be a non-empty string." in str(excinfo.value)
+			HomophonicCipher(" ")
+		assert "Parameter `plaintext` must be a non-blank string." in str(excinfo.value)
 
 	def test_plaintext_with_non_english_letters(self):
 		for text in [
@@ -156,7 +156,7 @@ class TestHomophonicCipher:
 			with pytest.raises(ValueError) as excinfo:
 				HomophonicCipher(text)
 			assert (
-				"Plaintext must contain only lowercase letters with no punctuation or spaces."
+				"Parameter `plaintext` must be a lowercase alphabetic string with no spaces."
 				in str(excinfo.value)
 			)
 
@@ -262,20 +262,20 @@ class TestMonoalphabeticCipher:
 			with pytest.raises(ValueError) as excinfo:
 				MonoalphabeticCipher(text)
 			assert (
-				"Plaintext must contain only lowercase letters with no punctuation or spaces."
+				"Parameter `plaintext` must be a lowercase alphabetic string with no spaces."
 				in str(excinfo.value)
 			)
 
 	def test_non_string_plaintext(self):
 		for non_string in [12345, None, 5.67, ["list"], {"dict": "value"}]:
-			with pytest.raises(ValueError) as excinfo:
+			with pytest.raises(TypeError) as excinfo:
 				MonoalphabeticCipher(non_string)
-			assert "Plaintext must be a string." in str(excinfo.value)
+			assert "Parameter `plaintext` must be of type str." in str(excinfo.value)
 
 	def test_empty_string_plaintext(self):
 		with pytest.raises(ValueError) as excinfo:
 			MonoalphabeticCipher("")
-		assert "Plaintext must be a non-empty string." in str(excinfo.value)
+		assert "Parameter `plaintext` must be a non-blank string." in str(excinfo.value)
 
 	def test_recurrence_encoding(self, sample_text_short):
 		cipher = MonoalphabeticCipher(sample_text_short)

@@ -32,6 +32,10 @@ def short_text():
 def no_text():
 	return None
 
+@pytest.fixture
+def empty_text():
+	return ""
+
 
 @pytest.fixture
 def accented_text():
@@ -47,11 +51,17 @@ def test_slicing_text(long_text):
 	assert len(sliced_text) == 100
 
 
-def test_slicing_no_text(no_text):
+def test_slicing_empty_text(empty_text):
 	fetcher = Fetcher()
 	with pytest.raises(ValueError) as excinfo:
+		fetcher.get_random_book_slice(empty_text, min_len=100, max_len=200)
+	assert "Parameter `book_text` cannot be blank nor empty" in str(excinfo.value)
+
+def test_slicing_no_text(no_text):
+	fetcher = Fetcher()
+	with pytest.raises(TypeError) as excinfo:
 		fetcher.get_random_book_slice(no_text, min_len=100, max_len=200)
-	assert "book_text must be a non-empty string" in str(excinfo.value)
+	assert "Parameter 'book_text' must be `str`, got `NoneType`." in str(excinfo.value)
 
 
 def test_slicing_short_text(short_text):
@@ -201,13 +211,13 @@ def test_book_slice_negative_lengths(long_text):
 	with pytest.raises(ValueError) as excinfo:
 		fetcher.get_random_book_slice(book_text=long_text, min_len=-50, max_len=100)
 	assert (
-		"min_len and max_len must be positive integers with min_len <= max_len"
+		"Parameter 'min_len' cannot be negative, but received -50."
 		in str(excinfo.value)
 	)
 	with pytest.raises(ValueError) as excinfo:
 		fetcher.get_random_book_slice(book_text=long_text, min_len=50, max_len=-100)
 	assert (
-		"min_len and max_len must be positive integers with min_len <= max_len"
+		"Parameter 'max_len' cannot be negative, but received -100."
 		in str(excinfo.value)
 	)
 
