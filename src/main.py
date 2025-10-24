@@ -32,6 +32,9 @@ def generate_cipher(
 	sliced_text = fetcher.get_random_book_slice(book_text, min_len, max_len)
 	try:
 		cipher = HomophonicCipher(sliced_text, difficulty=difficulty)
+		cipher.generate_difficulty()
+		cipher.generate_key()
+		cipher.encipher()
 	except ValueError as e:
 		logging.error(f"Error generating cipher for book id: {fetcher.book_id}")
 		raise e
@@ -69,9 +72,4 @@ if __name__ == "__main__":  # pragma: no cover
 			MAX_PLAINTEXT_LENGTH,
 			f"cipher-{i}.json",
 		)
-	generate_monoalphabetic_cipher(
-		MIN_PLAINTEXT_LENGTH,
-		MAX_PLAINTEXT_LENGTH,
-		"monoalphabetic-cipher.json",
-	)
 	pass

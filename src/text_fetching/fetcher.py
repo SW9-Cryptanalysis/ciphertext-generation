@@ -30,7 +30,6 @@ class Fetcher:
 		"84",  # Frankenstein
 		"2701",  # Moby Dick
 		"1342",  # Pride and Prejudice
-		"11",  # Alice's Adventures in Wonderland
 		"2641",  # A Room with a View
 		"145",  # Middlemarch
 		"37106",  # Little Women; Or, Meg, Jo, Beth, and Amy
@@ -70,7 +69,6 @@ class Fetcher:
 		"26184",  # Simple Sabotage Field Manual
 		"205",  # Walden, and On The Duty Of Civil Disobedience
 		"1497",  # The Republic
-		"64317",  # The Great Gatsby
 		"1998",  # Thus Spake Zarathustra
 		"23",  # Narrative of the Life of Frederick Douglass, an American Slave
 		"768",  # Wuthering Heights
@@ -86,10 +84,8 @@ class Fetcher:
 		"1400",  # Great Expectations
 		"74",  # The Adventures of Tom Sawyer
 		"36034",  # White Nights and Other Stories
-		"8438",  # The Ethics of Aristotle
 		"815",  # Democracy in America
 		"4300",  # Ulysses
-		"26659",  # The Will to Believe, and Other Essays in Popular Philosophy
 		"1023",  # Bleak House
 		"4363",  # Beyond Good and Evil
 		"2852",  # The Hound of the Baskervilles
@@ -106,8 +102,6 @@ class Fetcher:
 		"60976",  # Rip Van Winkle
 		"140",  # The Jungle
 		"1399",  # Anna Karenina
-		"4351",  # The English Constitution
-		"236",  # The Jungle Book
 		"56517",  # The Philosophy of Auguste Comte
 		"52621",  # Society in America, Vol. 1
 		"1228",  # On the Origin of Species by Means of Natural Selection
@@ -118,9 +112,26 @@ class Fetcher:
 		"33944",  # How to Observe: Morals and Manners
 	]
 
-	def __init__(self) -> None:
-		"""Initialize the BookFetcher with a random book ID and cache status."""
-		self.book_id = random.choice(self.BOOK_IDS)
+	BOOK_IDS_VALIDATION = [
+		"11",  # Alice's Adventures in Wonderland
+		"236",  # The Jungle Book
+		"4351",  # The English Constitution
+		"64317",  # The Great Gatsby
+		"8438",  # The Ethics of Aristotle
+		"26659",  # The Will to Believe, and Other Essays in Popular Philosophy
+	]
+
+	def __init__(self, validation: bool = False) -> None:
+		"""Initialize the BookFetcher with a random book ID and cache status.
+
+		Args:
+			validation (bool): If True, use a predefined set of book IDs for validation.
+
+		"""
+		if validation:
+			self.book_id = random.choice(self.BOOK_IDS_VALIDATION)
+		else:
+			self.book_id = random.choice(self.BOOK_IDS)
 		self.is_cached = book_is_cached(self.book_id)
 
 	def fetch_random_book_text(self) -> str:
@@ -173,7 +184,9 @@ class Fetcher:
 			raise RuntimeError(f"Error fetching book data: {e}") from e
 
 	@parameter_validator(
-		book_text=non_blank_string, min_len=non_negative, max_len=non_negative,
+		book_text=non_blank_string,
+		min_len=non_negative,
+		max_len=non_negative,
 	)
 	def get_random_book_slice(self, book_text: str, min_len: int, max_len: int) -> str:
 		"""Extract a random slice from the provided book text.

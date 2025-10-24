@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "gutenberg-cleaner>=0.1.6",
     "num2words>=0.5.14",
     "parameter-validator",
     "requests>=2.32.5",
