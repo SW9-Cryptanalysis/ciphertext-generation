@@ -123,6 +123,7 @@ class Fetcher:
 
 	def __init__(self, validation: bool = False) -> None:
 		"""Initialize the BookFetcher with a random book ID and cache status.
+
 		Args:
 			validation (bool): If True, use a predefined set of book IDs for validation.
 
