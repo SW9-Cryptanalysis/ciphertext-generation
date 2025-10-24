@@ -129,8 +129,9 @@ class Fetcher:
 
 		"""
 		if validation:
-			self.BOOK_IDS = self.BOOK_IDS_VALIDATION
-		self.book_id = random.choice(self.BOOK_IDS)
+			self.book_id = random.choice(self.BOOK_IDS_VALIDATION)
+		else:
+			self.book_id = random.choice(self.BOOK_IDS)
 		self.is_cached = book_is_cached(self.book_id)
 
 	def fetch_random_book_text(self) -> str:

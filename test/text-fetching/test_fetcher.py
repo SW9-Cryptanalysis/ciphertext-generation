@@ -32,6 +32,7 @@ def short_text():
 def no_text():
 	return None
 
+
 @pytest.fixture
 def empty_text():
 	return ""
@@ -56,6 +57,7 @@ def test_slicing_empty_text(empty_text):
 	with pytest.raises(ValueError) as excinfo:
 		fetcher.get_random_book_slice(empty_text, min_len=100, max_len=200)
 	assert "Parameter `book_text` cannot be blank nor empty" in str(excinfo.value)
+
 
 def test_slicing_no_text(no_text):
 	fetcher = Fetcher()
@@ -210,15 +212,13 @@ def test_book_slice_negative_lengths(long_text):
 	fetcher = Fetcher()
 	with pytest.raises(ValueError) as excinfo:
 		fetcher.get_random_book_slice(book_text=long_text, min_len=-50, max_len=100)
-	assert (
-		"Parameter 'min_len' cannot be negative, but received -50."
-		in str(excinfo.value)
+	assert "Parameter 'min_len' cannot be negative, but received -50." in str(
+		excinfo.value
 	)
 	with pytest.raises(ValueError) as excinfo:
 		fetcher.get_random_book_slice(book_text=long_text, min_len=50, max_len=-100)
-	assert (
-		"Parameter 'max_len' cannot be negative, but received -100."
-		in str(excinfo.value)
+	assert "Parameter 'max_len' cannot be negative, but received -100." in str(
+		excinfo.value
 	)
 
 
@@ -227,3 +227,34 @@ def test_book_slice_length_smaller_than_max(long_text):
 	with pytest.raises(ValueError) as excinfo:
 		fetcher.get_random_book_slice(book_text=long_text, min_len=50, max_len=20000)
 	assert "book_text is shorter than the specified max_len" in str(excinfo.value)
+
+
+def test_fetch_book_validation(mocker):
+	# First response: metadata
+	mock_metadata_resp = mocker.Mock()
+	mock_metadata_resp.raise_for_status.return_value = None
+	mock_metadata_resp.json.return_value = {
+		"formats": {"text/plain; charset=utf-8": "http://example.com/book.txt"}
+	}
+
+	# Mock cached book check to return False
+	mocker.patch("text_fetching.fetcher.book_is_cached", return_value=False)
+	fetcher = Fetcher(True)
+
+	# Second response: actual book text
+	mock_text_resp = mocker.Mock()
+	mock_text_resp.raise_for_status.return_value = None
+	mock_text_resp.text = "This is the book content."
+
+	mock_get = mocker.patch(
+		"text_fetching.fetcher.requests.get",
+		side_effect=[mock_metadata_resp, mock_text_resp],
+	)
+	book_text = fetcher.fetch_random_book_text()
+	assert book_text is not None
+	assert book_text == format_text("This is the book content.")
+	assert isinstance(book_text, str)
+	assert mock_get.call_count == 2
+	assert fetcher.book_id in fetcher.BOOK_IDS_VALIDATION
+	assert fetcher.book_id not in fetcher.BOOK_IDS
+	assert mock_get.call_args_list[0][0][0] == f"https://gutendex.com/books/{fetcher.book_id}"
