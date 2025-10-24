@@ -2,6 +2,7 @@ from unidecode import unidecode
 import re
 from num2words import num2words
 from parameter_validator import parameter_validator, strongly_typed
+from gutenberg_cleaner import simple_cleaner
 
 
 def numbers_to_words(text: str) -> str:
@@ -35,6 +36,7 @@ def format_text(text: str) -> str:
 				keeping only alphabetic characters.
 
 	"""
+	text = simple_cleaner(text)
 	text = numbers_to_words(text)
 	text = numbers_to_words(text)
 	text = unidecode(text.lower())
