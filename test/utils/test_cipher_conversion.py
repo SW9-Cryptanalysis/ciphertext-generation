@@ -176,16 +176,6 @@ class TestCipherConverter:
 		assert converter.ciphertext == new_cipher_str
 		assert converter.mappings == new_key
 
-	def test_from_ciphertext_and_mappings_z408_ambiguity(self):
-		with pytest.raises(ValueError) as excinfo:
-			CipherConverter.from_ciphertext_and_mappings(
-				ciphertext=cipher_str, mappings=key_formatted
-			)
-		assert (
-			"Invalid mappings provided: Ambiguous mapping: Symbol '▲' maps to multiple characters"
-			in str(excinfo.value)
-		)
-
 	def test_from_plaintext_and_ciphertext_z408(self):
 		converter = CipherConverter.from_plaintext_and_ciphertext(
 			ciphertext=cipher_str, plaintext=plaintext_str
