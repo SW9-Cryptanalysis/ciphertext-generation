@@ -169,7 +169,7 @@ class HomophonicCipher(SubstitutionCipher):
 			self.difficulty = self.generate_difficulty()
 		else:
 			self.difficulty = difficulty
-		self.key: dict[str, list[int]] = {}
+		self.key: dict[str, list] = {}
 		self.ciphertext: str = ""
 		self.recurrence_encoding: str = ""
 
