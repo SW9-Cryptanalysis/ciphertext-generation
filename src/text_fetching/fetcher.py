@@ -175,10 +175,10 @@ class Fetcher:
 			text_response.raise_for_status()
 			book_text = text_response.text
 
-			formatted_text = format_text(book_text)
-			save_book(self.book_id, formatted_text)
+			formatted_text_with_spaces = format_text(book_text)
+			save_book(self.book_id, formatted_text_with_spaces)
 
-			return formatted_text
+			return formatted_text_with_spaces
 
 		except requests.RequestException as e:
 			raise RuntimeError(f"Error fetching book data: {e}") from e

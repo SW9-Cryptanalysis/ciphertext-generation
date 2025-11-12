@@ -2,6 +2,7 @@ import logging
 from text_fetching.fetcher import Fetcher
 from encipherment.cipher import HomophonicCipher, MonoalphabeticCipher
 from utils.files import save_cipher
+from utils.formatting import clean_plaintext
 from utils.constants import (
 	MIN_PLAINTEXT_LENGTH,
 	MAX_PLAINTEXT_LENGTH,
@@ -30,8 +31,9 @@ def generate_cipher(
 	fetcher = Fetcher()
 	book_text = fetcher.fetch_random_book_text()
 	sliced_text = fetcher.get_random_book_slice(book_text, min_len, max_len)
+	cleaned_text = clean_plaintext(sliced_text)
 	try:
-		cipher = HomophonicCipher(sliced_text, difficulty=difficulty)
+		cipher = HomophonicCipher(cleaned_text, difficulty=difficulty)
 		cipher.generate_difficulty()
 		cipher.generate_key()
 		cipher.encipher()

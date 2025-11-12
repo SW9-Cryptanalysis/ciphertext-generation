@@ -213,3 +213,4 @@ __marimo__/
 # Books
 /books
 .DS_Store
+.direnv/
