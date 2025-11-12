@@ -56,8 +56,9 @@ def generate_monoalphabetic_cipher(min_len: int, max_len: int, filename: str) ->
 	fetcher = Fetcher()
 	book_text = fetcher.fetch_random_book_text()
 	sliced_text = fetcher.get_random_book_slice(book_text, min_len, max_len)
+	cleaned_text = clean_plaintext(sliced_text)
 	try:
-		cipher = MonoalphabeticCipher(sliced_text)
+		cipher = MonoalphabeticCipher(cleaned_text)
 	except ValueError as e:
 		logging.error(
 			f"Error generating monoalphabetic cipher for book id: {fetcher.book_id}",
