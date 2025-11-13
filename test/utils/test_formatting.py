@@ -1,4 +1,4 @@
-from utils.formatting import format_text, numbers_to_words
+from utils.formatting import clean_spaces, format_text, numbers_to_words
 
 
 def test_numbers_to_words():
@@ -58,3 +58,18 @@ def test_format_text_all_non_alpha():
 		format_text("1234!@#$%^&'*()’_+-=[]{}’|;:',.<>?/`~")
 		== "one thousand two hundred and thirty four"
 	)
+
+
+def test_format_text_multiple_spaces():
+	assert (
+		format_text("Hello---world!!  This   is a    test.")
+		== "hello world this is a test"
+	)
+
+
+def test_clean_spaces():
+	assert clean_spaces("This is a test.") == "Thisisatest."
+	assert clean_spaces("  Leading and trailing spaces  ") == "Leadingandtrailingspaces"
+	assert clean_spaces("Multiple   spaces   in   between") == "Multiplespacesinbetween"
+	assert clean_spaces("") == ""
+	assert clean_spaces("NoSpacesHere") == "NoSpacesHere"
