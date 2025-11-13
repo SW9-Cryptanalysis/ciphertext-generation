@@ -44,7 +44,7 @@ def accented_text():
 
 @pytest.fixture
 def text_with_spaces():
-	return "This    is  a    text   with   irregular   spacing."
+	return "this is a text for testing purposes which is extremely long and has spaces in it as well so that it can be sliced properly i cannot come up with a better example so i will just use this one so lets just write a lot of nonsense text and hope it works and then we can see if it breaks or not and if it does break we can fix it and then we can write a new one and so on and so forth until we run out of ideas and we have to write the next one"
 
 
 def test_slicing_text(text_with_spaces):
@@ -54,6 +54,14 @@ def test_slicing_text(text_with_spaces):
 	)
 	assert isinstance(sliced_text, str)
 	assert 5 <= len(sliced_text) <= 20
+
+def test_slicing_text_long(text_with_spaces):
+	fetcher = Fetcher()
+	sliced_text = fetcher.get_random_book_slice(
+		book_text=text_with_spaces, min_len=100, max_len=200
+	)
+	assert isinstance(sliced_text, str)
+	assert 100 <= len(sliced_text) <= 200
 
 
 def test_slicing_empty_text(empty_text):
