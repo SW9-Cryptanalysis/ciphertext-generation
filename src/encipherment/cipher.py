@@ -52,6 +52,7 @@ class SubstitutionCipher(ABC):
 		"""Initialize the Cipher object with the given plaintext."""
 		self.plaintext = plaintext
 		self.difficulty = difficulty
+		self.num_symbols = 0
 		self.key = {}
 		self.ciphertext = ""
 		self.recurrence_encoding = ""
@@ -87,6 +88,8 @@ class SubstitutionCipher(ABC):
 		"""
 		return {
 			"plaintext": self.plaintext,
+			"length": len(self.plaintext),
+			"num_symbols": self.num_symbols,
 			"difficulty": self.difficulty,
 			"key": self.key,
 			"ciphertext": self.ciphertext,
@@ -169,6 +172,7 @@ class HomophonicCipher(SubstitutionCipher):
 			self.difficulty = self.generate_difficulty()
 		else:
 			self.difficulty = difficulty
+		self.num_symbols = 0
 		self.key: dict[str, list] = {}
 		self.ciphertext: str = ""
 		self.recurrence_encoding: str = ""
@@ -187,12 +191,12 @@ class HomophonicCipher(SubstitutionCipher):
 			dict: A dictionary mapping each letter to a list of its homophones.
 
 		"""
-		cipher_symbols: int = round(len(self.plaintext) / self.difficulty)
+		self.num_symbols: int = round(len(self.plaintext) / self.difficulty)
 
 		letter_frequencies = frequencies(self.plaintext)
 
 		homophones_dict: dict[str, int] = extract_homophones(
-			cipher_symbols,
+			self.num_symbols,
 			letter_frequencies,
 		)
 
@@ -277,6 +281,7 @@ class MonoalphabeticCipher(SubstitutionCipher):
 
 		"""
 		self.plaintext = plaintext
+		self.num_symbols = 0
 		self.key = self.generate_key()
 		self.difficulty = 1
 		self.ciphertext = self.encipher()
@@ -297,8 +302,9 @@ class MonoalphabeticCipher(SubstitutionCipher):
 		random.shuffle(cipher_numbers)
 
 		key = {}
-		for i, letter in enumerate("abcdefghijklmnopqrstuvwxyz"):
+		for i, letter in enumerate(set(self.plaintext)):
 			key[letter] = [cipher_numbers[i]]
+			self.num_symbols += 1
 
 		return key
 
