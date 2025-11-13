@@ -1,6 +1,6 @@
 import requests
 import random
-from utils.formatting import format_text
+from utils.formatting import clean_spaces, format_text
 from utils.files import save_book, book_is_cached, get_cached_book
 from parameter_validator import parameter_validator, non_negative, non_blank_string
 
@@ -209,11 +209,12 @@ class Fetcher:
 				"min_len and max_len must be positive integers with min_len <= max_len",
 			)
 
-		if len(book_text) < max_len:
+		if len(clean_spaces(book_text)) < max_len:
 			raise ValueError("book_text is shorter than the specified max_len")
 
-		start_idx = random.randint(0, max(0, len(book_text) - max_len))
-		end_idx = min(len(book_text), start_idx + random.randint(min_len, max_len))
+		start_idx = random.randint(0, len(book_text) - max_len)
+		max_end = min(start_idx + max_len, len(book_text))
+		end_idx = random.randint(start_idx + min_len, max_end)
 
 		# Shrink start and end of string to nerest spaces to avoid cutting off words
 		while start_idx < len(book_text) and book_text[start_idx] != " ":
@@ -222,5 +223,18 @@ class Fetcher:
 			end_idx -= 1
 
 		slice_text = book_text[start_idx:end_idx]
+		no_space_len = len(clean_spaces(slice_text))
+
+		if no_space_len < min_len:
+			next_space = book_text.find(" ", end_idx)
+			if next_space != -1:
+				end_idx = next_space + 1
+				slice_text = book_text[start_idx:end_idx]
+
+		elif no_space_len > max_len:
+			next_start = book_text.find(" ", start_idx + 1)
+			if next_start != -1:
+				start_idx = next_start + 1
+				slice_text = book_text[start_idx:end_idx]
 
 		return slice_text
