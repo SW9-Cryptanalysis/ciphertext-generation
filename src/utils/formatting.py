@@ -39,8 +39,22 @@ def format_text(text: str) -> str:
 	text = simple_cleaner(text)
 	text = numbers_to_words(text)
 	text = unidecode(text.lower())
-	return re.sub(r"[A-Z]", "", text)
 
-def clean_plaintext(text: str) -> str:
-    """The final cleaning step: remove spaces and punctuation."""
-    return "".join([c for c in text if c.isalpha()])
+	# Morten: This seems weird, but there is a reason for it
+	# This is necessary when we have a sentence like "he loved--cake!", since we want -- to not just be removed
+	# We want multiple symbols to be replaced by a single space
+	text = re.sub(r"[^a-z\s]", " ", text)
+	return re.sub(r"\s+", " ", text).strip()
+
+
+@parameter_validator(text=strongly_typed)
+def clean_spaces(text: str) -> str:
+    """Remove spaces from the input text.
+	
+	Args:
+		text (str): The input text
+
+	Returns:
+		str: The text with all whitespace removed.
+	"""
+    return "".join(text.split())
