@@ -38,7 +38,7 @@ def generate_cipher(
 	book_text = fetcher.fetch_random_book_text()
 	sliced_text = fetcher.get_random_book_slice(book_text, min_len, max_len)
 	cleaned_text = clean_spaces(sliced_text)
- 
+
 	try:
 		cipher = HomophonicCipher(cleaned_text, difficulty=difficulty)
 		cipher.generate_difficulty()
