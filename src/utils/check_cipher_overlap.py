@@ -44,9 +44,19 @@ def get_ciphers() -> list[dict]:
 	return ciphers
 
 
-def check_cipher_overlap():
+def check_cipher_overlap() -> dict[str, list[str]]:
+	"""Check for overlapping ciphers.
+
+	Returns a dictionary of ciphers with overlapping plaintexts.
+
+	Returns:
+		dict[str, list[str]]: A dictionary mapping cipher names to lists of
+			overlapping cipher names.
+
+	"""
 	result = {}
 	for cipher in get_ciphers():
+		name = cipher["name"]
 		overlapping_ciphers = []
 		for other_cipher in get_ciphers():
 			if cipher["plaintext"] == other_cipher["plaintext"]:
@@ -56,13 +66,13 @@ def check_cipher_overlap():
 				get_jaccard_similarity(cipher["plaintext"], other_cipher["plaintext"])
 				> 0.01
 			):
-				overlapping_ciphers.append(other_cipher)
+				overlapping_ciphers.append(other_cipher["name"])
 
 		if overlapping_ciphers:
 			result[cipher["name"]] = overlapping_ciphers
 
 		logger.info(
-			f"Found {len(overlapping_ciphers)} overlapping ciphers for {cipher['name']}"
+			f"Found {len(overlapping_ciphers)} overlapping ciphers for {name}",
 		)
 	return result
 

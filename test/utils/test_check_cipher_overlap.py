@@ -1,6 +1,5 @@
 import pytest
 import json
-import os
 from utils.check_cipher_overlap import (
     get_jaccard_similarity,
     get_ciphers,
@@ -56,15 +55,15 @@ class TestGetCiphers:
         # 1. Create a temporary directory structure
         d = tmp_path / "ciphers"
         d.mkdir()
-        
+
         # 2. Create dummy json files
         cipher1 = {"plaintext": "test one", "data": 1}
         cipher2 = {"plaintext": "test two", "data": 2}
-        
+
         # Correct naming convention (starts with c_ and ends with .json)
         (d / "c_valid1.json").write_text(json.dumps(cipher1), encoding="utf-8")
         (d / "c_valid2.json").write_text(json.dumps(cipher2), encoding="utf-8")
-        
+
         # Invalid files (should be ignored)
         (d / "readme.txt").write_text("ignore me", encoding="utf-8")
         (d / "other.json").write_text("{}", encoding="utf-8") # Doesn't start with c_
@@ -80,7 +79,7 @@ class TestGetCiphers:
         assert len(results) == 2
         names = sorted([r["name"] for r in results])
         assert names == ["c_valid1.json", "c_valid2.json"]
-        
+
         # Verify content was loaded
         assert results[0]["plaintext"] in ["test one", "test two"]
 
@@ -96,8 +95,8 @@ class TestCheckCipherOverlap:
     def test_detects_overlaps(self, monkeypatch, sample_ciphers_list, mock_logger):
         # Monkeypatch get_ciphers to avoid file I/O and return controlled data
         monkeypatch.setattr(
-            target_module, 
-            "get_ciphers", 
+            target_module,
+            "get_ciphers",
             lambda: sample_ciphers_list
         )
 
@@ -107,9 +106,9 @@ class TestCheckCipherOverlap:
         # c_1 skips c_4 (identical text)
         assert "c_1.json" in result
         overlaps_for_1 = result["c_1.json"]
-        
+
         assert len(overlaps_for_1) == 1
-        assert overlaps_for_1[0]["name"] == "c_2.json"
+        assert overlaps_for_1[0] == "c_2.json"
 
         # Verify Logging
         # We expect 4 log messages (one per cipher processed)
@@ -121,28 +120,28 @@ class TestCheckCipherOverlap:
             {"name": "A", "plaintext": "same text"},
             {"name": "B", "plaintext": "same text"},
         ]
-        
+
         monkeypatch.setattr(target_module, "get_ciphers", lambda: ciphers)
-        
+
         result = check_cipher_overlap()
-        
+
         # Should be empty because they are identical and the code 'continues' on identical text
         assert result == {}
         assert "Found 0 overlapping ciphers for A" in mock_logger
 
     def test_filters_low_similarity(self, monkeypatch):
-        # Intersection: 1 word ("common"). Union: 101 words. 
+        # Intersection: 1 word ("common"). Union: 101 words.
         # Jaccard = ~0.0099 ( < 0.01 threshold )
         t1 = "common " + " ".join(str(i) for i in range(50))
         t2 = "common " + " ".join(str(i) for i in range(50, 100))
-        
+
         ciphers = [
             {"name": "A", "plaintext": t1},
             {"name": "B", "plaintext": t2},
         ]
 
         monkeypatch.setattr(target_module, "get_ciphers", lambda: ciphers)
-        
+
         result = check_cipher_overlap()
-        
+
         assert result == {}
