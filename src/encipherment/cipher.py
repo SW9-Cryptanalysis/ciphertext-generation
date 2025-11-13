@@ -191,14 +191,16 @@ class HomophonicCipher(SubstitutionCipher):
 			dict: A dictionary mapping each letter to a list of its homophones.
 
 		"""
-		self.num_symbols: int = round(len(self.plaintext) / self.difficulty)
+		symbols: int = round(len(self.plaintext) / self.difficulty)
 
 		letter_frequencies = frequencies(self.plaintext)
 
 		homophones_dict: dict[str, int] = extract_homophones(
-			self.num_symbols,
+			symbols,
 			letter_frequencies,
 		)
+
+		self.num_symbols = sum(homophones_dict.values())
 
 		homophone_numbers: list[int] = list(range(1, sum(homophones_dict.values()) + 1))
 		random.shuffle(homophone_numbers)
