@@ -44,7 +44,7 @@ def format_text(text: str) -> str:
 	# This is necessary when we have a sentence like "he loved--cake!"
 	# Since we want "--" to not just be removed, but replaced by a space
 	# We want multiple symbols to be replaced by a single space
-	text = re.sub(r"[^a-z\s]", " ", text)
+	text = re.sub(r"[^a-z\s]", "", text)
 	return re.sub(r"\s+", " ", text).strip()
 
 
