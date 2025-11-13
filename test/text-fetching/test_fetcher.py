@@ -42,14 +42,18 @@ def empty_text():
 def accented_text():
 	return "kožušček François æåø äö êèéêñ"
 
+@pytest.fixture
+def text_with_spaces():
+	return "This    is  a    text   with   irregular   spacing."
 
-def test_slicing_text(long_text):
+
+def test_slicing_text(text_with_spaces):
 	fetcher = Fetcher()
 	sliced_text = fetcher.get_random_book_slice(
-		book_text=long_text, min_len=100, max_len=100
+		book_text=text_with_spaces, min_len=5, max_len=20
 	)
 	assert isinstance(sliced_text, str)
-	assert len(sliced_text) == 100
+	assert 5 <= len(sliced_text) <= 20
 
 
 def test_slicing_empty_text(empty_text):

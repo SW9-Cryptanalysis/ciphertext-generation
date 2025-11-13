@@ -214,6 +214,13 @@ class Fetcher:
 
 		start_idx = random.randint(0, max(0, len(book_text) - max_len))
 		end_idx = min(len(book_text), start_idx + random.randint(min_len, max_len))
+
+		# Shrink start and end of string to nerest spaces to avoid cutting off words
+		while start_idx < len(book_text) and book_text[start_idx] != " ":
+			start_idx += 1
+		while end_idx > start_idx and book_text[end_idx - 1] != " ":
+			end_idx -= 1
+
 		slice_text = book_text[start_idx:end_idx]
 
 		return slice_text
