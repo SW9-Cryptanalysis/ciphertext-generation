@@ -1,8 +1,9 @@
 import requests
 import random
-from utils.formatting import format_text
+from utils.formatting import clean_spaces, format_text
 from utils.files import save_book, book_is_cached, get_cached_book
 from parameter_validator import parameter_validator, non_negative, non_blank_string
+import re
 
 GUTENDEX_BASE_URL = "https://gutendex.com/books"
 
@@ -134,6 +135,8 @@ class Fetcher:
 			self.book_id = random.choice(self.BOOK_IDS)
 		self.is_cached = book_is_cached(self.book_id)
 
+		self.word_pattern = re.compile(r"\S+")
+
 	def fetch_random_book_text(self) -> str:
 		"""Fetch metadata for a random book from Gutendex and return its text content.
 
@@ -175,10 +178,10 @@ class Fetcher:
 			text_response.raise_for_status()
 			book_text = text_response.text
 
-			formatted_text = format_text(book_text)
-			save_book(self.book_id, formatted_text)
+			formatted_text_with_spaces = format_text(book_text)
+			save_book(self.book_id, formatted_text_with_spaces)
 
-			return formatted_text
+			return formatted_text_with_spaces
 
 		except requests.RequestException as e:
 			raise RuntimeError(f"Error fetching book data: {e}") from e
@@ -209,11 +212,65 @@ class Fetcher:
 				"min_len and max_len must be positive integers with min_len <= max_len",
 			)
 
-		if len(book_text) < max_len:
+		if len(clean_spaces(book_text)) < max_len:
 			raise ValueError("book_text is shorter than the specified max_len")
 
-		start_idx = random.randint(0, max(0, len(book_text) - max_len))
-		end_idx = min(len(book_text), start_idx + random.randint(min_len, max_len))
-		slice_text = book_text[start_idx:end_idx]
+		length = random.randint(min_len, max_len)
 
-		return slice_text
+		start_idx = self.get_start_idx(book_text, length)
+		end_idx = self.get_end_idx(book_text, start_idx, length)
+
+		return clean_spaces(book_text[start_idx:end_idx])
+
+	def get_start_idx(self, book_text: str, length: int) -> int:
+		"""Find the start index of the book text slice.
+
+		The start index should come right after a space.
+
+		Args:
+			book_text (str): The entire text of the book.
+			length (int): The length of the book text slice.
+
+		Returns:
+			int: The start index of the book text slice.
+
+		"""
+		idx = random.randint(0, int(len(book_text) - (length * 1.5)))
+
+		# Walk backwards to find the start of a word
+		while idx > 0 and not book_text[idx - 1].isspace():
+			idx -= 1
+		return idx
+
+	def get_end_idx(self, text: str, start_idx: int, target_len: int) -> int:
+		"""Find the end index of the book text slice.
+
+		The end index is the index of the last space before the end of the book text.
+		The length should not include spaces.
+
+		Args:
+			text (str): The entire text of the book.
+			start_idx (int): The start index of the book text slice.
+			target_len (int): The intended length of the book text slice (no spaces).
+
+		Returns:
+			int: The end index of the book text slice.
+
+		"""
+		current_content_len = 0
+		end_idx = start_idx
+
+		# We use finditer to iterate over words efficiently starting from start_idx
+		# This skips over massive gaps of whitespace automatically
+		for match in self.word_pattern.finditer(text, pos=start_idx):
+
+			word_len = match.end() - match.start()
+
+			current_content_len += word_len
+
+			end_idx = match.end()
+
+			if current_content_len >= target_len:
+				break
+
+		return end_idx

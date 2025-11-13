@@ -1,4 +1,4 @@
-from utils.formatting import format_text, numbers_to_words
+from utils.formatting import clean_spaces, format_text, numbers_to_words
 
 
 def test_numbers_to_words():
@@ -35,10 +35,10 @@ def test_format_text():
 		format_text(
 			"I met a traveller from an antique land, Who said—“Two vast and trunkless legs of stone Stand in the desert..."
 		)
-		== "imetatravellerfromanantiquelandwhosaidtwovastandtrunklesslegsofstonestandinthedesert"
+		== "i met a traveller from an antique land who saidtwo vast and trunkless legs of stone stand in the desert"
 	)
-	assert format_text("Kózuscek Fránçois àéäöåôëëën") == "kozuscekfrancoisaeaoaoeeen"
-	assert format_text("123 ABC def!@#") == "onehundredandtwentythreeabcdef"
+	assert format_text("Kózuscek Fránçois àéäöåôëëën") == "kozuscek francois aeaoaoeeen"
+	assert format_text("123 ABC def!@#") == "one hundred and twentythree abc def"
 	assert format_text("") == ""
 	try:
 		format_text(12345)  # type: ignore
@@ -49,12 +49,34 @@ def test_format_text():
 def test_format_text_only_numbers():
 	assert (
 		format_text("2024 100 3.14")
-		== "twothousandandtwentyfouronehundredthreepointonefour"
+		== "two thousand and twentyfour one hundred three point one four"
 	)
 
 
 def test_format_text_all_non_alpha():
 	assert (
 		format_text("1234!@#$%^&'*()’_+-=[]{}’|;:',.<>?/`~")
-		== "onethousandtwohundredandthirtyfour"
+		== "one thousand two hundred and thirtyfour"
 	)
+
+
+def test_format_text_multiple_spaces():
+	assert (
+		format_text("Hello---world!!  This   is a    test.")
+		== "helloworld this is a test"
+	)
+
+
+def test_format_text_keeps_spaces_but_removes_punctuation():
+	assert (
+		format_text("Wait—did you seriously just say, ‘We’re leaving at 6:00 a.m., no exceptions!’—right after promising this would be a relaxing weekend?")
+		== "waitdid you seriously just say were leaving at sixzero am no exceptionsright after promising this would be a relaxing weekend"
+	)
+
+
+def test_clean_spaces():
+	assert clean_spaces("This is a test.") == "Thisisatest."
+	assert clean_spaces("  Leading and trailing spaces  ") == "Leadingandtrailingspaces"
+	assert clean_spaces("Multiple   spaces   in   between") == "Multiplespacesinbetween"
+	assert clean_spaces("") == ""
+	assert clean_spaces("NoSpacesHere") == "NoSpacesHere"
