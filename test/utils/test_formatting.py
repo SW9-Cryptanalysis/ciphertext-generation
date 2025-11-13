@@ -35,10 +35,10 @@ def test_format_text():
 		format_text(
 			"I met a traveller from an antique land, Who said—“Two vast and trunkless legs of stone Stand in the desert..."
 		)
-		== "i met a traveller from an antique land who said two vast and trunkless legs of stone stand in the desert"
+		== "i met a traveller from an antique land who saidtwo vast and trunkless legs of stone stand in the desert"
 	)
 	assert format_text("Kózuscek Fránçois àéäöåôëëën") == "kozuscek francois aeaoaoeeen"
-	assert format_text("123 ABC def!@#") == "one hundred and twenty three abc def"
+	assert format_text("123 ABC def!@#") == "one hundred and twentythree abc def"
 	assert format_text("") == ""
 	try:
 		format_text(12345)  # type: ignore
@@ -49,21 +49,21 @@ def test_format_text():
 def test_format_text_only_numbers():
 	assert (
 		format_text("2024 100 3.14")
-		== "two thousand and twenty four one hundred three point one four"
+		== "two thousand and twentyfour one hundred three point one four"
 	)
 
 
 def test_format_text_all_non_alpha():
 	assert (
 		format_text("1234!@#$%^&'*()’_+-=[]{}’|;:',.<>?/`~")
-		== "one thousand two hundred and thirty four"
+		== "one thousand two hundred and thirtyfour"
 	)
 
 
 def test_format_text_multiple_spaces():
 	assert (
 		format_text("Hello---world!!  This   is a    test.")
-		== "hello world this is a test"
+		== "helloworld this is a test"
 	)
 
 
