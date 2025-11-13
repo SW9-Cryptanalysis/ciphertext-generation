@@ -3,20 +3,26 @@ from text_fetching.fetcher import Fetcher
 from encipherment.cipher import HomophonicCipher, MonoalphabeticCipher
 from utils.files import save_cipher
 from utils.formatting import clean_spaces
-from utils.constants import (
-	MIN_PLAINTEXT_LENGTH,
-	MAX_PLAINTEXT_LENGTH,
-	NUM_CIPHERS,
-)
 from tqdm import tqdm
+from utils.constants import DIFFICULTIES, LENGTHS
+from utils.z408 import (
+	plaintext_str as z408_plaintext,
+	cipher_str as z408_cipher,
+	key_formatted as z408_key,
+)
+
 
 logging.basicConfig(
-	level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s",
+	level=logging.INFO,
+	format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
 
 def generate_cipher(
-	min_len: int, max_len: int, filename: str, difficulty: int | None = None,
+	min_len: int,
+	max_len: int,
+	filename: str,
+	difficulty: int | None = None,
 ) -> None:
 	"""Generate a cipher from a random book slice and save it to a JSON file.
 
@@ -32,6 +38,7 @@ def generate_cipher(
 	book_text = fetcher.fetch_random_book_text()
 	sliced_text = fetcher.get_random_book_slice(book_text, min_len, max_len)
 	cleaned_text = clean_spaces(sliced_text)
+
 	try:
 		cipher = HomophonicCipher(cleaned_text, difficulty=difficulty)
 		cipher.generate_difficulty()
@@ -69,10 +76,25 @@ def generate_monoalphabetic_cipher(min_len: int, max_len: int, filename: str) ->
 
 
 if __name__ == "__main__":  # pragma: no cover
-	for i in tqdm(range(NUM_CIPHERS), desc="Generating ciphers"):
-		generate_cipher(
-			MIN_PLAINTEXT_LENGTH,
-			MAX_PLAINTEXT_LENGTH,
-			f"cipher-{i}.json",
-		)
-	pass
+	# Homophonic Ciphers
+	with tqdm(total=len(DIFFICULTIES) * len(LENGTHS) + 2) as pbar:
+		for difficulty in DIFFICULTIES:
+			for length in LENGTHS:
+				generate_cipher(
+					length, length, f"c_{length}_{difficulty}.json", difficulty,
+				)
+				pbar.update(1)
+
+		# Z408 Cipher
+		z408 = HomophonicCipher(z408_plaintext, difficulty=7)
+		z408.key = z408_key
+		z408.ciphertext = z408_cipher
+		z408._generate_recurrence_encoding()
+
+		save_cipher(cipher_data=z408, filename="z408.json")
+		pbar.update(1)
+
+
+		# Monoalphabetic Cipher
+		generate_monoalphabetic_cipher(4000, 4000, "c_mono_4000.json")
+		pbar.update(1)
