@@ -67,6 +67,13 @@ def test_format_text_multiple_spaces():
 	)
 
 
+def test_format_text_keeps_spaces_but_removes_punctuation():
+	assert (
+		format_text("Wait—did you seriously just say, ‘We’re leaving at 6:00 a.m., no exceptions!’—right after promising this would be a relaxing weekend?")
+		== "waitdid you seriously just say were leaving at sixzero am no exceptionsright after promising this would be a relaxing weekend"
+	)
+
+
 def test_clean_spaces():
 	assert clean_spaces("This is a test.") == "Thisisatest."
 	assert clean_spaces("  Leading and trailing spaces  ") == "Leadingandtrailingspaces"
