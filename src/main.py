@@ -89,6 +89,7 @@ if __name__ == "__main__":  # pragma: no cover
 		z408 = HomophonicCipher(z408_plaintext, difficulty=7)
 		z408.key = z408_key
 		z408.ciphertext = z408_cipher
+		z408.num_symbols = 54
 		z408._generate_recurrence_encoding()
 
 		save_cipher(cipher_data=z408, filename="z408.json")
