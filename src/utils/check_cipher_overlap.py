@@ -4,6 +4,7 @@ from utils.logging import get_colored_logger
 
 logger = get_colored_logger("overlapping_ciphers")
 
+
 def get_jaccard_similarity(str1: str, str2: str) -> float:
 	"""Calculate intersection over union of words.
 
@@ -11,11 +12,11 @@ def get_jaccard_similarity(str1: str, str2: str) -> float:
 	1.0 = Identical set of words.
 
 	Args:
-        str1 (str): First string to compare.
-        str2 (str): Second string to compare.
+		str1 (str): First string to compare.
+		str2 (str): Second string to compare.
 
 	Returns:
-        float: Jaccard similarity between the two strings.
+		float: Jaccard similarity between the two strings.
 
 	"""
 	a = set(str1.lower().split())
@@ -37,13 +38,15 @@ def get_ciphers() -> list[dict]:
 		if filename.endswith(".json") and filename.startswith("c_"):
 			with open(f"ciphers/{filename}", encoding="utf-8") as f:
 				cipher = json.load(f)
+				cipher["name"] = filename
 				ciphers.append(cipher)
 
 	return ciphers
 
-if __name__ == "__main__":
+
+def check_cipher_overlap():
+	result = {}
 	for cipher in get_ciphers():
-		# Find overlapping ciphers
 		overlapping_ciphers = []
 		for other_cipher in get_ciphers():
 			if cipher["plaintext"] == other_cipher["plaintext"]:
@@ -55,5 +58,14 @@ if __name__ == "__main__":
 			):
 				overlapping_ciphers.append(other_cipher)
 
-		logger.info(f"Found {len(overlapping_ciphers)} overlapping ciphers"
-				f" for c_{len(cipher["plaintext"])}_{cipher["difficulty"]}")
+		if overlapping_ciphers:
+			result[cipher["name"]] = overlapping_ciphers
+
+		logger.info(
+			f"Found {len(overlapping_ciphers)} overlapping ciphers for {cipher['name']}"
+		)
+	return result
+
+
+if __name__ == "__main__":
+	check_cipher_overlap()  # pragma: no cover
