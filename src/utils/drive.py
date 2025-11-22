@@ -4,6 +4,9 @@ from io import BytesIO
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.external_account_authorized_user import (
+	Credentials as ExternalCredentials,
+)
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from encipherment.cipher import SubstitutionCipher
@@ -21,7 +24,7 @@ SCOPES = ["https://www.googleapis.com/auth/drive"]
 # File names for credentials and saved token
 CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
 TOKEN_JSON = os.getenv("GOOGLE_JSON_TOKEN")
-TEMP_TOKEN_FILE = "temp_token_for_auth.json" # noqa: S105
+TEMP_TOKEN_FILE = "temp_token_for_auth.json"  # noqa: S105
 DRIVE_VERSION = "v3"
 TEMP_CREDENTIALS_FILE = "temp_google_credentials.json"
 
@@ -46,22 +49,7 @@ def authenticate_drive_terminal() -> build:  # type: ignore
 		if creds and creds.expired:
 			creds.refresh(Request())
 		else:
-			with open(TEMP_CREDENTIALS_FILE, "w") as f:
-				f.write(CREDENTIALS_JSON if CREDENTIALS_JSON else "")
-			try:
-				flow = InstalledAppFlow.from_client_secrets_file(
-					TEMP_CREDENTIALS_FILE, SCOPES,
-				)
-
-				creds = flow.run_local_server(
-					port=0,
-					success_message="Authentication successful! You can close this"
-						"browser tab.",
-				)
-				log.info("Authentication successful.")
-			finally:
-				if os.path.exists(TEMP_CREDENTIALS_FILE):
-					os.remove(TEMP_CREDENTIALS_FILE)
+			creds = authenticate()
 
 		token_content = creds.to_json()
 
@@ -86,7 +74,33 @@ def authenticate_drive_terminal() -> build:  # type: ignore
 	return build("drive", DRIVE_VERSION, credentials=creds)
 
 
-# ---
+def authenticate() -> Credentials | ExternalCredentials:
+	"""Authenticate with Google Drive using the provided credentials.
+
+	Returns:
+		Credentials: The authenticated credentials.
+
+	"""
+	creds = None
+
+	with open(TEMP_CREDENTIALS_FILE, "w") as f:
+		f.write(CREDENTIALS_JSON if CREDENTIALS_JSON else "")
+	try:
+		flow = InstalledAppFlow.from_client_secrets_file(
+			TEMP_CREDENTIALS_FILE,
+			SCOPES,
+		)
+
+		creds = flow.run_local_server(
+			port=0,
+			success_message="Authentication successful! You can close thisbrowser tab.",
+		)
+		log.info("Authentication successful.")
+	finally:
+		if os.path.exists(TEMP_CREDENTIALS_FILE):
+			os.remove(TEMP_CREDENTIALS_FILE)
+
+	return creds
 
 
 def create_cipher_json(cipher: SubstitutionCipher) -> tuple[str, bytes]:
