@@ -120,6 +120,38 @@ class Fetcher:
 		"64317",  # The Great Gatsby
 		"8438",  # The Ethics of Aristotle
 		"26659",  # The Will to Believe, and Other Essays in Popular Philosophy
+
+		"7241", # Fables of La Fontaine
+		"6593", # History of Tom Jones, a Foundling
+		"1342", # Pride and Prejudice
+		"1661", # The Adventures of Sherlock Holmes
+		"15399", # The Interesting Narrative of the Life of Olaudah Equiano...
+		"1998", # Thus Spake Zarathustra
+		"3207", # Leviathan
+		"120", # Treasure Island
+		"2160", # The Expedition of Humphry Clinker
+		"2542", # A Doll's House
+		"84", # The Importance of Being Earnest: A Trivial Comedy for Serious People
+		"7370", 
+		"12",
+		"2852",
+		"76",
+		"1342",
+		"16389",
+		"2148",
+		"1952",
+		"1259",
+		"394",
+		"76939",
+		"2542",
+		"829",
+		"60976",
+		"2148",
+		"26184",
+		"2814",
+		"36034",
+		"1342",
+		"1342",
 	]
 
 	def __init__(self, validation: bool = False) -> None:
@@ -263,7 +295,6 @@ class Fetcher:
 		# We use finditer to iterate over words efficiently starting from start_idx
 		# This skips over massive gaps of whitespace automatically
 		for match in self.word_pattern.finditer(text, pos=start_idx):
-
 			word_len = match.end() - match.start()
 
 			current_content_len += word_len
