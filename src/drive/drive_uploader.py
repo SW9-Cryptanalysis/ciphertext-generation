@@ -115,13 +115,7 @@ class DriveUploader(mp.Process):
 
 		"""
 		process_name = self.name
-		try:
-			self.drive_service = authenticate_drive_terminal()
-		except Exception as e:
-			log.critical(
-				f"{process_name}: Error authenticating drive service: {e}",
-				exc_info=True,
-			)
+		if not self._authenticate_service():
 			return
 
 		bs = BatchState(1)
@@ -131,34 +125,85 @@ class DriveUploader(mp.Process):
 				try:
 					item = self.queue.get(timeout=5)
 				except queue.Empty:
-					if self.uploaded_count >= self.total_ciphers:
-						break
-					else:
-						continue
+					continue
 
 				if item == SENTINEL:
 					break
 
-				filename, file_bytes = item
+				bs = self._process_cipher_item(item, bs, pbar)
 
-				bs.zip_buffer.writestr(filename, file_bytes)
-				bs.current_batch_count += 1
-
-				if bs.current_batch_count < BATCH_SIZE:
-					continue
-
-				bs.zip_buffer.close()
-
-				batch_filename = f"ciphers_batch_{bs.batch_num}.zip"
-
-				bs: BatchState = self._upload_batch(bs, pbar, batch_filename)
-
-			batch_filename = f"ciphers_batch_final_{bs.batch_num}.zip"
-			bs = self._upload_batch(bs, pbar, batch_filename)
+			if bs.current_batch_count > 0:
+				bs = self._upload_final_batch(bs, pbar)
 
 		log.info(
 			f"{process_name} finished. Total uploaded: {self.uploaded_count} files.",
 		)
+
+	def _authenticate_service(self) -> bool:
+		"""Authenticate with the Google Drive service.
+
+		Returns:
+			bool: True if authentication was successful, False otherwise.
+
+		"""
+		try:
+			self.drive_service = authenticate_drive_terminal()
+			return True
+		except Exception as e:
+			log.critical(
+				f"{self.name}: Error authenticating drive service: {e}",
+				exc_info=True,
+			)
+			return False
+
+	def _process_cipher_item(
+		self,
+		item: tuple[str, bytes],
+		bs: BatchState,
+		pbar: tqdm,
+	) -> BatchState:
+		"""Process a single cipher item, adding it to the batch.
+
+		Args:
+			item (tuple[str, bytes]): The cipher item containing filename and bytes.
+			bs (BatchState): The current BatchState object.
+			pbar (tqdm): The progress bar to update.
+
+		Returns:
+			BatchState: The updated (or new) BatchState object.
+
+		"""
+		filename, file_bytes = item
+
+		bs.zip_buffer.writestr(filename, file_bytes)
+		bs.current_batch_count += 1
+
+		if bs.current_batch_count < BATCH_SIZE:
+			return bs
+
+		bs.zip_buffer.close()
+
+		batch_filename = f"ciphers_batch_{bs.batch_num}.zip"
+
+		return self._upload_batch(bs, pbar, batch_filename)
+
+	def _upload_final_batch(self, bs: BatchState, pbar: tqdm) -> BatchState:
+		"""Upload the final batch of ciphers to Google Drive.
+
+		Args:
+			bs (BatchState): The current BatchState object.
+			pbar (tqdm): The progress bar to update.
+
+		Returns:
+			BatchState: The updated BatchState object.
+
+		"""
+		log.info(f"Uploading final partial batch of {bs.current_batch_count} files.")
+		bs.zip_buffer.close()
+
+		batch_filename = f"ciphers_batch_final_{bs.batch_num}.zip"
+
+		return self._upload_batch(bs, pbar, batch_filename)
 
 	def _upload_batch(
 		self,
@@ -192,7 +237,7 @@ class DriveUploader(mp.Process):
 
 				return BatchState(batch_num=bs.batch_num + 1)
 			else:
-				log.error(
+				log.critical(
 					f"FATAL: Batch {bs.batch_num} failed all retries and was skipped.",
 				)
 				return BatchState(batch_num=bs.batch_num + 1)
