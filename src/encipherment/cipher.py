@@ -5,6 +5,7 @@ from collections import Counter
 from utils.constants import MIN_DIFFICULTY, MAX_DIFFICULTY
 from abc import ABC, abstractmethod
 from parameter_validator import parameter_validator, all_of
+import json
 
 from utils.validators import (
 	in_range,
@@ -120,6 +121,19 @@ class SubstitutionCipher(ABC):
 	def encipher(self) -> str:  # pragma: no cover
 		"""Encipher the plaintext using the generated key."""
 		pass
+
+	@classmethod
+	def from_json(cls, json_data: str) -> "SubstitutionCipher":  # pragma: no cover
+		"""Create a cipher object from a JSON string."""
+		data = json.loads(json_data)
+		cipher = cls(data["plaintext"])
+		cipher.key = data["key"]
+		cipher.ciphertext = data["ciphertext"]
+		cipher.recurrence_encoding = data["recurrence_encoding"]
+		cipher.num_symbols = data["num_symbols"]
+		cipher.difficulty = data["difficulty"]
+
+		return cipher
 
 
 class HomophonicCipher(SubstitutionCipher):
@@ -245,7 +259,6 @@ class HomophonicCipher(SubstitutionCipher):
 
 		"""
 		return random.randint(MIN_DIFFICULTY, MAX_DIFFICULTY)
-
 
 class MonoalphabeticCipher(SubstitutionCipher):
 	"""A monoalphabetic substitution cipher.
