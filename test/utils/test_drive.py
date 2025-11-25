@@ -1,14 +1,11 @@
 import pytest
 import json
-import os
 from unittest.mock import MagicMock, mock_open
 from google.oauth2.credentials import Credentials
 from utils.drive import (
     authenticate_drive_terminal,
     create_cipher_json,
     upload_to_drive,
-    CREDENTIALS_JSON,
-    TOKEN_JSON,
 )
 
 @pytest.fixture
@@ -41,12 +38,12 @@ class TestDriveUtils:
     def test_authenticate_drive_terminal_expired_token_refresh(self, mocker, mock_credentials):
         mock_credentials.valid = False
         mock_credentials.expired = True
-        mock_credentials.refresh_token = "refresh_token"
-        
+        mock_credentials.refresh_token = "refresh_token" # noqa: S105
+
         mocker.patch("utils.drive.TOKEN_JSON", '{"token": "expired"}')
         mocker.patch("google.oauth2.credentials.Credentials.from_authorized_user_info", return_value=mock_credentials)
         mock_build = mocker.patch("utils.drive.build")
-        
+
         service = authenticate_drive_terminal()
 
         mock_credentials.refresh.assert_called_once()
@@ -54,10 +51,10 @@ class TestDriveUtils:
 
     def test_authenticate_drive_terminal_new_auth_flow(self, mocker, mock_credentials):
         mocker.patch("utils.drive.TOKEN_JSON", "")
-        
+
         mock_flow = mocker.patch("utils.drive.InstalledAppFlow")
         mock_flow.from_client_secrets_file.return_value.run_local_server.return_value = mock_credentials
-        
+
         mock_build = mocker.patch("utils.drive.build")
         mocker.patch("builtins.open", mock_open())
         mocker.patch("os.path.exists", return_value=True)
@@ -79,7 +76,7 @@ class TestDriveUtils:
         mock_service = MagicMock()
         mock_execute = mock_service.files.return_value.create.return_value.execute
         mock_execute.return_value = {"id": "file_123", "name": "cipher.json", "parents": ["root"]}
-        
+
         file_id = upload_to_drive(
             mock_service,
             b"data",
@@ -89,7 +86,7 @@ class TestDriveUtils:
 
         assert file_id == "file_123"
         mock_service.files.return_value.create.assert_called_once()
-        
+
         call_kwargs = mock_service.files.return_value.create.call_args[1]
         assert call_kwargs["body"]["name"] == "cipher.json"
         assert call_kwargs["body"]["parents"] == ["folder_123"]
