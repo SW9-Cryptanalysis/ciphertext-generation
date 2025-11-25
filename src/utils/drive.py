@@ -119,9 +119,6 @@ def create_cipher_json(cipher: SubstitutionCipher) -> tuple[str, bytes]:
 	return json_string, file_bytes
 
 
-# ---
-
-
 def upload_to_drive(
 	drive_service: build,  # type: ignore
 	file_bytes: bytes,
