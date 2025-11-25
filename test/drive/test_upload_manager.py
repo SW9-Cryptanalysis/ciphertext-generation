@@ -1,6 +1,4 @@
-import pytest
-from unittest.mock import call, MagicMock
-import multiprocessing as mp
+from unittest.mock import call
 from drive.cipher_manager import CipherManager
 
 class TestCipherManager:
@@ -24,24 +22,24 @@ class TestCipherManager:
     def test_divide_workload_even_split(self, mocker):
         mocker.patch("multiprocessing.Manager")
         mocker.patch("os.cpu_count", return_value=4)
-        
+
         manager = CipherManager("id")
         manager.TOTAL_CIPHERS = 100
-        
+
         workload = manager._divide_workload()
-        
+
         assert len(workload) == 4
         assert workload == [(0, 25), (25, 25), (50, 25), (75, 25)]
 
     def test_divide_workload_uneven_split(self, mocker):
         mocker.patch("multiprocessing.Manager")
         mocker.patch("os.cpu_count", return_value=3)
-        
+
         manager = CipherManager("id")
         manager.TOTAL_CIPHERS = 100
-        
+
         workload = manager._divide_workload()
-        
+
         assert len(workload) == 3
         assert workload == [(0, 33), (33, 33), (66, 34)]
 
@@ -50,11 +48,11 @@ class TestCipherManager:
         mock_queue = mocker.Mock()
         mock_manager_cls.return_value.Queue.return_value = mock_queue
 
-        mock_cpu_count = mocker.patch("os.cpu_count", return_value=2)
-        
+        mocker.patch("os.cpu_count", return_value=2)
+
         mock_consumer_cls = mocker.patch("drive.cipher_manager.DriveUploader")
         mock_consumer = mock_consumer_cls.return_value
-        
+
         mock_producer_cls = mocker.patch("drive.cipher_manager.CipherProducer")
         mock_producer_1 = mocker.Mock()
         mock_producer_2 = mocker.Mock()
@@ -63,7 +61,7 @@ class TestCipherManager:
         mock_log = mocker.patch("drive.cipher_manager.log")
 
         manager = CipherManager("test_folder")
-        manager.TOTAL_CIPHERS = 100 
+        manager.TOTAL_CIPHERS = 100
 
         manager.execute()
 
@@ -88,12 +86,12 @@ class TestCipherManager:
     def test_execute_with_zero_total_ciphers(self, mocker):
         mocker.patch("multiprocessing.Manager")
         mocker.patch("os.cpu_count", return_value=2)
-        mock_consumer_cls = mocker.patch("drive.cipher_manager.DriveUploader")
+        mocker.patch("drive.cipher_manager.DriveUploader")
         mock_producer_cls = mocker.patch("drive.cipher_manager.CipherProducer")
-        
+
         manager = CipherManager("id")
         manager.TOTAL_CIPHERS = 0
-        
+
         manager.execute()
-        
+
         mock_producer_cls.assert_not_called()

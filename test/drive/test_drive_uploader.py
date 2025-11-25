@@ -70,10 +70,10 @@ class TestDriveUploader:
 	def test_successful_full_upload(
 		self, mocker, mock_queue, mock_cipher_item, mock_cipher_item_2
 	):
-		TOTAL_TO_UPLOAD = 2
+		total_to_upload = 2
 
 		local_config = DriveUploaderConfig(
-			folder_id=MOCK_FOLDER_ID, total_ciphers=TOTAL_TO_UPLOAD
+			folder_id=MOCK_FOLDER_ID, total_ciphers=total_to_upload
 		)
 
 		mocker.patch(
@@ -85,7 +85,7 @@ class TestDriveUploader:
 			side_effect=["file_id_1", "file_id_2"],
 		)
 
-		mock_pbar = mocker.Mock(total=TOTAL_TO_UPLOAD)
+		mock_pbar = mocker.Mock(total=total_to_upload)
 		mocker.patch(
 			"drive.drive_uploader.tqdm",
 			return_value=mocker.MagicMock(
@@ -101,7 +101,7 @@ class TestDriveUploader:
 
 		uploader.run()
 
-		assert uploader.uploaded_count == TOTAL_TO_UPLOAD
+		assert uploader.uploaded_count == total_to_upload
 		assert mock_upload_drive.call_count == 1
 		mock_pbar.update.assert_called_once_with(BATCH_SIZE)
 
@@ -280,13 +280,13 @@ class TestDriveUploader:
 		"""Test the exception block in _upload_batch."""
 		# Mock ZipFile to prevent ResourceWarning/IO error during test teardown
 		mocker.patch("drive.drive_uploader.zipfile.ZipFile")
-		
+
 		uploader = DriveUploader(mocker.Mock(), uploader_config, name="TestUploader")
 		uploader.drive_service = mocker.Mock()
 		mock_log = mocker.patch("drive.drive_uploader.log")
 
 		mocker.patch(
-			"drive.drive_uploader.upload_to_drive", 
+			"drive.drive_uploader.upload_to_drive",
 			side_effect=Exception("Unexpected API Crash")
 		)
 		mock_pbar = mocker.Mock()
@@ -299,10 +299,10 @@ class TestDriveUploader:
 
 		assert new_bs.batch_num == 8
 		assert new_bs.current_batch_count == 0
-		
+
 		mock_log.error.assert_called_once_with(
 			"FATAL: Unexpected error during upload of Batch 7: Unexpected API Crash",
 			exc_info=True,
 		)
-		
+
 		mock_pbar.update.assert_not_called()
