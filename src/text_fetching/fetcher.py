@@ -30,7 +30,6 @@ class Fetcher:
 	BOOK_IDS = [
 		"84",  # Frankenstein
 		"2701",  # Moby Dick
-		"1342",  # Pride and Prejudice
 		"2641",  # A Room with a View
 		"145",  # Middlemarch
 		"37106",  # Little Women; Or, Meg, Jo, Beth, and Amy
@@ -39,7 +38,6 @@ class Fetcher:
 		"1260",  # Jane Eyre
 		"6761",  # The Adventures of Ferdinand Count Fathom
 		"345",  # Dracula
-		"2160",  # The Expedition of Humphry Clinker
 		"4085",  # The Adventures of Roderick Random
 		"5197",  # My Life - Volume 1
 		"1232",  # The Prince
@@ -51,12 +49,10 @@ class Fetcher:
 		"2591",  # Grimm's Fairy Tales
 		"2600",  # War and Peace
 		"41",  # The Legend of Sleepy Hollow
-		"844",  # The Importance of Being Earnest: A Trivial Comedy for Serious People
 		"46",  # A Christmas Carol in Prose; Being a Ghost Story of Christmas
 		"3296",  # The Confessions of St. Augustine
 		"408",  # The Souls of Black Folk
 		"5200",  # Metamorphosis
-		"26184",  # Simple Sabotage Field Manual
 		"205",  # Walden, and On The Duty Of Civil Disobedience
 		"1497",  # The Republic
 		"23",  # Narrative of the Life of Frederick Douglass, an American Slave
@@ -67,7 +63,6 @@ class Fetcher:
 		"219",  # Heart of Darkness
 		"20203",  # Autobiography of Benjamin Franklin
 		"1184",  # The Count of Monte Cristo
-		"15399",  # The Interesting Narrative of the Life of Olaudah Equiano...
 		"1400",  # Great Expectations
 		"74",  # The Adventures of Tom Sawyer
 		"815",  # Democracy in America
