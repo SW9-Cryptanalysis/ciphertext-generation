@@ -1,10 +1,9 @@
 import os
 from utils.logging import get_colored_logger
-from drive.upload_manager import CipherManager
-
-log = get_colored_logger("gen_training")
+from drive.cipher_manager import CipherManager
 
 if __name__ == "__main__":
+	log = get_colored_logger("gen_training")
 	folder_id = os.getenv("FOLDER_ID")
 
 	if not folder_id:
