@@ -28,7 +28,6 @@ class Fetcher:
 	"""
 
 	BOOK_IDS = [
-		"84",  # Frankenstein
 		"2701",  # Moby Dick
 		"2641",  # A Room with a View
 		"145",  # Middlemarch
@@ -103,7 +102,7 @@ class Fetcher:
 		"120", # Treasure Island
 		"2160", # The Expedition of Humphry Clinker
 		"2542", # A Doll's House
-		"84", # The Importance of Being Earnest: A Trivial Comedy for Serious People
+		"84", # Frankenstein
 		"7370", # Second Treatise of Government
 		"12", # Through the Looking-Glass
 		"2852", # The Hound of the Baskervilles
