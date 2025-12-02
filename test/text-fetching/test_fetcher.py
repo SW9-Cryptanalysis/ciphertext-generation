@@ -1,5 +1,6 @@
 import pytest
 import requests
+import itertools
 
 from text_fetching.fetcher import Fetcher
 from utils.formatting import format_text
@@ -42,6 +43,7 @@ def empty_text():
 def accented_text():
 	return "kožušček François æåø äö êèéêñ"
 
+
 @pytest.fixture
 def text_with_spaces():
 	return "this is a text for testing purposes which is extremely long and has spaces in it as well so that it can be sliced properly i cannot come up with a better example so i will just use this one so lets just write a lot of nonsense text and hope it works and then we can see if it breaks or not and if it does break we can fix it and then we can write a new one and so on and so forth until we run out of ideas and we have to write the next one"
@@ -54,6 +56,7 @@ def test_slicing_text(text_with_spaces):
 	)
 	assert isinstance(sliced_text, str)
 	assert 5 <= len(sliced_text) <= 20
+
 
 def test_slicing_text_long(text_with_spaces):
 	fetcher = Fetcher()
@@ -269,4 +272,42 @@ def test_fetch_book_validation(mocker):
 	assert mock_get.call_count == 2
 	assert fetcher.book_id in fetcher.BOOK_IDS_VALIDATION
 	assert fetcher.book_id not in fetcher.BOOK_IDS
-	assert mock_get.call_args_list[0][0][0] == f"https://gutendex.com/books/{fetcher.book_id}"
+	assert (
+		mock_get.call_args_list[0][0][0]
+		== f"https://gutendex.com/books/{fetcher.book_id}"
+	)
+
+
+def test_load_books(mocker):
+	# Mock the metadata response with empty formats
+	# Mock is_cached to return False
+	mocker.patch("text_fetching.fetcher.book_is_cached", return_value=False)
+
+	mock_metadata_resp = mocker.Mock()
+	mock_metadata_resp.raise_for_status.return_value = None
+	mock_metadata_resp.json.return_value = {
+		"formats": {"text/plain; charset=utf-8": "http://example.com/book.txt"}
+	}
+
+	# Mock the text response
+	mock_text_resp = mocker.Mock()
+	mock_text_resp.raise_for_status.return_value = None
+	mock_text_resp.text = "This is the book content. It should have a certain length."
+
+	mock_get = mocker.patch(
+		"text_fetching.fetcher.requests.get",
+		side_effect=itertools.cycle([mock_metadata_resp, mock_text_resp]),
+	)
+	fetcher = Fetcher()
+	fetcher.load_books()
+	assert fetcher.book_id in fetcher.BOOK_IDS_VALIDATION
+	assert fetcher.book_id not in fetcher.BOOK_IDS
+	assert (
+		mock_get.call_count
+		== (len(fetcher.BOOK_IDS_VALIDATION) + len(fetcher.BOOK_IDS)) * 2
+	)
+	assert (
+		mock_get.call_args_list[-2][0][0]
+		== f"https://gutendex.com/books/{fetcher.book_id}"
+	)
+	assert mock_get.call_args_list[-1][0][0] == "http://example.com/book.txt"
