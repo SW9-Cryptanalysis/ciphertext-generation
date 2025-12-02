@@ -271,3 +271,13 @@ class Fetcher:
 				break
 
 		return end_idx
+
+	def load_books(self) -> None:
+		"""Load books from the books directory."""
+		for book in self.BOOK_IDS:
+			self.book_id = book
+			self.fetch_random_book_text()
+
+		for book in self.BOOK_IDS_VALIDATION:
+			self.book_id = book
+			self.fetch_random_book_text()
