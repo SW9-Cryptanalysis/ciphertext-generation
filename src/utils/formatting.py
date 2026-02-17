@@ -17,11 +17,19 @@ def numbers_to_words(text: str) -> str:
 	"""
 
 	def replace_number(match: re.Match) -> str:
-		number_str = match.group()
-		number_float = float(number_str)
-		return num2words(number_float)
+		groups = match.groupdict()
+		number_str = groups["number"]
+		suffix = groups["suffix"]
+		
+		number_val = float(number_str) if "." in number_str else int(number_str)
+		
+		if suffix:
+			return num2words(number_val, ordinal=True)
+		return num2words(number_val)
 
-	return re.sub(r"\d+(\.\d+)?+", replace_number, text)
+	pattern = r"(?P<number>\d+(\.\d+)?)(?P<suffix>st|nd|rd|th)?"
+
+	return re.sub(pattern, replace_number, text, flags=re.IGNORECASE)
 
 
 @parameter_validator(text=strongly_typed)
@@ -50,13 +58,13 @@ def format_text(text: str) -> str:
 
 @parameter_validator(text=strongly_typed)
 def clean_spaces(text: str) -> str:
-    """Remove spaces from the input text.
+	"""Remove spaces from the input text.
 
-    Args:
-    text (str): The input text
+	Args:
+	text (str): The input text
 
-    Returns:
-    str: The text with all whitespace removed.
+	Returns:
+	str: The text with all whitespace removed.
 
-    """
-    return "".join(text.split())
+	"""
+	return "".join(text.split())

@@ -28,6 +28,14 @@ def test_numbers_to_words():
 		numbers_to_words("1234567890")
 		== "one billion, two hundred and thirty-four million, five hundred and sixty-seven thousand, eight hundred and ninety"
 	)
+	assert (
+		numbers_to_words("May 3rd, 2024")
+		== "May third, two thousand and twenty-four"
+	)
+	assert (
+		numbers_to_words("He came from the 10th floor.")
+		== "He came from the tenth floor."
+	)
 
 
 def test_format_text():
