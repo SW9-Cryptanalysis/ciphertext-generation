@@ -10,6 +10,7 @@ from typing_extensions import TypedDict
 from datasets import load_dataset
 from datasets.iterable_dataset import IterableDataset
 
+from utils.formatting import format_text, clean_spaces
 from utils.constants import BOOK_IDS_VALIDATION, TOTAL_BOOKS, DATASET_NAME
 
 dotenv.load_dotenv()
@@ -185,35 +186,64 @@ def get_book_chunks(
 		Iterator[str]: An iterator of text chunks.
 
 	"""
-	zone_size = len(book_text) // actual_take
+	total_len = len(book_text)
+
+	start_trim = min(int(total_len * 0.02), 10000)
+	end_trim = min(int(total_len * 0.01), 5000)
+
+	if total_len < len_bounds[1] * 3:
+		usable_text = book_text
+	else:
+		usable_text = book_text[start_trim : total_len - end_trim]
+
+	zone_size = len(usable_text) // actual_take
 
 	for i in range(actual_take):
 		raw_chunk = extract_random_chunk(
-			book_text,
+			usable_text,
 			i * zone_size,
 			zone_size,
 			len_bounds,
 		)
-		yield clean_whitespace(raw_chunk)
-  
+		yield clean_spaces(format_text(raw_chunk))
+
+
 def validate_targets(targets: dict[str, int]) -> None:
 	"""Validate the targets dictionary.
- 
+
 	Args:
 		targets (dict[str, int]): The targets dictionary to validate.
-  
+
 	Raises:
 		ValueError: If any of the targets are not valid.
-  
+
 	"""
 	required_keys = {"train", "val", "test"}
 	if set(targets.keys()) != required_keys:
-		raise ValueError(f"total_samples_map must contain exactly keys: {required_keys}")
+		raise ValueError(
+			f"total_samples_map must contain exactly keys: {required_keys}",
+		)
+
+
+def get_actual_take(split: str, debts: dict[str, float], capacity: int) -> int:
+	"""Get the actual take for a given split.
+
+	Args:
+		split (str): The split to get the actual take for.
+		debts (dict[str, float]): The debts dictionary.
+		capacity (int): The capacity of the split.
+
+	Returns:
+		int: The actual take for the split.
+
+	"""
+	actual_take = max(min(int(debts[split]), capacity), 1) if capacity > 0 else 0
+	return actual_take
 
 
 def text_streams_generator(
 	stream: Iterable,
-	total_samples_map: dict[str, int], # e.g. {"train": 1000, "val": 15, "test": 15}
+	total_samples_map: dict[str, int],  # e.g. {"train": 1000, "val": 15, "test": 15}
 	len_bounds: tuple[int, int],
 ) -> Iterator[tuple[str, TextStream]]:
 	"""Generate a stream of text chunks from the provided dataset.
@@ -258,7 +288,11 @@ def text_streams_generator(
 		capacity = len(raw_text) // len_bounds[1]
 
 		debts[split] += means[split]
-		actual_take = max(min(int(debts[split]), capacity), 1)
+
+		actual_take = get_actual_take(split, debts, capacity)
+
+		if actual_take == 0:
+			continue
 
 		take_limit = min(actual_take, total_samples_map[split] - counts[split])
 

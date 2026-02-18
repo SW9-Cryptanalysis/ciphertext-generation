@@ -130,32 +130,32 @@ class TestStreamGenerator:
         mocker.patch("fetching.text_splits.TOTAL_BOOKS", 100)
         # Mock validation list
         mocker.patch("fetching.text_splits.BOOK_IDS_VALIDATION", ["999"])
-        
+
     def test_text_streams_generator_skips_blacklisted_ids(self, mocker):
         # 1. Setup: Stream with 1 good book and 1 bad book
         stream = [
             {"id": "good_id", "text": "valid content " * 100, "metadata": {"title": "Good Book"}},
             {"id": "bad_id", "text": "invalid content " * 100, "metadata": {"title": "Bad Book"}},
         ]
-        
+
         # 2. Mock Constants: Force 'bad_id' into the blacklist
         mocker.patch("fetching.text_splits.BOOK_IDS_VALIDATION", ["bad_id"])
-        
-        # 3. Targets: We want 5 chunks from 'train'. 
+
+        # 3. Targets: We want 5 chunks from 'train'.
         # If the blacklist fails, we'd get chunks from 'bad_id' too.
         targets = {"train": 10, "val": 0, "test": 0}
-        
+
         # Force all splits to 'train' to ensure logic hits the blacklist check
         mocker.patch("fetching.text_splits.get_split", return_value="train")
 
         # 4. Execution
         gen = text_streams_generator(stream, targets, (10, 20))
         results = list(gen)
-        
+
         # 5. Assertions
         # verify we got results
         assert len(results) > 0
-        
+
         # Verify EVERY result comes from 'good_id'
         for _, data in results:
             assert data["source_id"] == "good_id"
@@ -189,7 +189,7 @@ class TestStreamGenerator:
         stream = []
         # Missing 'val' and 'test'
         invalid_targets = {"train": 10}
-        
+
         with pytest.raises(ValueError, match="must contain exactly keys"):
             list(text_streams_generator(stream, invalid_targets, (10, 20)))
 
@@ -226,23 +226,22 @@ class TestStreamGenerator:
         gen = text_streams_generator(stream, targets, (100, 200))
         results = list(gen)
 
-        assert len(results) == 1
-        assert results[0][0] == "val"
+        assert len(results) == 0
 
     def test_text_streams_generator_debt_accounting(self, mocker):
         # 1. Setup: A massive book so 'capacity' doesn't limit us
         # Length 20,000 ensures we can easily take 10+ chunks of size ~20
         stream = [{"id": "1", "text": "long " * 4000, "metadata": {"title": "Test Book"}}]
-        
+
         targets = {"train": 10, "val": 0, "test": 0}
-        
+
         # 2. Patch Constants & Logic to force high debt
         # Formula: mean = target / (TOTAL_BOOKS * 0.98)
         # If TOTAL_BOOKS=1 and target=10, mean = 10 / 0.98 ≈ 10.2
         # This guarantees 'actual_take' will be at least 10.
         mocker.patch("fetching.text_splits.TOTAL_BOOKS", 1)
         mocker.patch("fetching.text_splits.BOOK_IDS_VALIDATION", [])
-        
+
         # Force the first book (idx 0) to be 'train' so we hit the target logic immediately
         mocker.patch("fetching.text_splits.get_split", return_value="train")
 
@@ -253,7 +252,7 @@ class TestStreamGenerator:
         # 4. Assertions
         # We expected a mean of ~10.2, so we should get at least 10 chunks from this single book.
         assert len(results) >= 10
-        
+
         # Verify they are all from the same book and split
         for split, data in results:
             assert split == "train"
