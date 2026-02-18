@@ -195,11 +195,25 @@ def get_book_chunks(
 			len_bounds,
 		)
 		yield clean_whitespace(raw_chunk)
+  
+def validate_targets(targets: dict[str, int]) -> None:
+	"""Validate the targets dictionary.
+ 
+	Args:
+		targets (dict[str, int]): The targets dictionary to validate.
+  
+	Raises:
+		ValueError: If any of the targets are not valid.
+  
+	"""
+	required_keys = {"train", "val", "test"}
+	if set(targets.keys()) != required_keys:
+		raise ValueError(f"total_samples_map must contain exactly keys: {required_keys}")
 
 
 def text_streams_generator(
 	stream: Iterable,
-	total_samples_map: dict[str, int],  # e.g. {"train": 1000000, "val": 15000}
+	total_samples_map: dict[str, int], # e.g. {"train": 1000, "val": 15, "test": 15}
 	len_bounds: tuple[int, int],
 ) -> Iterator[tuple[str, TextStream]]:
 	"""Generate a stream of text chunks from the provided dataset.
@@ -219,6 +233,7 @@ def text_streams_generator(
 		Iterator[tuple[str, TextStream]]: An iterator of text chunks.
 
 	"""
+	validate_targets(total_samples_map)
 	means = {
 		"val": total_samples_map["val"] / (TOTAL_BOOKS * 0.01),
 		"test": total_samples_map["test"] / (TOTAL_BOOKS * 0.01),
@@ -244,9 +259,6 @@ def text_streams_generator(
 
 		debts[split] += means[split]
 		actual_take = max(min(int(debts[split]), capacity), 1)
-
-		if actual_take == 0:
-			continue
 
 		take_limit = min(actual_take, total_samples_map[split] - counts[split])
 
