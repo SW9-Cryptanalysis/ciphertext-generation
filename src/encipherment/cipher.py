@@ -5,7 +5,10 @@ from collections import Counter
 from utils.constants import MIN_DIFFICULTY, MAX_DIFFICULTY
 from abc import ABC, abstractmethod
 from parameter_validator import parameter_validator, all_of
+from parameter_validator.builtin_validators import strongly_typed
 import json
+from fetching.text_splits import TextStream
+from utils.validators import validate_text_obj
 
 from utils.validators import (
 	in_range,
@@ -43,20 +46,23 @@ class SubstitutionCipher(ABC):
 	"""
 
 	@abstractmethod
+	@parameter_validator(text_obj=strongly_typed, difficulty=strongly_typed_optional, cipher_type=strongly_typed_optional)
 	def __init__(
 		self,
-		plaintext: str,
+		text_obj: TextStream,
 		*,
 		difficulty: int | None = None,
 		cipher_type: str = "homophonic",
 	) -> None:  # pragma: no cover
 		"""Initialize the Cipher object with the given plaintext."""
-		self.plaintext = plaintext
+		self.plaintext = text_obj["text"]
 		self.difficulty = difficulty
 		self.num_symbols = 0
 		self.key = {}
 		self.ciphertext = ""
 		self.recurrence_encoding = ""
+		self.source_id = text_obj["source_id"]
+		self.source_name = text_obj["source_name"]
 		raise NotImplementedError("This is an abstract base class.")
 
 	def _generate_recurrence_encoding(self) -> str:
@@ -93,8 +99,9 @@ class SubstitutionCipher(ABC):
 			"num_symbols": self.num_symbols,
 			"difficulty": self.difficulty,
 			"key": self.key,
-			"ciphertext": self.ciphertext,
-			"recurrence_encoding": self.recurrence_encoding,
+			"ciphertext": self.recurrence_encoding,
+			"source_id": self.source_id,
+			"source_name": self.source_name,
 		}
 
 	def __str__(self) -> str:
@@ -132,6 +139,8 @@ class SubstitutionCipher(ABC):
 		cipher.recurrence_encoding = data["recurrence_encoding"]
 		cipher.num_symbols = data["num_symbols"]
 		cipher.difficulty = data["difficulty"]
+		cipher.source_id = data["source_id"]
+		cipher.source_name = data["source_name"]
 
 		return cipher
 
@@ -164,24 +173,23 @@ class HomophonicCipher(SubstitutionCipher):
 	"""
 
 	@parameter_validator(
-		plaintext=lower_case_no_spaces_alpha_string,
+		text_obj=validate_text_obj,
 		difficulty=all_of(
 			in_range(MIN_DIFFICULTY, MAX_DIFFICULTY), strongly_typed_optional,
 		),
 	)
-	def __init__(self, plaintext: str, *, difficulty: int | None = None) -> None:
+	def __init__(self, text_obj: TextStream, *, difficulty: int | None = None) -> None:
 		"""Initialize the Cipher object with the given plaintext.
 
 		Args:
-			plaintext (str): The lowercase plaintext to be encrypted with no
-				punctuation or spaces.
+			text_obj (TextStream): Text object containing the plaintext and metadata.
 			difficulty (int | None): The difficulty level of the cipher (4-20). If None,
 				a random difficulty will be generated.
 			cipher_type (str): The type of cipher to generate
 				("homophonic" or "monoalphabetic").
 
 		"""
-		self.plaintext = plaintext
+		self.plaintext = text_obj["text"]
 		if not difficulty:
 			self.difficulty = self.generate_difficulty()
 		else:
@@ -190,6 +198,8 @@ class HomophonicCipher(SubstitutionCipher):
 		self.key: dict[str, list] = {}
 		self.ciphertext: str = ""
 		self.recurrence_encoding: str = ""
+		self.source_id = text_obj["source_id"]
+		self.source_name = text_obj["source_name"]
 
 	def generate_key(self) -> dict:
 		"""Generate a homophonic substitution cipher key based on a difficulty level.
@@ -286,8 +296,8 @@ class MonoalphabeticCipher(SubstitutionCipher):
 
 	"""
 
-	@parameter_validator(plaintext=lower_case_no_spaces_alpha_string)
-	def __init__(self, plaintext: str) -> None:
+	@parameter_validator(text_obj=validate_text_obj)
+	def __init__(self, text_obj: TextStream) -> None:
 		"""Initialize the MonoalphabeticCipher with the given plaintext.
 
 		Args:
@@ -295,12 +305,15 @@ class MonoalphabeticCipher(SubstitutionCipher):
 				punctuation or spaces.
 
 		"""
-		self.plaintext = plaintext
+		self.plaintext = text_obj["text"]
 		self.num_symbols = 0
 		self.key = self.generate_key()
 		self.difficulty = 1
 		self.ciphertext = self.encipher()
 		self.recurrence_encoding = self._generate_recurrence_encoding()
+		self.ciphertext = self.recurrence_encoding
+		self.source_id = text_obj["source_id"]
+		self.source_name = text_obj["source_name"]
 
 	def generate_key(self) -> dict[str, list[int]]:
 		"""Generate a random monoalphabetic substitution key.
