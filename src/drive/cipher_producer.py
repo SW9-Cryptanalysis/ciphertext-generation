@@ -1,112 +1,105 @@
 import multiprocessing as mp
+import os
+import queue  # Standard queue for Empty exception
+from typing import Any
 from multiprocessing.queues import Queue as MPQueue
+
 from utils.drive import create_cipher_json
 from utils.logging import get_colored_logger
 from encipherment.cipher import SubstitutionCipher, HomophonicCipher
-from text_fetching.fetcher import Fetcher
-import os
-from typing import Any
+from fetching.text_splits import TextStream
+
+# Note: Fetcher import removed as it is no longer needed in the Producer
 
 log = get_colored_logger("cipher_producer")
 
 
 class CipherProducer(mp.Process):
-	"""A multiprocessing process for generating ciphers.
+	"""A multiprocessing process for generating ciphers from a shared input queue.
 
 	Attributes:
-		queue (MPQueue[Any]): The queue to add ciphers to.
-		start_idx (int): The start index for the cipher generation.
-		total_to_generate (int): The total number of ciphers to generate.
-
-	Methods:
-		run(): Execute the cipher generation process.
+		input_queue (MPQueue[Any]): Queue containing raw text data dicts.
+		output_queue (MPQueue[Any]): Queue to send finished cipher JSONs/bytes to.
 
 	"""
 
-	MIN_LEN = 400
-	MAX_LEN = 1000
-
 	def __init__(
 		self,
-		queue: MPQueue[Any],
-		start_and_total: tuple[int, int],
+		input_queue: MPQueue[Any],
+		output_queue: MPQueue[Any],
 		*args: Any,
 		**kwargs: Any,
 	) -> None:
-		"""Initialize the CipherProducer with a queue and start and total.
+		"""Initialize the CipherProducer.
 
 		Args:
-			queue (MPQueue[Any]): The queue to add ciphers to.
-			start_and_total (tuple[int, int]): A tuple containing the start and total
-				indices for the cipher generation.
-			*args: Additional positional arguments.
+			input_queue (MPQueue): Queue to receive text chunks from.
+			output_queue (MPQueue): Queue to send results to.
+			*args: Additional arguments.
 			**kwargs: Additional keyword arguments.
 
 		"""
 		super().__init__(*args, **kwargs)
-		self.start_idx, self.total_to_generate = start_and_total
-		self.queue = queue
+		self.input_queue = input_queue
+		self.output_queue = output_queue
 
 	def run(self) -> None:
-		"""Execute the cipher generation process.
-
-		This method continuously generates ciphers and adds them to the queue.
-		It handles errors and retries for cipher generation.
-
-		Raises:
-			Exception: If any error occurs during the execution.
-
-		"""
-		try:
-			self.fetcher = Fetcher()
-		except Exception as e:
-			log.critical(f"Error creating Fetcher: {e}")
-			return
-
+		"""Execute the cipher generation process loop."""
 		process_name = self.name
+		log.info(f"{process_name} started.")
 
-		for i in range(self.start_idx, self.start_idx + self.total_to_generate):
+		while True:
 			try:
-				cipher = self.generate_cipher()
+				item = self.input_queue.get(timeout=5)
+
+				if item == "STOP":
+					log.info(f"{process_name} received STOP signal.")
+					break
+
+				cipher = self.generate_cipher(item)
+
+				if cipher is None:
+					continue
+
 				_, file_bytes = create_cipher_json(cipher)
 
 				filename = (
-					f"c_{len(cipher.plaintext)}_"
-					f"{cipher.difficulty}_{i}_{os.getpid()}.json"
+					f"c_{len(cipher.plaintext)}_{item["source_id"]}_"
+					f"{cipher.difficulty}_{os.getpid()}.json"
 				)
 
-				self.queue.put((filename, file_bytes))
+				# Send to Uploader
+				self.output_queue.put((filename, file_bytes))
 
+			except queue.Empty:
+				continue
 			except Exception as e:
-				log.error(f"Producer {process_name} failed on cipher {i}: {e}")
+				log.error(f"Producer {process_name} failed: {e}")
 
 		log.info(f"{process_name} finished generation.")
 
-	def generate_cipher(self) -> SubstitutionCipher:
-		"""Generate a cipher from a random book slice and save it to a JSON file.
+	def generate_cipher(self, text: TextStream) -> SubstitutionCipher | None:
+		"""Generate a cipher from the provided text string.
 
 		Args:
-			min_len (int): The minimum length of the text slice.
-			max_len (int): The maximum length of the text slice.
-			difficulty (int | None): The difficulty level for the cipher (4-30).
-				If None, a random difficulty will be chosen.
+			text (TextStream): The text chunk with metadata to encrypt.
 
 		"""
-		fetcher = Fetcher()
-		book_text = fetcher.fetch_random_book_text()
-		sliced_text = fetcher.get_random_book_slice(
-			book_text,
-			self.MIN_LEN,
-			self.MAX_LEN,
-		)
-
 		try:
-			cipher = HomophonicCipher(sliced_text)
+			# We assume 'text' is already the correct length/slice
+			# because the generator handled MIN/MAX_LEN bounds.
+			cipher = HomophonicCipher(text)
+
+			# Use random difficulty if that is the logic
 			cipher.generate_difficulty()
 			cipher.generate_key()
 			cipher.encipher()
-		except ValueError as e:
-			log.error(f"Error generating cipher for book id: {self.fetcher.book_id}")
-			raise e
 
-		return cipher
+			return cipher
+
+		except ValueError as e:
+			log.error(f"Error generating cipher: {e}")
+			return None
+		except Exception as e:
+			log.error(f"Unexpected cipher generation error: {e}")
+			return None
