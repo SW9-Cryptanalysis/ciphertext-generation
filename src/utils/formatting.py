@@ -20,9 +20,9 @@ def numbers_to_words(text: str) -> str:
 		groups = match.groupdict()
 		number_str = groups["number"]
 		suffix = groups["suffix"]
-		
+
 		number_val = float(number_str) if "." in number_str else int(number_str)
-		
+
 		if suffix:
 			return num2words(number_val, ordinal=True)
 		return num2words(number_val)
