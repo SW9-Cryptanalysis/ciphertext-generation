@@ -2,6 +2,7 @@ from parameter_validator import validator
 from typing import Callable, Any, get_origin, get_args
 from types import UnionType
 from utils.constants import ALPHABET
+from parameter_validator import validator
 
 
 def in_range(min_value: int, max_value: int) -> Callable:
@@ -87,3 +88,35 @@ def is_alpha_lowercase_no_spaces(value: str) -> bool:
 	if not value.islower():
 		return False
 	return all(c in ALPHABET for c in value)
+
+
+@validator
+def validate_text_obj(value: Any, name: str) -> None:
+	"""Validate that a value is a valid TextStream object.
+
+	Args:
+		value (Any): The value to validate.
+		name (str): The name of the parameter.
+
+	Raises:
+		TypeError: If the value is not a dict.
+		KeyError: If the dict does not contain the required keys.
+		ValueError: If the dict does not contain the required keys.
+
+	"""
+	if not isinstance(value, dict):
+		raise TypeError(f"Parameter `{name}` must be of type dict.")
+
+	required_keys = ["text", "source_id", "source_name", "length"]
+	if set(value.keys()) != set(required_keys):
+		raise KeyError(
+			f"Parameter `{name}` must contain the following keys: {str(required_keys)}."
+			f" Missing keys: {set(value.keys()) - set(required_keys)}"
+		)
+
+	text_content = value["text"]
+	if not text_content or not is_alpha_lowercase_no_spaces(text_content):
+		raise ValueError(
+			f"Parameter `{name}` must include a non-empty, lowercase alphabetic string "
+			"with no spaces in the text field."
+		)
