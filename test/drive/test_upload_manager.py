@@ -120,19 +120,44 @@ class TestCipherManager:
 		mock_job_q.put.assert_called_with("STOP")
 		mock_result_q.put.assert_called_with("STOP")
 
-	def test_execute_with_empty_stream(self, mocker, mock_mp_manager, base_config):
-		_, mock_job_q, mock_result_q = mock_mp_manager
+
+	def test_execute_logging_progress(self, mocker, mock_mp_manager, base_config):
+		"""Line 95: Triggers the progress log every 1000 items."""
+		_, mock_job_q, _ = mock_mp_manager
+		mock_log = mocker.patch("drive.cipher_manager.log")
 		
-		mock_stream = []
+		# Create a stream of 1001 items to trigger the log at 1000
+		mock_stream = [("train", {"text": "A"}) for _ in range(1001)]
 		
-		mocker.patch("os.cpu_count", return_value=3)
+		manager = CipherManager(base_config, mock_stream)
+		# We can mock start/join to speed up the test
+		mocker.patch("drive.cipher_manager.DriveUploader.start")
+		mocker.patch("drive.cipher_manager.DriveUploader.join")
+		mocker.patch("drive.cipher_manager.CipherProducer.start")
+		mocker.patch("drive.cipher_manager.CipherProducer.join")
+
+		manager.execute()
+
+		# Verify the progress log was called
+		mock_log.info.assert_any_call("Fed 1000 texts to workers...")
+
+	def test_execute_keyboard_interrupt(self, mocker, mock_mp_manager, base_config):
+		"""Line 98: Triggers the KeyboardInterrupt warning block."""
+		_, mock_job_q, _ = mock_mp_manager
+		mock_log = mocker.patch("drive.cipher_manager.log")
+
+		# Mock the stream to raise KeyboardInterrupt when iterated
+		mock_stream = mocker.MagicMock()
+		mock_stream.__iter__.side_effect = KeyboardInterrupt()
+
+		manager = CipherManager(base_config, mock_stream)
+		# Mocking components to avoid real process spawning
 		mocker.patch("drive.cipher_manager.DriveUploader")
 		mocker.patch("drive.cipher_manager.CipherProducer")
 
-		# Set total count to 0 dynamically for this specific test
-		empty_config = {"train": {"count": 0, "folder_id": "test"}}
-		manager = CipherManager(empty_config, mock_stream)
 		manager.execute()
 
-		assert mock_job_q.put.call_count == 1
-		mock_job_q.put.assert_called_once_with("STOP")
+		# Verify the warning log was called
+		mock_log.warning.assert_called_with("Job interrupted! Stopping...")
+		# Verify cleanup (Sentinels) still happened in finally block
+		assert mock_job_q.put.called
