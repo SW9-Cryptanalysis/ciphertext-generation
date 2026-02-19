@@ -46,8 +46,7 @@ class CipherManager:
 
 		self.total_count = sum(split_data["count"] for split_data in config.values())
 		self.split_folders = {
-			split: split_data["folder_id"]
-			for split, split_data in config.items()
+			split: split_data["folder_id"] for split, split_data in config.items()
 		}
 
 		self.num_workers = num_workers or max(1, (os.cpu_count() or 4) - 2)
@@ -64,7 +63,7 @@ class CipherManager:
 		)
 
 		uploader = DriveUploader(
-			queue=self.result_queue, # type: ignore
+			queue=self.result_queue,  # type: ignore
 			config=DriveUploaderConfig(
 				split_folders=self.split_folders,
 				total_ciphers=self.total_count,
@@ -76,8 +75,8 @@ class CipherManager:
 		workers = []
 		for i in range(self.num_workers):
 			p = CipherProducer(
-				input_queue=self.job_queue, # type: ignore
-				output_queue=self.result_queue, # type: ignore
+				input_queue=self.job_queue,  # type: ignore
+				output_queue=self.result_queue,  # type: ignore
 				name=f"Worker-{i + 1}",
 			)
 			workers.append(p)
