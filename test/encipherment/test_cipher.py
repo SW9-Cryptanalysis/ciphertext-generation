@@ -1,7 +1,6 @@
 import pytest
 from encipherment.cipher import HomophonicCipher, MonoalphabeticCipher
 from utils.constants import MIN_DIFFICULTY, MAX_DIFFICULTY
-from fetching.text_splits import TextStream
 
 # --- Fixtures ---
 
@@ -219,11 +218,11 @@ class TestMonoalphabeticCipher:
     def test_legal_plaintext(self, sample_stream_short):
         # FIX: Pass stream dict, not string
         cipher = MonoalphabeticCipher(sample_stream_short)
-        
+
         assert cipher.plaintext == sample_stream_short["text"]
         assert cipher.source_id == sample_stream_short["source_id"]
         assert cipher.source_name == sample_stream_short["source_name"]
-        
+
         assert isinstance(cipher.key, dict)
         assert all(isinstance(v, list) and len(v) == 1 for v in cipher.key.values())
         assert isinstance(cipher.ciphertext, str)
@@ -257,12 +256,12 @@ class TestMonoalphabeticCipher:
 
     def test_json_serialization_success(self, sample_stream_short):
         """
-        FIX: This previously expected failure. Now that MonoalphabeticCipher 
+        FIX: This previously expected failure. Now that MonoalphabeticCipher
         sets source_id/name, serialization should SUCCEED.
         """
         cipher = MonoalphabeticCipher(sample_stream_short)
         json_data = cipher.__json__()
-        
+
         assert isinstance(json_data, dict)
         assert json_data["plaintext"] == sample_stream_short["text"]
         assert json_data["source_id"] == sample_stream_short["source_id"]
@@ -282,15 +281,15 @@ class TestMonoalphabeticCipher:
         for text in sample_texts_illegal:
             # FIX: Wrap illegal text in a TextStream dict structure
             bad_stream = {
-                "text": text, 
-                "source_id": "1", 
-                "source_name": "test", 
+                "text": text,
+                "source_id": "1",
+                "source_name": "test",
                 "length": len(text)
             }
-            
+
             with pytest.raises(ValueError) as excinfo:
                 MonoalphabeticCipher(bad_stream) # type: ignore
-            
+
             # Use the error message from validate_text_obj
             assert (
                 "must include a non-empty, lowercase alphabetic string with no spaces"
@@ -305,14 +304,14 @@ class TestMonoalphabeticCipher:
 
     def test_empty_string_plaintext(self):
         bad_stream = {
-            "text": "", 
-            "source_id": "1", 
-            "source_name": "test", 
+            "text": "",
+            "source_id": "1",
+            "source_name": "test",
             "length": 0
         }
         with pytest.raises(ValueError) as excinfo:
             MonoalphabeticCipher(bad_stream) # type: ignore
         assert (
-            "must include a non-empty, lowercase alphabetic string" 
+            "must include a non-empty, lowercase alphabetic string"
             in str(excinfo.value)
         )

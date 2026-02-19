@@ -11,7 +11,8 @@ if __name__ == "__main__":
 
 	if not folder_id_train:
 		raise OSError(
-			"FOLDER_ID_TRAIN environment variable not set. Please set it before running.",
+			"FOLDER_ID_TRAIN environment variable not set. "
+			"Please set it before running.",
 		)
 
 	if not folder_id_val:
@@ -20,7 +21,8 @@ if __name__ == "__main__":
 		)
 	if not folder_id_test:
 		raise OSError(
-			"FOLDER_ID_TEST environment variable not set. Please set it before running.",
+			"FOLDER_ID_TEST environment variable not set. "
+			"Please set it before running.",
 		)
 
 	text_stream = get_text_stream()

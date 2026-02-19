@@ -1,6 +1,5 @@
 import pytest
 from utils.cipher_conversion import CipherConverter
-from encipherment.cipher import HomophonicCipher, MonoalphabeticCipher
 import copy
 from utils.z408 import plaintext_str, cipher_str, key_formatted
 
@@ -54,8 +53,8 @@ def sample_monoalphabetic_ciphertext():
 
 @pytest.fixture
 def mono_data(
-    sample_monoalphabetic_plaintext, 
-    sample_monoalphabetic_ciphertext, 
+    sample_monoalphabetic_plaintext,
+    sample_monoalphabetic_ciphertext,
     sample_monoalphabetic_mappings
 ):
     """Bundles monoalphabetic test data to reduce argument count."""
@@ -85,7 +84,7 @@ class TestCipherConverter:
         # So we patch it where it is USED: utils.cipher_conversion.HomophonicCipher
         mock_homophonic_cls = mocker.patch("utils.cipher_conversion.HomophonicCipher")
         mock_cipher_instance = mock_homophonic_cls.return_value
-        
+
         # Setup the mock instance to behave like a cipher
         mock_cipher_instance.plaintext = sample_plaintext
         mock_cipher_instance.ciphertext = sample_ciphertext
@@ -98,14 +97,14 @@ class TestCipherConverter:
             ciphertext=sample_ciphertext,
             mappings=sample_mappings,
         )
-        
+
         cipher = converter.convert_to_cipher()
 
         # Verify the converter initialized the class correctly
-        mock_homophonic_cls.assert_called_once() 
+        mock_homophonic_cls.assert_called_once()
         # Note: The provided CipherConverter passes (self.plaintext, difficulty=4)
-        assert mock_homophonic_cls.call_args[0][0]['text'] == sample_plaintext
-        
+        assert mock_homophonic_cls.call_args[0][0]["text"] == sample_plaintext
+
         assert cipher.plaintext == sample_plaintext
         assert cipher.ciphertext == sample_ciphertext
         assert cipher.key == converter.mappings
@@ -114,7 +113,7 @@ class TestCipherConverter:
         self, mocker, sample_plaintext, sample_ciphertext, sample_mappings
     ):
         mocker.patch("utils.cipher_conversion.HomophonicCipher")
-        
+
         converter = CipherConverter(
             plaintext=sample_plaintext,
             ciphertext=sample_ciphertext,
@@ -131,7 +130,7 @@ class TestCipherConverter:
             plaintext=plaintext_str, ciphertext=cipher_str, mappings=key_formatted
         )
         cipher = converter.convert_to_cipher()
-        
+
         # We verify attributes on the mock, or just the converter state
         # Since we mocked the class, we rely on the converter setting attributes on the mock
         assert cipher.ciphertext == cipher_str
@@ -171,7 +170,7 @@ class TestCipherConverter:
                 ciphertext="1 2 3 4",
                 mappings={"a": ["1"], "b": ["2"], "c": ["3"], "d": ["5"]},
             )
-        
+
         # The new code raises ValueError with a tuple of arguments.
         # str(excinfo.value) will look like: "('Symbol \'4\' not found in mappings.', ...)"
         assert "Symbol '4' not found in mappings." in str(excinfo.value)
@@ -222,17 +221,17 @@ class TestCipherConverter:
         sample_monoalphabetic_plaintext,
     ):
         mock_mono = mocker.patch("utils.cipher_conversion.MonoalphabeticCipher")
-        
+
         converter = CipherConverter.from_plaintext_and_ciphertext(
             plaintext=sample_monoalphabetic_plaintext,
             ciphertext=sample_monoalphabetic_ciphertext,
         )
         assert converter.plaintext == sample_monoalphabetic_plaintext
         assert converter.ciphertext == sample_monoalphabetic_ciphertext
-        
+
         # Check that it detects monoalphabetic correctly
         assert not converter._is_homophonic()
-        
+
         # Check conversion uses MonoalphabeticCipher
         converter.convert_to_cipher()
         mock_mono.assert_called_once()
@@ -267,7 +266,7 @@ class TestCipherConverter:
             )
         else:
             pytest.fail(f"Unknown construction_method: {construction_method}")
-            
+
         expected = {
 			"plaintext": mono_data["pt"],
 			"ciphertext": mono_data["ct"],
@@ -291,9 +290,9 @@ class TestCipherConverter:
         assert converter.mappings == expected["mappings"]
 
         assert not converter._is_homophonic()
-        
+
         cipher = converter.convert_to_cipher()
-        
+
         # Verify MonoalphabeticCipher was instantiated
         mock_mono_cls.assert_called()
         # And that the returned object is the mock's return value

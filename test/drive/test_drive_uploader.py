@@ -1,7 +1,6 @@
 import pytest
 import multiprocessing as mp
 import io
-import zipfile
 from typing import Final
 from dataclasses import dataclass
 from multiprocessing.queues import Queue as MPQueue
@@ -298,7 +297,7 @@ class TestDriveUploader:
 	def test_upload_batch_exception_handling(self, mocker, uploader_config):
 		"""Test the exception block in _upload_batch."""
 		mock_bs_class = mocker.patch("drive.drive_uploader.BatchState")
-	
+
 		# Setup the return value for the NEW BatchState created inside _upload_batch
 		mock_new_bs = mocker.Mock()
 		mock_new_bs.batch_num = 8
@@ -318,7 +317,7 @@ class TestDriveUploader:
 		# This now uses the patched ZipFile
 		bs_initial = BatchState(split="train", batch_num=7)
 		bs_initial.current_batch_count = 5
-		
+
 		new_bs = uploader._upload_batch(bs_initial, mock_pbar, "crash_batch.zip")
 
 		assert new_bs.batch_num == 8

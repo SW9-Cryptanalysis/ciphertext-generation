@@ -18,7 +18,8 @@ class CipherProducer(mp.Process):
 
 	Attributes:
 		input_queue (MPQueue[Any]): Queue containing tuples of (split, text_data).
-		output_queue (MPQueue[Any]): Queue to send tuples of (split, filename, file_bytes).
+		output_queue (MPQueue[Any]): Queue to send tuples of
+			(split, filename, file_bytes).
 
 	"""
 

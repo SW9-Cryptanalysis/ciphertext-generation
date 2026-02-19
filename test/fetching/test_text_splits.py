@@ -1,7 +1,5 @@
 import pytest
 import os
-import random
-from fetching import text_splits
 from fetching.text_splits import (
 	find_boundaries,
 	find_spaceless_target_index,
@@ -217,10 +215,10 @@ class TestStreamGenerator:
 		]
 		targets = {"train": 1, "val": 0, "test": 0}
 		mocker.patch("fetching.text_splits.get_split", return_value="train")
-		
+
 		gen = text_streams_generator(stream, targets, (500, 1000))
 		results = list(gen)
-		
+
 		# Only 'valid' should produce a result
 		assert len(results) == 1
 		assert results[0][1]["source_id"] == "valid"
@@ -253,14 +251,14 @@ class TestStreamGenerator:
 			{"id": "full", "text": "content " * 1000, "metadata": {}},
 			{"id": "small", "text": "short", "metadata": {}},
 		]
-		
+
 		# Mock targets so 'train' is already done
 		targets = {"train": 0, "val": 10, "test": 10}
 		mocker.patch("fetching.text_splits.get_split", side_effect=["train", "val"])
-		
+
 		gen = text_streams_generator(stream, targets, (500, 1000))
 		results = list(gen)
-		
+
 		# Should be empty because first was skipped (full) and second was skipped (capacity)
 		assert len(results) == 0
 

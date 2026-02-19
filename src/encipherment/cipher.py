@@ -5,7 +5,6 @@ from collections import Counter
 from utils.constants import MIN_DIFFICULTY, MAX_DIFFICULTY
 from abc import ABC, abstractmethod
 from parameter_validator import parameter_validator, all_of
-from parameter_validator.builtin_validators import strongly_typed
 import json
 from fetching.text_splits import TextStream
 from utils.validators import validate_text_obj
@@ -13,7 +12,6 @@ from utils.validators import validate_text_obj
 from utils.validators import (
 	in_range,
 	strongly_typed_optional,
-	lower_case_no_spaces_alpha_string,
 )
 
 
@@ -46,7 +44,6 @@ class SubstitutionCipher(ABC):
 	"""
 
 	@abstractmethod
-	@parameter_validator(text_obj=strongly_typed, difficulty=strongly_typed_optional, cipher_type=strongly_typed_optional)
 	def __init__(
 		self,
 		text_obj: TextStream,
@@ -175,7 +172,8 @@ class HomophonicCipher(SubstitutionCipher):
 	@parameter_validator(
 		text_obj=validate_text_obj,
 		difficulty=all_of(
-			in_range(MIN_DIFFICULTY, MAX_DIFFICULTY), strongly_typed_optional,
+			in_range(MIN_DIFFICULTY, MAX_DIFFICULTY),
+			strongly_typed_optional,
 		),
 	)
 	def __init__(self, text_obj: TextStream, *, difficulty: int | None = None) -> None:
@@ -270,6 +268,7 @@ class HomophonicCipher(SubstitutionCipher):
 		"""
 		return random.randint(MIN_DIFFICULTY, MAX_DIFFICULTY)
 
+
 class MonoalphabeticCipher(SubstitutionCipher):
 	"""A monoalphabetic substitution cipher.
 
@@ -298,11 +297,10 @@ class MonoalphabeticCipher(SubstitutionCipher):
 
 	@parameter_validator(text_obj=validate_text_obj)
 	def __init__(self, text_obj: TextStream) -> None:
-		"""Initialize the MonoalphabeticCipher with the given plaintext.
+		"""Initialize the MonoalphabeticCipher with the given text object.
 
 		Args:
-			plaintext (str): The lowercase plaintext to be encrypted with no
-				punctuation or spaces.
+			text_obj (TextStream): Text object containing the plaintext and metadata.
 
 		"""
 		self.plaintext = text_obj["text"]

@@ -41,7 +41,12 @@ def generate_cipher(
 	cleaned_text = clean_spaces(sliced_text)
 
 	try:
-		text_obj: TextStream = {"text": cleaned_text, "source_id": fetcher.book_id, "source_name": "Test", "length": len(cleaned_text)}
+		text_obj: TextStream = {
+			"text": cleaned_text,
+			"source_id": fetcher.book_id,
+			"source_name": "Test",
+			"length": len(cleaned_text),
+		}
 		cipher = HomophonicCipher(text_obj, difficulty=difficulty)
 		cipher.generate_difficulty()
 		cipher.generate_key()
@@ -66,7 +71,12 @@ def generate_monoalphabetic_cipher(min_len: int, max_len: int, filename: str) ->
 	book_text = fetcher.fetch_random_book_text()
 	sliced_text = fetcher.get_random_book_slice(book_text, min_len, max_len)
 	cleaned_text = clean_spaces(sliced_text)
-	text_obj: TextStream = {"text": cleaned_text, "source_id": fetcher.book_id, "source_name": "Test", "length": len(cleaned_text)}
+	text_obj: TextStream = {
+		"text": cleaned_text,
+		"source_id": fetcher.book_id,
+		"source_name": "Test",
+		"length": len(cleaned_text),
+	}
 	try:
 		cipher = MonoalphabeticCipher(text_obj)
 	except ValueError as e:
@@ -84,12 +94,20 @@ if __name__ == "__main__":  # pragma: no cover
 		for difficulty in DIFFICULTIES:
 			for length in LENGTHS:
 				generate_cipher(
-					length, length, f"c_{length}_{difficulty}.json", difficulty,
+					length,
+					length,
+					f"c_{length}_{difficulty}.json",
+					difficulty,
 				)
 				pbar.update(1)
 
 		# Z408 Cipher
-		z408_text_obj: TextStream = {"text": z408_plaintext, "source_id": "z408", "source_name": "Test", "length": len(z408_plaintext)}
+		z408_text_obj: TextStream = {
+			"text": z408_plaintext,
+			"source_id": "z408",
+			"source_name": "Test",
+			"length": len(z408_plaintext),
+		}
 		z408 = HomophonicCipher(z408_text_obj, difficulty=7)
 		z408.key = z408_key
 		z408.ciphertext = z408_cipher
@@ -98,7 +116,6 @@ if __name__ == "__main__":  # pragma: no cover
 
 		save_cipher(cipher_data=z408, filename="z408.json")
 		pbar.update(1)
-
 
 		# Monoalphabetic Cipher
 		generate_monoalphabetic_cipher(4000, 4000, "c_mono_4000.json")

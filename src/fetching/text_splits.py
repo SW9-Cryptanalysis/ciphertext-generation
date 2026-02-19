@@ -125,13 +125,13 @@ def find_spaceless_target_index(spaced_text: str, target_len: int) -> int:
 
 	"""
 	non_space_count = 0
-	
+
 	for i, char in enumerate(spaced_text):
 		if char.strip():
 			non_space_count += 1
 		if non_space_count == target_len:
 			return i
-			
+
 	return len(spaced_text)
 
 
@@ -158,17 +158,17 @@ def extract_random_chunk(
 
 	max_start = max(0, zone_size - target_len)
 	raw_start = zone_start + random.randint(0, max_start)
-	
+
 	spaced_window = ""
 	raw_end = min(len(text), raw_start + (target_len * 2))
-	
+
 	while True:
 		raw_window = text[raw_start:raw_end]
 		spaced_window = format_text(raw_window)
-		
+
 		if len(clean_spaces(spaced_window)) >= target_len + 200 or raw_end >= len(text):
 			break
-			
+
 		raw_end = min(len(text), raw_end + target_len)
 
 	if len(clean_spaces(spaced_window)) < min_len:
@@ -176,9 +176,9 @@ def extract_random_chunk(
 
 	spaced_target_len = find_spaceless_target_index(spaced_window, target_len)
 	start_idx, end_idx = find_boundaries(spaced_window, 0, spaced_target_len)
-	
+
 	final_chunk = spaced_window[start_idx:end_idx]
-	
+
 	return clean_spaces(final_chunk).strip()
 
 
@@ -275,15 +275,15 @@ def get_actual_take(split: str, debts: dict[str, float], capacity: int) -> int:
 
 def get_usable_text(raw_text: str, len_bounds: tuple[int, int]) -> str:
 	"""Get the usable text from the raw text.
-	
+
 	Args:
 		raw_text (str): The raw text to get the usable text from.
 		len_bounds (tuple[int, int]): The minimum and maximum length bounds for the
 			text.
-	
+
 	Returns:
 		str: The usable text.
-	
+
 	"""
 	total_len = len(raw_text)
 	start_trim = min(int(total_len * 0.02), 10000)

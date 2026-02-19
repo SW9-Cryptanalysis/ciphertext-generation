@@ -42,11 +42,11 @@ def mock_cipher_data():
 class TestCipherProducerRun:
 	def test_successful_run(self, mocker, mock_queues, mock_cipher_data):
 		input_q, output_q = mock_queues
-		
+
 		sample_item = {
-			"text": "sample text", 
-			"source_id": "123", 
-			"source_name": "Book", 
+			"text": "sample text",
+			"source_id": "123",
+			"source_name": "Book",
 			"length": 11
 		}
 		input_q.put(("train", sample_item))
@@ -108,7 +108,7 @@ class TestCipherProducerRun:
 
 	def test_generation_runtime_failure(self, mocker, mock_queues, caplog):
 		input_q, output_q = mock_queues
-		
+
 		input_q.put(("val", {"text": "fail", "source_id": "1"}))
 		input_q.put("STOP")
 
@@ -121,8 +121,8 @@ class TestCipherProducerRun:
 		)
 
 		producer = CipherProducer(
-			input_queue=input_q, 
-			output_queue=output_q, 
+			input_queue=input_q,
+			output_queue=output_q,
 			name="TestProducer"
 		)
 
@@ -130,38 +130,38 @@ class TestCipherProducerRun:
 
 		assert output_q.empty()
 		mock_log.info.assert_any_call("TestProducer finished generation.")
-		
+
 	def test_run_handles_queue_empty_and_retries(self, mocker):
 		mock_input_q = mocker.Mock()
 		mock_output_q = mocker.Mock()
-		
+
 		mock_input_q.get.side_effect = [queue.Empty, "STOP"]
-		
+
 		producer = CipherProducer(
-			input_queue=mock_input_q, 
-			output_queue=mock_output_q, 
+			input_queue=mock_input_q,
+			output_queue=mock_output_q,
 			name="TestProducer"
 		)
-		
+
 		producer.run()
-		
+
 		assert mock_input_q.get.call_count == 2
 
 	def test_run_handles_unexpected_loop_exception(self, mocker):
 		mock_input_q = mocker.Mock()
 		mock_output_q = mocker.Mock()
 		mock_log = mocker.patch("drive.cipher_producer.log")
-		
+
 		mock_input_q.get.side_effect = [Exception("Queue connection lost"), "STOP"]
-		
+
 		producer = CipherProducer(
-			input_queue=mock_input_q, 
-			output_queue=mock_output_q, 
+			input_queue=mock_input_q,
+			output_queue=mock_output_q,
 			name="TestProducer"
 		)
-		
+
 		producer.run()
-		
+
 		mock_log.error.assert_called()
 		assert "Queue connection lost" in mock_log.error.call_args[0][0]
 		assert mock_input_q.get.call_count == 2
@@ -170,35 +170,35 @@ class TestCipherProducerRun:
 class TestGenerateCipherLogic:
 	def test_generate_cipher_success(self, mocker):
 		producer = CipherProducer(mocker.Mock(), mocker.Mock(), name="Test")
-		
+
 		sample_item: TextStream = {
-			"text": "testslice", 
-			"source_id": "123", 
-			"source_name": "Book", 
+			"text": "testslice",
+			"source_id": "123",
+			"source_name": "Book",
 			"length": 9
 		}
 
 		mock_cipher_instance = mocker.Mock(spec=HomophonicCipher)
 		mocked_homophonic_cipher = mocker.patch(
-			"drive.cipher_producer.HomophonicCipher", 
+			"drive.cipher_producer.HomophonicCipher",
 			return_value=mock_cipher_instance
 		)
 
 		cipher = producer.generate_cipher(sample_item)
 
 		mocked_homophonic_cipher.assert_called_once_with(sample_item)
-		
+
 		mock_cipher_instance.generate_difficulty.assert_called_once()
 		mock_cipher_instance.generate_key.assert_called_once()
 		mock_cipher_instance.encipher.assert_called_once()
-		
+
 		assert cipher == mock_cipher_instance
 
-	def test_generate_cipher_value_error(self, mocker, caplog):
+	def test_generate_cipher_errors(self, mocker, caplog):
 		producer = CipherProducer(mocker.Mock(), mocker.Mock(), name="Test")
-		
+
 		sample_item: TextStream = {
-			"text": "invalid", 
+			"text": "invalid",
 			"source_id": "123",
 			"source_name": "Book",
 			"length": 9
@@ -220,7 +220,7 @@ class TestGenerateCipherLogic:
 	def test_generate_cipher_unexpected_exception(self, mocker):
 		producer = CipherProducer(mocker.Mock(), mocker.Mock(), name="Test")
 		sample_item: TextStream = {
-			"text": "crash_test", 
+			"text": "crash_test",
 			"source_id": "123",
 			"source_name": "Book",
 			"length": 10

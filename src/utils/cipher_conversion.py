@@ -165,7 +165,12 @@ class CipherConverter:
 		if self._cipher:
 			return self._cipher
 
-		text_obj: TextStream = {"text": self.plaintext, "source_id": "Unknown", "source_name": "Unknown", "length": len(self.plaintext)}
+		text_obj: TextStream = {
+			"text": self.plaintext,
+			"source_id": "Unknown",
+			"source_name": "Unknown",
+			"length": len(self.plaintext),
+		}
 
 		if self._is_homophonic():
 			self._cipher = HomophonicCipher(text_obj, difficulty=4)

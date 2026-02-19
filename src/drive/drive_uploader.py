@@ -108,9 +108,7 @@ class DriveUploader(mp.Process):
 		self.total_ciphers = config.total_ciphers
 		self.drive_service = None
 		self.uploaded_count = 0
-		self.batch_states = {
-			split: BatchState(split) for split in self.split_folders
-		}
+		self.batch_states = {split: BatchState(split) for split in self.split_folders}
 
 	def run(self) -> None:
 		"""Execute the cipher upload process.
@@ -235,7 +233,9 @@ class DriveUploader(mp.Process):
 			if file_id:
 				self.uploaded_count += bs.current_batch_count
 				pbar.update(bs.current_batch_count)
-				log.info(f"Uploaded {bs.split} Batch {bs.batch_num} to Drive: {file_id}")
+				log.info(
+					f"Uploaded {bs.split} Batch {bs.batch_num} to Drive: {file_id}",
+				)
 
 				return BatchState(split=bs.split, batch_num=bs.batch_num + 1)
 			else:
@@ -246,7 +246,8 @@ class DriveUploader(mp.Process):
 
 		except Exception as e:
 			log.error(
-				f"FATAL: Unexpected error uploading {bs.split} Batch {bs.batch_num}: {e}",
+				f"FATAL: Unexpected error uploading {bs.split} "
+				f"Batch {bs.batch_num}: {e}",
 				exc_info=True,
 			)
 			return BatchState(split=bs.split, batch_num=bs.batch_num + 1)

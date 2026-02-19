@@ -2,7 +2,6 @@ from parameter_validator import validator
 from typing import Callable, Any, get_origin, get_args
 from types import UnionType
 from utils.constants import ALPHABET
-from parameter_validator import validator
 
 
 def in_range(min_value: int, max_value: int) -> Callable:
@@ -111,12 +110,12 @@ def validate_text_obj(value: Any, name: str) -> None:
 	if set(value.keys()) != set(required_keys):
 		raise KeyError(
 			f"Parameter `{name}` must contain the following keys: {str(required_keys)}."
-			f" Missing keys: {set(value.keys()) - set(required_keys)}"
+			f" Missing keys: {set(value.keys()) - set(required_keys)}",
 		)
 
 	text_content = value["text"]
 	if not text_content or not is_alpha_lowercase_no_spaces(text_content):
 		raise ValueError(
 			f"Parameter `{name}` must include a non-empty, lowercase alphabetic string "
-			"with no spaces in the text field."
+			"with no spaces in the text field.",
 		)
