@@ -5,17 +5,35 @@ from fetching.text_splits import get_text_stream
 
 if __name__ == "__main__":
 	log = get_colored_logger("gen_training")
-	folder_id = os.getenv("FOLDER_ID_TRAIN")
+	folder_id_train = os.getenv("FOLDER_ID_TRAIN")
+	folder_id_val = os.getenv("FOLDER_ID_VAL")
+	folder_id_test = os.getenv("FOLDER_ID_TEST")
 
-	if not folder_id:
+	if not folder_id_train:
 		raise OSError(
-			"FOLDER_ID environment variable not set. Please set it before running.",
+			"FOLDER_ID_TRAIN environment variable not set. Please set it before running.",
+		)
+
+	if not folder_id_val:
+		raise OSError(
+			"FOLDER_ID_VAL environment variable not set. Please set it before running.",
+		)
+	if not folder_id_test:
+		raise OSError(
+			"FOLDER_ID_TEST environment variable not set. Please set it before running.",
 		)
 
 	text_stream = get_text_stream()
 
+	config = {
+		"train": {"folder_id": folder_id_train, "count": 100_000_000},
+		"val": {"folder_id": folder_id_val, "count": 10_000},
+		"test": {"folder_id": folder_id_test, "count": 10_000},
+	}
+
 	manager = CipherManager(
-		folder_id=folder_id, text_stream_source=text_stream, total_count=1_000_000,
+		config=config,
+		text_stream_source=text_stream,
 	)
 
 	try:
