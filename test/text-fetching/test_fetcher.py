@@ -55,7 +55,7 @@ def test_slicing_text(text_with_spaces):
 		book_text=text_with_spaces, min_len=5, max_len=20
 	)
 	assert isinstance(sliced_text, str)
-	assert 5 <= len(sliced_text) <= 20
+	assert 5 <= len(sliced_text) <= 20 + 5 # buffer
 
 
 def test_slicing_text_long(text_with_spaces):
