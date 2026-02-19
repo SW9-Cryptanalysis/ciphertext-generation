@@ -23,20 +23,21 @@ class DriveUploaderConfig:
 	"""A dataclass to store the configuration for the DriveUploader.
 
 	Attributes:
-		folder_id (str): The ID of the folder to upload the ciphers to.
-		total_ciphers (int): The total number of ciphers to upload.
+		split_folders (dict[str, str]): A dictionary mapping split names to folder IDs.
+		total_ciphers (int): The total number of ciphers to upload across all splits.
 
 	"""
 
-	folder_id: str
+	split_folders: dict[str, str]
 	total_ciphers: int
 
 
 @dataclass
 class BatchState:
-	"""A dataclass to store the state of a batch upload.
+	"""A dataclass to store the state of a batch upload for a specific split.
 
 	Attributes:
+		split (str): The split identifier for this batch.
 		current_batch_count (int): The number of ciphers in the current batch.
 		batch_buffer (io.BytesIO): A buffer for the current batch ZIP file.
 		zip_buffer (zipfile.ZipFile): A ZIP file for the current batch.
@@ -44,18 +45,21 @@ class BatchState:
 
 	"""
 
+	split: str
 	current_batch_count: int
 	batch_buffer: io.BytesIO
 	zip_buffer: zipfile.ZipFile
 	batch_num: int
 
-	def __init__(self, batch_num: int = 1) -> None:
-		"""Initialize the BatchState with default values.
+	def __init__(self, split: str, batch_num: int = 1) -> None:
+		"""Initialize the BatchState with default values for a given split.
 
 		Args:
+			split (str): The split identifier (e.g., 'train', 'val').
 			batch_num (int, optional): The batch number. Defaults to 1.
 
 		"""
+		self.split = split
 		self.current_batch_count = 0
 		self.batch_num = batch_num
 		self.batch_buffer = io.BytesIO()
@@ -72,9 +76,10 @@ class DriveUploader(mp.Process):
 
 	Attributes:
 		queue (MPQueue[Any]): The queue to read ciphers from.
-		folder_id (str): The ID of the folder to upload the ciphers to.
+		split_folders (dict[str, str]): Mappings of splits to Google Drive folder IDs.
 		total_ciphers (int): The total number of ciphers to upload.
 		drive_service (build): The authenticated Google Drive service object.
+		batch_states (dict[str, BatchState]): The current batch state for each split.
 
 	Methods:
 		run(): Execute the cipher upload process.
@@ -99,16 +104,17 @@ class DriveUploader(mp.Process):
 		"""
 		super().__init__(*args, **kwargs)
 		self.queue = queue
-		self.folder_id = config.folder_id
+		self.split_folders = config.split_folders
 		self.total_ciphers = config.total_ciphers
 		self.drive_service = None
 		self.uploaded_count = 0
+		self.batch_states = {split: BatchState(split) for split in self.split_folders}
 
 	def run(self) -> None:
 		"""Execute the cipher upload process.
 
 		This method continuously reads ciphers from the queue and uploads them to
-		Google Drive in batches. It handles retries and error handling for uploads.
+		Google Drive in batches. It handles routing by split and error handling.
 
 		Raises:
 			Exception: If any error occurs during the execution.
@@ -118,8 +124,6 @@ class DriveUploader(mp.Process):
 		if not self._authenticate_service():
 			return
 
-		bs = BatchState(1)
-
 		with tqdm(total=self.total_ciphers, desc="Total Ciphers Uploaded") as pbar:
 			while self.uploaded_count < self.total_ciphers:
 				try:
@@ -128,12 +132,12 @@ class DriveUploader(mp.Process):
 					continue
 
 				if item == SENTINEL:
+					self._upload_all_final_batches(pbar)
 					break
 
-				bs = self._process_cipher_item(item, bs, pbar)
-
-			if bs.current_batch_count > 0:
-				bs = self._upload_final_batch(bs, pbar)
+				split, filename, file_bytes = item
+				if split in self.batch_states:
+					self._process_cipher_item(split, filename, file_bytes, pbar)
 
 		log.info(
 			f"{process_name} finished. Total uploaded: {self.uploaded_count} files.",
@@ -158,52 +162,46 @@ class DriveUploader(mp.Process):
 
 	def _process_cipher_item(
 		self,
-		item: tuple[str, bytes],
-		bs: BatchState,
+		split: str,
+		filename: str,
+		file_bytes: bytes,
 		pbar: tqdm,
-	) -> BatchState:
-		"""Process a single cipher item, adding it to the batch.
+	) -> None:
+		"""Process a single cipher item, adding it to the corresponding split batch.
 
 		Args:
-			item (tuple[str, bytes]): The cipher item containing filename and bytes.
-			bs (BatchState): The current BatchState object.
+			split (str): The split routing identifier.
+			filename (str): The name of the file to add to the archive.
+			file_bytes (bytes): The raw bytes of the file.
 			pbar (tqdm): The progress bar to update.
 
-		Returns:
-			BatchState: The updated (or new) BatchState object.
-
 		"""
-		filename, file_bytes = item
+		bs = self.batch_states[split]
 
 		bs.zip_buffer.writestr(filename, file_bytes)
 		bs.current_batch_count += 1
 
-		if bs.current_batch_count < BATCH_SIZE:
-			return bs
+		if bs.current_batch_count >= BATCH_SIZE:
+			bs.zip_buffer.close()
+			batch_filename = f"{split}_ciphers_batch_{bs.batch_num}.zip"
+			self.batch_states[split] = self._upload_batch(bs, pbar, batch_filename)
 
-		bs.zip_buffer.close()
-
-		batch_filename = f"ciphers_batch_{bs.batch_num}.zip"
-
-		return self._upload_batch(bs, pbar, batch_filename)
-
-	def _upload_final_batch(self, bs: BatchState, pbar: tqdm) -> BatchState:
-		"""Upload the final batch of ciphers to Google Drive.
+	def _upload_all_final_batches(self, pbar: tqdm) -> None:
+		"""Upload any remaining partial batches for all configured splits.
 
 		Args:
-			bs (BatchState): The current BatchState object.
 			pbar (tqdm): The progress bar to update.
 
-		Returns:
-			BatchState: The updated BatchState object.
-
 		"""
-		log.info(f"Uploading final partial batch of {bs.current_batch_count} files.")
-		bs.zip_buffer.close()
-
-		batch_filename = f"ciphers_batch_final_{bs.batch_num}.zip"
-
-		return self._upload_batch(bs, pbar, batch_filename)
+		for split, bs in self.batch_states.items():
+			if bs.current_batch_count > 0:
+				log.info(
+					f"Uploading final partial batch for {split}: "
+					f"{bs.current_batch_count} files.",
+				)
+				bs.zip_buffer.close()
+				batch_filename = f"{split}_ciphers_batch_final_{bs.batch_num}.zip"
+				self.batch_states[split] = self._upload_batch(bs, pbar, batch_filename)
 
 	def _upload_batch(
 		self,
@@ -219,32 +217,37 @@ class DriveUploader(mp.Process):
 			batch_filename (str): The filename of the batch ZIP file.
 
 		Returns:
-			BatchState: The updated BatchState object.
+			BatchState: A fresh BatchState object for the next iterations.
 
 		"""
+		folder_id = self.split_folders[bs.split]
+
 		try:
 			file_id = upload_to_drive(
 				self.drive_service,
 				bs.batch_buffer.getvalue(),
 				batch_filename,
-				self.folder_id,
+				folder_id,
 			)
 
 			if file_id:
 				self.uploaded_count += bs.current_batch_count
 				pbar.update(bs.current_batch_count)
-				log.info(f"Uploaded Batch {bs.batch_num} to Drive: {file_id}")
+				log.info(
+					f"Uploaded {bs.split} Batch {bs.batch_num} to Drive: {file_id}",
+				)
 
-				return BatchState(batch_num=bs.batch_num + 1)
+				return BatchState(split=bs.split, batch_num=bs.batch_num + 1)
 			else:
 				log.critical(
-					f"FATAL: Batch {bs.batch_num} failed all retries and was skipped.",
+					f"FATAL: {bs.split} Batch {bs.batch_num} failed all retries.",
 				)
-				return BatchState(batch_num=bs.batch_num + 1)
+				return BatchState(split=bs.split, batch_num=bs.batch_num + 1)
 
 		except Exception as e:
 			log.error(
-				f"FATAL: Unexpected error during upload of Batch {bs.batch_num}: {e}",
+				f"FATAL: Unexpected error uploading {bs.split} "
+				f"Batch {bs.batch_num}: {e}",
 				exc_info=True,
 			)
-			return BatchState(batch_num=bs.batch_num + 1)
+			return BatchState(split=bs.split, batch_num=bs.batch_num + 1)

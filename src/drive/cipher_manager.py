@@ -1,130 +1,111 @@
-import os
 import multiprocessing as mp
 from utils.logging import get_colored_logger
-from drive.cipher_producer import CipherProducer
-from drive.drive_uploader import DriveUploader, DriveUploaderConfig
+import os
+from typing import Iterable, Any
 
+from drive.drive_uploader import DriveUploader, DriveUploaderConfig
+from drive.cipher_producer import CipherProducer
 
 log = get_colored_logger("cipher_manager")
 
 
 class CipherManager:
-	"""Orchestrates the parallel Producer-Consumer architecture for cipher generation.
+	"""Orchestrates the parallel generation using Feeder -> Worker -> Uploader pattern.
 
 	Attributes:
-		TOTAL_CIPHERS (int): The total number of ciphers to generate.
-		SENTINEL (str): A sentinel value to signal the Consumer to finish.
-		folder_id (str): The ID of the folder to upload the ciphers to.
-		num_producers (int): The number of producer processes to use.
-		manager (mp.Manager): A manager for the Queue shared between processes.
-		queue (mp.Queue): A Queue shared between processes for communication.
+		config (dict[str, dict[str, Any]]): Configuration dictionary mapping splits
+			to their folder IDs and target counts.
+		text_stream_source (Iterable): The iterable source of text chunks.
+		total_count (int): The total number of ciphers to generate across all splits.
+		split_folders (dict[str, str]): A mapping of splits to their folder IDs.
+		num_workers (int): The number of workers to use.
 
 	Methods:
-		execute(): Execute the cipher generation and upload process.
+		execute(): Execute the cipher generation process.
 
 	"""
 
-	# Class constants for configuration
-	TOTAL_CIPHERS: int = 2_000_000
-	SENTINEL: str = "STOP"
+	SENTINEL = "STOP"
 
-	def __init__(self, folder_id: str) -> None:
-		"""Initialize the CipherManager with a folder ID.
+	def __init__(
+		self,
+		config: dict[str, dict[str, Any]],
+		text_stream_source: Iterable,
+		num_workers: int | None = None,
+	) -> None:
+		"""Initialize the CipherManager.
 
 		Args:
-			folder_id (str): The ID of the folder to upload the ciphers to.
+			config: Configuration dictionary with count and folder_id per split.
+			text_stream_source: Iterator yielding (split, text_data) from the generator.
+			num_workers: Number of workers to use. Defaults to None.
 
 		"""
-		self.folder_id = folder_id
-		# Determine number of worker processes based on available cores
-		self.num_producers = os.cpu_count() or 4
+		self.config = config
+		self.stream = text_stream_source
 
-		# Use a Manager to create a Queue that can be safely shared between processes
+		self.total_count = sum(split_data["count"] for split_data in config.values())
+		self.split_folders = {
+			split: split_data["folder_id"] for split, split_data in config.items()
+		}
+
+		self.num_workers = num_workers or max(1, (os.cpu_count() or 4) - 2)
+
 		self.manager = mp.Manager()
-		self.queue = self.manager.Queue()
-
-	def _divide_workload(self) -> list[tuple[int, int]]:
-		"""Calculate the start index and total count for each producer.
-
-		Returns:
-			list[tuple[int, int]]: A list of tuples containing the start
-				index and total count for each producer.
-
-		"""
-		ciphers_per_producer = self.TOTAL_CIPHERS // self.num_producers
-
-		workload = []
-		current_start = 0
-
-		for i in range(self.num_producers):
-			count = ciphers_per_producer
-
-			# The last worker handles any remainder
-			if i == self.num_producers - 1:
-				count = self.TOTAL_CIPHERS - current_start
-
-			if count > 0:
-				workload.append((current_start, count))
-				current_start += count
-
-		return workload
+		self.job_queue = self.manager.Queue(maxsize=1000)
+		self.result_queue = self.manager.Queue()
 
 	def execute(self) -> None:
-		"""Execute the cipher generation and upload process.
+		"""Execute the cipher generation process."""
+		log.info(
+			f"Starting job. Target: {self.total_count} ciphers "
+			f"using {self.num_workers} workers.",
+		)
 
-		This method starts the Consumer (I/O-Bound) and Producer (CPU-Bound) processes.
-		It then waits for the Producers to finish and signals the Consumer to finish.
-		The Consumer then waits for the final batch upload to complete and exits.
-
-		Raises:
-			Exception: If any error occurs during the execution.
-
-		"""
-		log.info(f"Starting cipher generation job. Total ciphers: {self.TOTAL_CIPHERS}")
-		log.info(f"Using {self.num_producers} CPU producer processes.")
-
-		consumer_process = DriveUploader(
-			queue=self.queue,  # type: ignore
+		uploader = DriveUploader(
+			queue=self.result_queue,  # type: ignore
 			config=DriveUploaderConfig(
-				folder_id=self.folder_id,
-				total_ciphers=self.TOTAL_CIPHERS,
+				split_folders=self.split_folders,
+				total_ciphers=self.total_count,
 			),
 			name="Uploader-Consumer",
 		)
-		consumer_process.start()
-		log.info(f"Consumer process started: {consumer_process.name}")
+		uploader.start()
 
-		workload = self._divide_workload()
-		producer_pool = []
-
-		for i, (start, count) in enumerate(workload):
+		workers = []
+		for i in range(self.num_workers):
 			p = CipherProducer(
-				queue=self.queue,  # type: ignore
-				start_and_total=(start, count),
-				name=f"Generator-Producer-{i + 1}",
+				input_queue=self.job_queue,  # type: ignore
+				output_queue=self.result_queue,  # type: ignore
+				name=f"Worker-{i + 1}",
 			)
-			producer_pool.append(p)
+			workers.append(p)
 			p.start()
 
-		log.info(
-			f"Started {len(producer_pool)} Producer processes."
-			"Generation in progress...",
-		)
+		log.info("Feeder started. Reading stream and filling queues...")
 
-		# --- 3. Wait for Producers to finish ---
-		for p in producer_pool:
+		count_fed = 0
+		try:
+			for split, text_data in self.stream:
+				self.job_queue.put((split, text_data))
+				count_fed += 1
+
+				if count_fed % 1000 == 0:
+					log.info(f"Fed {count_fed} texts to workers...")
+
+		except KeyboardInterrupt:
+			log.warning("Job interrupted! Stopping...")
+		except Exception as e:
+			log.error(f"Stream error: {e}")
+		finally:
+			log.info(f"Stream finished. Fed {count_fed} items. Stopping workers...")
+			for _ in range(self.num_workers):
+				self.job_queue.put(self.SENTINEL)
+
+		for p in workers:
 			p.join()
 
-		log.info("All Producers have finished generating ciphers.")
+		self.result_queue.put(self.SENTINEL)
 
-		# --- 4. Signal the Consumer to finish ---
-		# Send a sentinel for every producer that finished. The consumer will check
-		# for these to confirm all expected data is received before exiting its loop.
-		for _ in range(len(producer_pool)):
-			self.queue.put(self.SENTINEL)
-
-		# --- 5. Wait for the Consumer to finish ---
-		# This blocks until the consumer has uploaded the final batch and exited.
-		consumer_process.join()
-
-		log.info("✅ All processes complete. Job finished successfully.")
+		uploader.join()
+		log.info("Job complete.")

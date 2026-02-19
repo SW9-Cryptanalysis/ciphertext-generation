@@ -78,6 +78,11 @@ class TestLowerCaseNoSpacesAlphaStringValidator:
 			lower_case_no_spaces_alpha_string(12345, name="test_param", type_hint=str)
 		assert "Parameter `test_param` must be of type str." in str(excinfo.value)
 
+	def test_empty_string(self):
+		with pytest.raises(ValueError) as excinfo:
+			lower_case_no_spaces_alpha_string("", name="test_param", type_hint=str)
+		assert "Parameter `test_param` must be a non-blank string." in str(excinfo.value)
+
 
 class TestIsAlphaLowercaseNoSpaces:
 	def test_valid_string(self):

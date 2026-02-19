@@ -1,9 +1,10 @@
 import pytest
 import os
 import multiprocessing as mp
+import queue
 from drive.cipher_producer import CipherProducer
 from encipherment.cipher import SubstitutionCipher, HomophonicCipher
-import queue
+from fetching.text_splits import TextStream
 
 
 class MockCipher(SubstitutionCipher):
@@ -15,21 +16,19 @@ class MockCipher(SubstitutionCipher):
 
 	def generate_key(self):
 		self.key = {"a": ["1"], "b": ["2"], "c": ["3"]}
-
 		return self.key
 
 	def encipher(self):
 		self.ciphertext = "1 2 3"
 		self.recurrence_encoding = "1 2 3"
-
 		return self.ciphertext
 
 
 @pytest.fixture
-def mock_queue():
-	"""Provides a thread-safe multiprocessing queue."""
+def mock_queues():
+	"""Provides thread-safe multiprocessing queues."""
 	manager = mp.Manager()
-	return manager.Queue()
+	return manager.Queue(), manager.Queue()
 
 
 @pytest.fixture
@@ -41,14 +40,17 @@ def mock_cipher_data():
 
 
 class TestCipherProducerRun:
-	def test_successful_run(self, mocker, mock_queue, mock_cipher_data):
-		total_ciphers = 3
+	def test_successful_run(self, mocker, mock_queues, mock_cipher_data):
+		input_q, output_q = mock_queues
 
-		mock_fetcher_instance = mocker.Mock()
-		mock_fetcher_class = mocker.patch(
-			"drive.cipher_producer.Fetcher",
-			return_value=mock_fetcher_instance
-		)
+		sample_item = {
+			"text": "sample text",
+			"source_id": "123",
+			"source_name": "Book",
+			"length": 11
+		}
+		input_q.put(("train", sample_item))
+		input_q.put("STOP")
 
 		mock_cipher_return = MockCipher()
 
@@ -64,128 +66,143 @@ class TestCipherProducerRun:
 		)
 
 		producer = CipherProducer(
-			queue=mock_queue,
-			start_and_total=(10, total_ciphers),
+			input_queue=input_q,
+			output_queue=output_q,
 			name="TestProducer"
 		)
 
 		producer.run()
 
-		mock_fetcher_class.assert_called_once()
-
-		assert mock_generate_cipher.call_count == total_ciphers
-		assert mock_create_json.call_count == total_ciphers
+		mock_generate_cipher.assert_called_once_with(sample_item)
+		mock_create_json.assert_called_once_with(mock_cipher_return)
 
 		items_in_queue = []
-		for _ in range(total_ciphers):
-			try:
-				items_in_queue.append(mock_queue.get(timeout=0.1))
-			except queue.Empty:
-				pytest.fail("Queue was empty before receiving all expected ciphers.")
+		try:
+			items_in_queue.append(output_q.get(timeout=0.1))
+		except queue.Empty:
+			pytest.fail("Queue was empty before receiving expected cipher.")
 
-		assert len(items_in_queue) == total_ciphers
+		assert len(items_in_queue) == 1
 
-		last_filename, last_bytes = items_in_queue[-1]
+		last_split, last_filename, last_bytes = items_in_queue[-1]
 		expected_pid = os.getpid()
 
-		assert f"_{12}_{expected_pid}.json" in last_filename
+		assert last_split == "train"
+		assert f"_{expected_pid}.json" in last_filename
+		assert "123" in last_filename
 		assert last_bytes == mock_cipher_data[1]
 
-	def test_fetcher_initialization_failure(self, mocker, mock_queue, caplog):
-		mock_log = mocker.patch("drive.cipher_producer.log")
-		mocker.patch(
-			"drive.cipher_producer.Fetcher",
-			side_effect=Exception("Fetcher init error"),
-		)
-
-		mock_generate_cipher = mocker.patch.object(
-			CipherProducer,
-			"generate_cipher",
-			side_effect=Exception("Cipher generation failed mid-loop"),
-		)
+	def test_stop_signal(self, mock_queues, caplog):
+		input_q, output_q = mock_queues
+		input_q.put("STOP")
 
 		producer = CipherProducer(
-			queue=mock_queue, start_and_total=(0, 10), name="TestProducer"
+			input_queue=input_q,
+			output_queue=output_q,
+			name="TestProducer"
 		)
 
 		producer.run()
 
-		mock_log.critical.assert_called_once()
-		mock_generate_cipher.assert_not_called()
-		assert mock_queue.empty()
+		assert output_q.empty()
 
-	def test_generation_runtime_failure(self, mocker, mock_queue, caplog):
-		total_ciphers = 3
+	def test_generation_runtime_failure(self, mocker, mock_queues, caplog):
+		input_q, output_q = mock_queues
+
+		input_q.put(("val", {"text": "fail", "source_id": "1"}))
+		input_q.put("STOP")
 
 		mock_log = mocker.patch("drive.cipher_producer.log")
-		mocker.patch("drive.cipher_producer.Fetcher")
 
 		mocker.patch.object(
 			CipherProducer,
 			"generate_cipher",
-			side_effect=[
-				MockCipher(),
-				Exception("Cipher generation failed mid-loop"),
-				MockCipher(),
-			],
-		)
-
-		mock_generate_cipher = mocker.patch.object(
-			CipherProducer,
-			"generate_cipher",
-			side_effect=[
-				MockCipher(),
-				Exception("Cipher generation failed mid-loop")
-			]
+			return_value=None
 		)
 
 		producer = CipherProducer(
-			queue=mock_queue, start_and_total=(0, total_ciphers), name="TestProducer"
+			input_queue=input_q,
+			output_queue=output_q,
+			name="TestProducer"
 		)
 
 		producer.run()
 
-		mock_log.error.assert_called_with("Producer TestProducer failed on cipher 2: ")
-		assert mock_generate_cipher.call_count == total_ciphers
-		assert mock_queue.qsize() == 0
-		mock_log.info.assert_called_with("TestProducer finished generation.")
+		assert output_q.empty()
+		mock_log.info.assert_any_call("TestProducer finished generation.")
+
+	def test_run_handles_queue_empty_and_retries(self, mocker):
+		mock_input_q = mocker.Mock()
+		mock_output_q = mocker.Mock()
+
+		mock_input_q.get.side_effect = [queue.Empty, "STOP"]
+
+		producer = CipherProducer(
+			input_queue=mock_input_q,
+			output_queue=mock_output_q,
+			name="TestProducer"
+		)
+
+		producer.run()
+
+		assert mock_input_q.get.call_count == 2
+
+	def test_run_handles_unexpected_loop_exception(self, mocker):
+		mock_input_q = mocker.Mock()
+		mock_output_q = mocker.Mock()
+		mock_log = mocker.patch("drive.cipher_producer.log")
+
+		mock_input_q.get.side_effect = [Exception("Queue connection lost"), "STOP"]
+
+		producer = CipherProducer(
+			input_queue=mock_input_q,
+			output_queue=mock_output_q,
+			name="TestProducer"
+		)
+
+		producer.run()
+
+		mock_log.error.assert_called()
+		assert "Queue connection lost" in mock_log.error.call_args[0][0]
+		assert mock_input_q.get.call_count == 2
 
 
 class TestGenerateCipherLogic:
 	def test_generate_cipher_success(self, mocker):
-		producer = mocker.MagicMock(spec=CipherProducer)
+		producer = CipherProducer(mocker.Mock(), mocker.Mock(), name="Test")
 
-		mock_fetch_text = mocker.patch(
-			"drive.cipher_producer.Fetcher.fetch_random_book_text",
-			return_value="a" * 1000
-		)
-		mock_get_slice = mocker.patch(
-			"drive.cipher_producer.Fetcher.get_random_book_slice",
-			return_value="testslice"
-		)
+		sample_item: TextStream = {
+			"text": "testslice",
+			"source_id": "123",
+			"source_name": "Book",
+			"length": 9
+		}
 
 		mock_cipher_instance = mocker.Mock(spec=HomophonicCipher)
 		mocked_homophonic_cipher = mocker.patch(
-			"drive.cipher_producer.HomophonicCipher", return_value=mock_cipher_instance
+			"drive.cipher_producer.HomophonicCipher",
+			return_value=mock_cipher_instance
 		)
 
-		cipher = CipherProducer.generate_cipher(producer)
+		cipher = producer.generate_cipher(sample_item)
 
-		mocked_homophonic_cipher.assert_called_once_with("testslice")
-		mock_fetch_text.assert_called_once()
-		mock_get_slice.assert_called_once()
-		assert isinstance(cipher, HomophonicCipher)
+		mocked_homophonic_cipher.assert_called_once_with(sample_item)
 
-	def test_generate_cipher_value_error(self, mocker, caplog):
-		producer = mocker.MagicMock(spec=CipherProducer)
-		producer.MIN_LEN = 400
-		producer.MAX_LEN = 1000
+		mock_cipher_instance.generate_difficulty.assert_called_once()
+		mock_cipher_instance.generate_key.assert_called_once()
+		mock_cipher_instance.encipher.assert_called_once()
 
-		mock_fetcher = mocker.Mock()
-		mock_fetcher.fetch_random_book_text.return_value = "a" * 1000
-		mock_fetcher.get_random_book_slice.return_value = "testslice"
-		mock_fetcher.book_id = "test_book_123"
-		producer.fetcher = mock_fetcher
+		assert cipher == mock_cipher_instance
+
+	def test_generate_cipher_errors(self, mocker, caplog):
+		producer = CipherProducer(mocker.Mock(), mocker.Mock(), name="Test")
+
+		sample_item: TextStream = {
+			"text": "invalid",
+			"source_id": "123",
+			"source_name": "Book",
+			"length": 9
+		}
 
 		mock_log = mocker.patch("drive.cipher_producer.log")
 
@@ -194,7 +211,32 @@ class TestGenerateCipherLogic:
 			side_effect=ValueError("Invalid cipher setup"),
 		)
 
-		with pytest.raises(ValueError):
-			CipherProducer.generate_cipher(producer)
+		result = producer.generate_cipher(sample_item)
 
-		mock_log.error.assert_called_with("Error generating cipher for book id: test_book_123")
+		assert result is None
+		mock_log.error.assert_called()
+		assert "Error generating cipher" in mock_log.error.call_args[0][0]
+
+	def test_generate_cipher_unexpected_exception(self, mocker):
+		producer = CipherProducer(mocker.Mock(), mocker.Mock(), name="Test")
+		sample_item: TextStream = {
+			"text": "crash_test",
+			"source_id": "123",
+			"source_name": "Book",
+			"length": 10
+		}
+
+		mock_log = mocker.patch("drive.cipher_producer.log")
+
+		mocker.patch(
+			"drive.cipher_producer.HomophonicCipher",
+			side_effect=Exception("Critical system failure"),
+		)
+
+		result = producer.generate_cipher(sample_item)
+
+		assert result is None
+		mock_log.error.assert_called()
+		log_msg = mock_log.error.call_args[0][0]
+		assert "Unexpected cipher generation error" in log_msg
+		assert "Critical system failure" in log_msg
