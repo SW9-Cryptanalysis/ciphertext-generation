@@ -1,6 +1,6 @@
 import multiprocessing as mp
 import os
-import queue  # Standard queue for Empty exception
+import queue
 from typing import Any
 from multiprocessing.queues import Queue as MPQueue
 
@@ -9,7 +9,6 @@ from utils.logging import get_colored_logger
 from encipherment.cipher import SubstitutionCipher, HomophonicCipher
 from fetching.text_splits import TextStream
 
-# Note: Fetcher import removed as it is no longer needed in the Producer
 
 log = get_colored_logger("cipher_producer")
 
@@ -18,8 +17,8 @@ class CipherProducer(mp.Process):
 	"""A multiprocessing process for generating ciphers from a shared input queue.
 
 	Attributes:
-		input_queue (MPQueue[Any]): Queue containing raw text data dicts.
-		output_queue (MPQueue[Any]): Queue to send finished cipher JSONs/bytes to.
+		input_queue (MPQueue[Any]): Queue containing tuples of (split, text_data).
+		output_queue (MPQueue[Any]): Queue to send tuples of (split, filename, file_bytes).
 
 	"""
 
@@ -33,8 +32,8 @@ class CipherProducer(mp.Process):
 		"""Initialize the CipherProducer.
 
 		Args:
-			input_queue (MPQueue): Queue to receive text chunks from.
-			output_queue (MPQueue): Queue to send results to.
+			input_queue (MPQueue): Queue to receive split and text chunks from.
+			output_queue (MPQueue): Queue to send split, filename, and bytes to.
 			*args: Additional arguments.
 			**kwargs: Additional keyword arguments.
 
@@ -56,7 +55,9 @@ class CipherProducer(mp.Process):
 					log.info(f"{process_name} received STOP signal.")
 					break
 
-				cipher = self.generate_cipher(item)
+				split, text_obj = item
+
+				cipher = self.generate_cipher(text_obj)
 
 				if cipher is None:
 					continue
@@ -64,12 +65,11 @@ class CipherProducer(mp.Process):
 				_, file_bytes = create_cipher_json(cipher)
 
 				filename = (
-					f"c_{len(cipher.plaintext)}_{item["source_id"]}_"
+					f"c_{len(cipher.plaintext)}_{text_obj['source_id']}_"
 					f"{cipher.difficulty}_{os.getpid()}.json"
 				)
 
-				# Send to Uploader
-				self.output_queue.put((filename, file_bytes))
+				self.output_queue.put((split, filename, file_bytes))
 
 			except queue.Empty:
 				continue
@@ -86,11 +86,8 @@ class CipherProducer(mp.Process):
 
 		"""
 		try:
-			# We assume 'text' is already the correct length/slice
-			# because the generator handled MIN/MAX_LEN bounds.
 			cipher = HomophonicCipher(text)
 
-			# Use random difficulty if that is the logic
 			cipher.generate_difficulty()
 			cipher.generate_key()
 			cipher.encipher()

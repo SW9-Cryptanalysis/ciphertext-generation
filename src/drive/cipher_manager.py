@@ -1,7 +1,7 @@
 import multiprocessing as mp
 from utils.logging import get_colored_logger
 import os
-from typing import Iterable
+from typing import Iterable, Any
 
 from drive.drive_uploader import DriveUploader, DriveUploaderConfig
 from drive.cipher_producer import CipherProducer
@@ -13,11 +13,12 @@ class CipherManager:
 	"""Orchestrates the parallel generation using Feeder -> Worker -> Uploader pattern.
 
 	Attributes:
-		folder_id (str): The folder ID to upload the ciphers to.
+		config (dict[str, dict[str, Any]]): Configuration dictionary mapping splits
+			to their folder IDs and target counts.
 		text_stream_source (Iterable): The iterable source of text chunks.
-		total_count (int): The total number of ciphers to generate.
-		num_workers (int | None, optional): The number of workers to use.
-			Defaults to None.
+		total_count (int): The total number of ciphers to generate across all splits.
+		split_folders (dict[str, str]): A mapping of splits to their folder IDs.
+		num_workers (int): The number of workers to use.
 
 	Methods:
 		execute(): Execute the cipher generation process.
@@ -28,23 +29,26 @@ class CipherManager:
 
 	def __init__(
 		self,
-		folder_id: str,
+		config: dict[str, dict[str, Any]],
 		text_stream_source: Iterable,
-		total_count: int,
 		num_workers: int | None = None,
 	) -> None:
 		"""Initialize the CipherManager.
 
 		Args:
-			folder_id: The folder ID to upload the ciphers to.
-			text_stream_source: Iterator yielding (split,text_data) from your generator.
-			total_count: Total expected ciphers (for progress bars/logging).
+			config: Configuration dictionary with count and folder_id per split.
+			text_stream_source: Iterator yielding (split, text_data) from the generator.
 			num_workers: Number of workers to use. Defaults to None.
 
 		"""
-		self.folder_id = folder_id
+		self.config = config
 		self.stream = text_stream_source
-		self.total_count = total_count
+
+		self.total_count = sum(split_data["count"] for split_data in config.values())
+		self.split_folders = {
+			split: split_data["folder_id"]
+			for split, split_data in config.items()
+		}
 
 		self.num_workers = num_workers or max(1, (os.cpu_count() or 4) - 2)
 
@@ -53,19 +57,16 @@ class CipherManager:
 		self.result_queue = self.manager.Queue()
 
 	def execute(self) -> None:
-		"""Execute the cipher generation process.
-
-		Starts the Feeder -> Workers -> Uploader pattern.
-		"""
+		"""Execute the cipher generation process."""
 		log.info(
-			f"Starting job. Target: {self.total_count} ciphers"
-			" using {self.num_workers} workers.",
+			f"Starting job. Target: {self.total_count} ciphers "
+			f"using {self.num_workers} workers.",
 		)
 
 		uploader = DriveUploader(
-			queue=self.result_queue,  # type: ignore
+			queue=self.result_queue, # type: ignore
 			config=DriveUploaderConfig(
-				folder_id=self.folder_id,
+				split_folders=self.split_folders,
 				total_ciphers=self.total_count,
 			),
 			name="Uploader-Consumer",
@@ -75,8 +76,8 @@ class CipherManager:
 		workers = []
 		for i in range(self.num_workers):
 			p = CipherProducer(
-				input_queue=self.job_queue,  # type: ignore
-				output_queue=self.result_queue,  # type: ignore
+				input_queue=self.job_queue, # type: ignore
+				output_queue=self.result_queue, # type: ignore
 				name=f"Worker-{i + 1}",
 			)
 			workers.append(p)
@@ -86,8 +87,8 @@ class CipherManager:
 
 		count_fed = 0
 		try:
-			for split, text_data in self.stream:  # noqa B007
-				self.job_queue.put(text_data)
+			for split, text_data in self.stream:
+				self.job_queue.put((split, text_data))
 				count_fed += 1
 
 				if count_fed % 1000 == 0:
@@ -108,4 +109,4 @@ class CipherManager:
 		self.result_queue.put(self.SENTINEL)
 
 		uploader.join()
-		log.info("✅ Job complete.")
+		log.info("Job complete.")
