@@ -43,14 +43,13 @@ class TestCipherProducerRun:
 	def test_successful_run(self, mocker, mock_queues, mock_cipher_data):
 		input_q, output_q = mock_queues
 		
-		# Setup input data
 		sample_item = {
 			"text": "sample text", 
 			"source_id": "123", 
 			"source_name": "Book", 
 			"length": 11
 		}
-		input_q.put(sample_item)
+		input_q.put(("train", sample_item))
 		input_q.put("STOP")
 
 		mock_cipher_return = MockCipher()
@@ -85,10 +84,10 @@ class TestCipherProducerRun:
 
 		assert len(items_in_queue) == 1
 
-		last_filename, last_bytes = items_in_queue[-1]
+		last_split, last_filename, last_bytes = items_in_queue[-1]
 		expected_pid = os.getpid()
 
-		# Filename format: c_{len}_{source_id}_{difficulty}_{pid}.json
+		assert last_split == "train"
 		assert f"_{expected_pid}.json" in last_filename
 		assert "123" in last_filename
 		assert last_bytes == mock_cipher_data[1]
@@ -110,13 +109,11 @@ class TestCipherProducerRun:
 	def test_generation_runtime_failure(self, mocker, mock_queues, caplog):
 		input_q, output_q = mock_queues
 		
-		# Add two items: one that fails, one that stops
-		input_q.put({"text": "fail", "source_id": "1"})
+		input_q.put(("val", {"text": "fail", "source_id": "1"}))
 		input_q.put("STOP")
 
 		mock_log = mocker.patch("drive.cipher_producer.log")
 
-		# Mock generate_cipher to return None (failure)
 		mocker.patch.object(
 			CipherProducer,
 			"generate_cipher",
@@ -131,19 +128,13 @@ class TestCipherProducerRun:
 
 		producer.run()
 
-		# Queue should be empty because the failed item is skipped
 		assert output_q.empty()
-		
-		# We don't assert specific log calls for the loop since the Producer 
-		# just continues on None, but we verify it finished gracefully.
 		mock_log.info.assert_any_call("TestProducer finished generation.")
 		
 	def test_run_handles_queue_empty_and_retries(self, mocker):
-		# We mock the input queue to simulate a timeout (Empty) followed by a valid STOP
 		mock_input_q = mocker.Mock()
 		mock_output_q = mocker.Mock()
 		
-		# Side effect: First call raises Empty, second returns "STOP"
 		mock_input_q.get.side_effect = [queue.Empty, "STOP"]
 		
 		producer = CipherProducer(
@@ -154,16 +145,13 @@ class TestCipherProducerRun:
 		
 		producer.run()
 		
-		# Assert get was called twice (retried after Empty)
 		assert mock_input_q.get.call_count == 2
 
 	def test_run_handles_unexpected_loop_exception(self, mocker):
-		# We mock the queue to raise a generic Exception, then STOP
 		mock_input_q = mocker.Mock()
 		mock_output_q = mocker.Mock()
 		mock_log = mocker.patch("drive.cipher_producer.log")
 		
-		# Side effect: First call crashes, second stops
 		mock_input_q.get.side_effect = [Exception("Queue connection lost"), "STOP"]
 		
 		producer = CipherProducer(
@@ -174,16 +162,13 @@ class TestCipherProducerRun:
 		
 		producer.run()
 		
-		# Verify the error was logged
 		mock_log.error.assert_called()
 		assert "Queue connection lost" in mock_log.error.call_args[0][0]
-		# Verify it didn't crash the process (it called get a second time)
 		assert mock_input_q.get.call_count == 2
 
 
 class TestGenerateCipherLogic:
 	def test_generate_cipher_success(self, mocker):
-		# We pass mocks for queues since we only test the method
 		producer = CipherProducer(mocker.Mock(), mocker.Mock(), name="Test")
 		
 		sample_item: TextStream = {
@@ -201,7 +186,6 @@ class TestGenerateCipherLogic:
 
 		cipher = producer.generate_cipher(sample_item)
 
-		# New logic passes the entire item/text to the cipher
 		mocked_homophonic_cipher.assert_called_once_with(sample_item)
 		
 		mock_cipher_instance.generate_difficulty.assert_called_once()
@@ -227,7 +211,6 @@ class TestGenerateCipherLogic:
 			side_effect=ValueError("Invalid cipher setup"),
 		)
 
-		# The new implementation catches exceptions and returns None
 		result = producer.generate_cipher(sample_item)
 
 		assert result is None
@@ -245,7 +228,6 @@ class TestGenerateCipherLogic:
 
 		mock_log = mocker.patch("drive.cipher_producer.log")
 
-		# Mock HomophonicCipher to raise a generic Exception (not ValueError)
 		mocker.patch(
 			"drive.cipher_producer.HomophonicCipher",
 			side_effect=Exception("Critical system failure"),
@@ -255,7 +237,6 @@ class TestGenerateCipherLogic:
 
 		assert result is None
 		mock_log.error.assert_called()
-		# Ensure it hit the "Unexpected cipher generation error" block
 		log_msg = mock_log.error.call_args[0][0]
 		assert "Unexpected cipher generation error" in log_msg
 		assert "Critical system failure" in log_msg
