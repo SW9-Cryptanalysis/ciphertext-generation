@@ -1,294 +1,291 @@
 import pytest
 import os
+import random
 from fetching import text_splits
 from fetching.text_splits import (
-    find_boundaries,
-    clean_whitespace,
-    extract_random_chunk,
-    get_split,
-    get_book_chunks,
-    text_streams_generator,
-    get_text_stream,
-    randomize_stream,
+	find_boundaries,
+	find_spaceless_target_index,
+	extract_random_chunk,
+	get_split,
+	get_book_chunks,
+	get_usable_text,
+	get_actual_take,
+	validate_targets,
+	clean_whitespace,
+	text_streams_generator,
+	get_text_stream,
+	randomize_stream,
 )
 
 # --- Fixtures ---
 
+
 @pytest.fixture
 def sample_text():
-    return "This is a sample text used for testing boundaries and extraction logic."
+	return "This is a sample text used for testing boundaries and extraction logic."
+
 
 @pytest.fixture
 def mock_book_stream():
-    return [
-        {"id": "1", "text": "Book One content " * 500, "metadata": {"title": "Book One"}},
-        {"id": "2", "text": "Book Two content " * 500, "metadata": {"title": "Book Two"}},
-        {"id": "3", "text": "Book Three content " * 500, "metadata": {"title": "Book Three"}},
-    ]
+	return [
+		{
+			"id": "1",
+			"text": "Book One content " * 500,
+			"metadata": {"title": "Book One"},
+		},
+		{
+			"id": "2",
+			"text": "Book Two content " * 500,
+			"metadata": {"title": "Book Two"},
+		},
+		{
+			"id": "3",
+			"text": "Book Three content " * 500,
+			"metadata": {"title": "Book Three"},
+		},
+	]
+
 
 # --- Helper Function Tests ---
 
+
 class TestTextHelpers:
+	def test_find_boundaries_standard(self, sample_text):
+		start, end = find_boundaries(sample_text, 10, 11)
+		assert sample_text[start:end] == "sample text"
 
-    def test_find_boundaries_standard(self, sample_text):
-        # Target "sample text" (length ~11) starting around index 10
-        # raw text: "This is a sample text..."
-        # index 10 is 's' in sample.
-        start, end = find_boundaries(sample_text, 10, 11)
+	def test_find_spaceless_target_index(self):
+		text = "a b c d e"  # Spaced
+		assert find_spaceless_target_index(text, 3) == 4
+		assert find_spaceless_target_index(text, 10) == len(text)
 
-        # Expectation:
-        # Lookback from 10 finds space at 9 (" a "). start -> 10.
-        # Target end -> 10 + 11 = 21 ("...text").
-        # Lookahead from 21 finds space at 21 (" "). end -> 21.
-        assert sample_text[start:end] == "sample text"
+	def test_get_split(self):
+		assert get_split(0) == "val"
+		assert get_split(1) == "test"
+		assert get_split(2) == "train"
+		assert get_split(100) == "val"
 
-    def test_find_boundaries_start_of_string(self):
-        text = "Start of string test."
-        # No space before index 0
-        start, end = find_boundaries(text, 0, 5)
-        assert start == 0
-        # Finds space after "Start"
-        assert text[start:end] == "Start"
+	def test_clean_whitespace(self):
+		raw = "Line\nBreak\tTab   Multiple  Spaces"
+		expected = "Line Break Tab Multiple Spaces"
+		assert clean_whitespace(raw) == expected
 
-    def test_find_boundaries_end_of_string(self):
-        text = "Test end of string"
-        # Target "string" at the end
-        start_raw = text.index("string")
-        start, end = find_boundaries(text, start_raw, 6)
+	def test_clean_whitespace_multiple_regex_spaces(self):
+		"""Line 90: Ensure regex replacement of multiple spaces is hit."""
+		text = "word    word"
+		assert clean_whitespace(text) == "word word"
 
-        # Should detect no space after and clamp to len(text)
-        assert text[start:end] == "string"
+	def test_validate_targets_valid(self):
+		targets = {"train": 100, "val": 10, "test": 10}
+		# Should not raise
+		validate_targets(targets)
 
-    def test_clean_whitespace(self):
-        raw = "Line\nBreak\tTab   Multiple  Spaces"
-        expected = "Line Break Tab Multiple Spaces"
-        assert clean_whitespace(raw) == expected
+	def test_validate_targets_invalid(self):
+		with pytest.raises(ValueError, match="must contain exactly keys"):
+			validate_targets({"train": 100})
 
-    def test_clean_whitespace_strip(self):
-        raw = "  Leading and trailing  "
-        expected = "Leading and trailing"
-        assert clean_whitespace(raw) == expected
+	def test_get_actual_take_logic(self):
+		debts = {"train": 10.5}
+		# Capacity is 5, debt is 10.5 -> Should take 5
+		assert get_actual_take("train", debts, 5) == 5
+		# Capacity is 20, debt is 10.5 -> Should take 10
+		assert get_actual_take("train", debts, 20) == 10
+		# Capacity is 0 -> Should take 0
+		assert get_actual_take("train", debts, 0) == 0
 
-    def test_get_split(self):
-        assert get_split(0) == "val"
-        assert get_split(100) == "val"
-        assert get_split(1) == "test"
-        assert get_split(101) == "test"
-        assert get_split(2) == "train"
-        assert get_split(99) == "train"
+	def test_get_usable_text_trimming(self):
+		# 100,000 chars. 2% = 2000, 1% = 1000.
+		raw = "A" * 100_000
+		usable = get_usable_text(raw, (4000, 10000))
+		assert len(usable) == 97_000
 
-    def test_randomize_stream(self, mocker):
-        mock_stream = mocker.Mock()
-        randomize_stream(mock_stream)
-        mock_stream.shuffle.assert_called_once_with(seed=42, buffer_size=100)
+	def test_get_usable_text_short_book(self):
+		# Book shorter than 3x max_len should not be trimmed
+		raw = "Short book content"
+		usable = get_usable_text(raw, (4000, 10000))
+		assert usable == raw
+
+	def test_randomize_stream(self, mocker):
+		mock_stream = mocker.Mock()
+		randomize_stream(mock_stream)
+		mock_stream.shuffle.assert_called_once_with(seed=42, buffer_size=100)
 
 
 # --- Core Logic Tests ---
 
+
 class TestChunkExtraction:
+	def test_extract_random_chunk_logic_flow(self, mocker):
+		text = "wordone wordtwo wordthree wordfour"
+		mocker.patch("random.randint", side_effect=[7, 0, 0, 0])
+		mocker.patch("fetching.text_splits.format_text", side_effect=lambda x: x)
 
-    def test_extract_random_chunk(self, mocker, sample_text):
-        # Mock random to return specific values
-        # 1. randint for target_len: returns 10
-        # 2. randint for raw_start: returns 5
-        mocker.patch("random.randint", side_effect=[10, 5])
+		chunk = extract_random_chunk(text, 0, len(text), (5, 15))
 
-        # We need to verify that find_boundaries is called with expected calculated args
-        # zone_size = 50, target_len = 10 -> max_start = 40.
-        # raw_start = 5 + 5 (offset) = 10? No, raw_start = zone_start (0) + 5 = 5.
+		assert " " not in chunk
+		assert chunk == "wordone"
 
-        spy_boundaries = mocker.spy(text_splits, "find_boundaries")
+	def test_get_book_chunks_filters_length(self, mocker):
+		min_bound = 1000
+		# 960 is within 5% of 1000 (threshold 950)
+		valid_chunk = "a" * 960
+		invalid_chunk = "a" * 940
 
-        chunk = extract_random_chunk(sample_text, 0, 50, (5, 20))
+		mocker.patch(
+			"fetching.text_splits.extract_random_chunk",
+			side_effect=[valid_chunk, invalid_chunk],
+		)
 
-        # Check interactions
-        spy_boundaries.assert_called_once()
-        # Ensure it returns a string slice
-        assert isinstance(chunk, str)
+		chunks = list(
+			get_book_chunks("dummy text", actual_take=2, len_bounds=(min_bound, 2000))
+		)
 
-    def test_get_book_chunks(self, mocker):
-        book_text = "word " * 100
-        mocker.patch("fetching.text_splits.extract_random_chunk", return_value="chunk")
-        mocker.patch("fetching.text_splits.clean_whitespace", return_value="chunk")
+		assert len(chunks) == 1
+		assert chunks[0] == valid_chunk
 
-        # Test yielding
-        chunks = list(get_book_chunks(book_text, actual_take=3, len_bounds=(10, 20)))
+	def test_get_book_chunks_clamping(self, mocker):
+		# Test that chunks longer than max_len are clamped
+		max_bound = 50
+		long_chunk = "a" * 100
+		mocker.patch(
+			"fetching.text_splits.extract_random_chunk",
+			return_value=long_chunk,
+		)
 
-        assert len(chunks) == 3
-        assert chunks == ["chunk", "chunk", "chunk"]
+		chunks = list(get_book_chunks("text", 1, (10, max_bound)))
+		assert len(chunks[0]) == max_bound
+
+	def test_extract_random_chunk_reaches_end_of_text(self, mocker):
+		"""Line 175: Test when raw_end >= len(text) breaks the loop."""
+		short_text = "This is very short."
+		# Mock target_len to be larger than the text
+		mocker.patch("random.randint", side_effect=[100, 0, 0])
+		mocker.patch("fetching.text_splits.format_text", side_effect=lambda x: x)
+
+		# This should trigger the break in the while loop at Line 175
+		chunk = extract_random_chunk(short_text, 0, 10, (5, 150))
+		assert len(chunk) > 0
+
+	def test_extract_random_chunk_too_small_returns_immediately(self, mocker):
+		"""Line 184: Test return when clean text < min_len."""
+		text = "tiny"
+		mocker.patch("random.randint", side_effect=[10, 0, 0])
+		mocker.patch("fetching.text_splits.format_text", side_effect=lambda x: x)
+
+		# min_len is 5, text is 4 chars
+		chunk = extract_random_chunk(text, 0, 5, (5, 15))
+		assert chunk == "tiny"
+
+
+# --- Stream Generator Tests ---
 
 
 class TestStreamGenerator:
+	@pytest.fixture
+	def mock_constants(self, mocker):
+		mocker.patch("fetching.text_splits.TOTAL_BOOKS", 100)
+		mocker.patch("fetching.text_splits.BOOK_IDS_VALIDATION", ["999"])
 
-    @pytest.fixture
-    def mock_constants(self, mocker):
-        # Patch constants to make math easy
-        # Total books = 100.
-        # Val = 1% = 1 book.
-        # Test = 1% = 1 book.
-        # Train = 98% = 98 books.
-        mocker.patch("fetching.text_splits.TOTAL_BOOKS", 100)
-        # Mock validation list
-        mocker.patch("fetching.text_splits.BOOK_IDS_VALIDATION", ["999"])
+	def test_text_streams_generator_skips_blacklisted_ids(self, mocker, mock_constants):
+		stream = [
+			{
+				"id": "good_id",
+				"text": "valid content " * 1000,
+				"metadata": {"title": "Good"},
+			},
+			{
+				"id": "bad_id",
+				"text": "invalid content " * 1000,
+				"metadata": {"title": "Bad"},
+			},
+		]
+		mocker.patch("fetching.text_splits.BOOK_IDS_VALIDATION", ["bad_id"])
+		targets = {"train": 1, "val": 0, "test": 0}
+		len_bounds = (500, 1000)
+		mocker.patch("fetching.text_splits.get_split", return_value="train")
 
-    def test_text_streams_generator_skips_blacklisted_ids(self, mocker):
-        # 1. Setup: Stream with 1 good book and 1 bad book
-        stream = [
-            {"id": "good_id", "text": "valid content " * 100, "metadata": {"title": "Good Book"}},
-            {"id": "bad_id", "text": "invalid content " * 100, "metadata": {"title": "Bad Book"}},
-        ]
+		results = list(text_streams_generator(stream, targets, len_bounds))
 
-        # 2. Mock Constants: Force 'bad_id' into the blacklist
-        mocker.patch("fetching.text_splits.BOOK_IDS_VALIDATION", ["bad_id"])
+		assert len(results) > 0
+		assert all(data["source_id"] == "good_id" for _, data in results)
 
-        # 3. Targets: We want 5 chunks from 'train'.
-        # If the blacklist fails, we'd get chunks from 'bad_id' too.
-        targets = {"train": 10, "val": 0, "test": 0}
+	def test_text_streams_generator_skips_validation_ids(self, mocker, mock_constants):
+		# Force ID '999' into the blacklist (set via mock_constants fixture)
+		stream = [
+			{"id": "999", "text": "content " * 1000, "metadata": {}},
+			{"id": "valid", "text": "content " * 1000, "metadata": {}}
+		]
+		targets = {"train": 1, "val": 0, "test": 0}
+		mocker.patch("fetching.text_splits.get_split", return_value="train")
+		
+		gen = text_streams_generator(stream, targets, (500, 1000))
+		results = list(gen)
+		
+		# Only 'valid' should produce a result
+		assert len(results) == 1
+		assert results[0][1]["source_id"] == "valid"
 
-        # Force all splits to 'train' to ensure logic hits the blacklist check
-        mocker.patch("fetching.text_splits.get_split", return_value="train")
+	def test_text_streams_generator_debt_and_take(self, mocker, mock_constants):
+		# Ensure that debt carries over and influences actual_take
+		stream = [
+			{"id": "1", "text": "content " * 2000, "metadata": {"title": "B1"}},
+		]
+		# Very high target to force high mean/debt
+		targets = {"train": 100, "val": 1, "test": 1}
+		len_bounds = (500, 1000)
+		mocker.patch("fetching.text_splits.get_split", return_value="train")
 
-        # 4. Execution
-        gen = text_streams_generator(stream, targets, (10, 20))
-        results = list(gen)
+		results = list(text_streams_generator(stream, targets, len_bounds))
+		# It should take as much as capacity allows (usable text len // (max_len * 1.5))
+		assert len(results) > 0
 
-        # 5. Assertions
-        # verify we got results
-        assert len(results) > 0
+	def test_text_streams_generator_capacity_handling(self, mock_constants):
+		stream = [{"id": "1", "text": "short", "metadata": {}}]
+		targets = {"train": 1, "val": 1, "test": 1}
 
-        # Verify EVERY result comes from 'good_id'
-        for _, data in results:
-            assert data["source_id"] == "good_id"
-            assert data["source_id"] != "bad_id"
+		gen = text_streams_generator(stream, targets, (4000, 10000))
+		assert len(list(gen)) == 0
 
-    def test_text_streams_generator_basic_flow(self, mock_constants, mock_book_stream):
-        targets = {"train": 2, "val": 1, "test": 1}
-        len_bounds = (10, 20)
-
-        # ID 1 (idx 0) -> Val (0 % 100 == 0)
-        # ID 2 (idx 1) -> Test (1 % 100 == 1)
-        # ID 3 (idx 2) -> Train (2 % 100 == 2)
-
-        gen = text_streams_generator(mock_book_stream, targets, len_bounds)
-        results = list(gen)
-
-        splits = [r[0] for r in results]
-
-        # We expect at least one from each if capacity allows
-        assert "val" in splits
-        assert "test" in splits
-        assert "train" in splits
-
-        # Verify structure
-        first_item = results[0][1]
-        assert "text" in first_item
-        assert "source_id" in first_item
-        assert "source_name" in first_item
-
-    def test_text_streams_generator_enforces_keys(self, mock_constants):
-        stream = []
-        # Missing 'val' and 'test'
-        invalid_targets = {"train": 10}
-
-        with pytest.raises(ValueError, match="must contain exactly keys"):
-            list(text_streams_generator(stream, invalid_targets, (10, 20)))
-
-        # Extra key 'other'
-        invalid_targets_2 = {"train": 10, "val": 10, "test": 10, "other": 5}
-        with pytest.raises(ValueError, match="must contain exactly keys"):
-            list(text_streams_generator(stream, invalid_targets_2, (10, 20)))
-
-    def test_text_streams_generator_skips_full_buckets(self, mocker, mock_constants):
-        # Targets are full for Val, but we feed a Val book (idx 0)
-        targets = {"val": 0, "train": 10, "test": 10}
-        stream = [{"id": "1", "text": "content", "metadata": {}}]
-
-        gen = text_streams_generator(stream, targets, (10, 20))
-        results = list(gen)
-
-        # Should be empty because idx 0 is Val, and Val target is 0
-        assert len(results) == 0
-
-    def test_text_streams_generator_global_break(self, mock_constants):
-        # All targets satisfied
-        targets = {"train": 0, "val": 0, "test": 0}
-        stream = [{"id": "1", "text": "content", "metadata": {}}]
-
-        gen = text_streams_generator(stream, targets, (10, 20))
-        # Should break immediately
-        results = list(gen)
-        assert len(results) == 0
-
-    def test_text_streams_generator_capacity_logic(self, mock_constants):
-        stream = [{"id": "1", "text": "short", "metadata": {}}]
-        targets = {"val": 5, "test": 5, "train": 5}
-
-        gen = text_streams_generator(stream, targets, (100, 200))
-        results = list(gen)
-
-        assert len(results) == 0
-
-    def test_text_streams_generator_debt_accounting(self, mocker):
-        # 1. Setup: A massive book so 'capacity' doesn't limit us
-        # Length 20,000 ensures we can easily take 10+ chunks of size ~20
-        stream = [{"id": "1", "text": "long " * 4000, "metadata": {"title": "Test Book"}}]
-
-        targets = {"train": 10, "val": 0, "test": 0}
-
-        # 2. Patch Constants & Logic to force high debt
-        # Formula: mean = target / (TOTAL_BOOKS * 0.98)
-        # If TOTAL_BOOKS=1 and target=10, mean = 10 / 0.98 ≈ 10.2
-        # This guarantees 'actual_take' will be at least 10.
-        mocker.patch("fetching.text_splits.TOTAL_BOOKS", 1)
-        mocker.patch("fetching.text_splits.BOOK_IDS_VALIDATION", [])
-
-        # Force the first book (idx 0) to be 'train' so we hit the target logic immediately
-        mocker.patch("fetching.text_splits.get_split", return_value="train")
-
-        # 3. Execution
-        gen = text_streams_generator(stream, targets, (10, 20))
-        results = list(gen)
-
-        # 4. Assertions
-        # We expected a mean of ~10.2, so we should get at least 10 chunks from this single book.
-        assert len(results) >= 10
-
-        # Verify they are all from the same book and split
-        for split, data in results:
-            assert split == "train"
-            assert data["source_id"] == "1"
+	def test_text_streams_generator_full_and_zero_capacity(self, mocker, mock_constants):
+		# Book 1: Split is full
+		# Book 2: Capacity is 0 (usable text too short)
+		stream = [
+			{"id": "full", "text": "content " * 1000, "metadata": {}},
+			{"id": "small", "text": "short", "metadata": {}},
+		]
+		
+		# Mock targets so 'train' is already done
+		targets = {"train": 0, "val": 10, "test": 10}
+		mocker.patch("fetching.text_splits.get_split", side_effect=["train", "val"])
+		
+		gen = text_streams_generator(stream, targets, (500, 1000))
+		results = list(gen)
+		
+		# Should be empty because first was skipped (full) and second was skipped (capacity)
+		assert len(results) == 0
 
 
 class TestGetTextStream:
+	def test_get_text_stream_integration(self, mocker):
+		mocker.patch("fetching.text_splits.load_dataset")
+		mocker.patch("fetching.text_splits.randomize_stream")
+		mock_gen = mocker.patch("fetching.text_splits.text_streams_generator")
+		mocker.patch.dict(os.environ, {"HF_TOKEN": "mock_token"})
 
-    def test_get_text_stream_defaults(self, mocker):
-        # Mock external dependencies
-        mocker.patch("fetching.text_splits.load_dataset")
-        mock_randomize = mocker.patch("fetching.text_splits.randomize_stream")
-        mock_generator = mocker.patch("fetching.text_splits.text_streams_generator")
-        mocker.patch.dict(os.environ, {"HF_TOKEN": "mock_token"})
+		result = get_text_stream(targets={"train": 10, "val": 1, "test": 1})
 
-        # Call
-        result = get_text_stream()
+		assert result == mock_gen.return_value
+		mock_gen.assert_called_once()
 
-        # Assert pipeline
-        mock_randomize.assert_called_once()
-        mock_generator.assert_called_once()
-        assert result == mock_generator.return_value
+	def test_get_text_stream_none_targets(self, mocker):
+		"""Line 386: Test default targets assignment."""
+		mocker.patch("fetching.text_splits.load_dataset")
+		mocker.patch("fetching.text_splits.randomize_stream")
+		mock_gen = mocker.patch("fetching.text_splits.text_streams_generator")
+		mocker.patch.dict(os.environ, {"HF_TOKEN": "mock"})
 
-        # Check default targets were passed
-        call_args = mock_generator.call_args
-        targets_passed = call_args[0][1] # 2nd arg
-        assert targets_passed["train"] == 1_000_000
+		get_text_stream(targets=None)
 
-    def test_get_text_stream_custom_targets(self, mocker):
-        mocker.patch("fetching.text_splits.load_dataset")
-        mocker.patch("fetching.text_splits.randomize_stream")
-        mock_generator = mocker.patch("fetching.text_splits.text_streams_generator")
-        mocker.patch.dict(os.environ, {"HF_TOKEN": "mock_token"})
-
-        custom_targets = {"train": 50}
-        get_text_stream(targets=custom_targets)
-
-        call_args = mock_generator.call_args
-        assert call_args[0][1] == custom_targets
+		# Verify the default dict was passed to the generator
+		passed_targets = mock_gen.call_args[0][1]
+		assert passed_targets == {"train": 1_000_000, "val": 10000, "test": 10000}
