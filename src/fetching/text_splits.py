@@ -113,36 +113,73 @@ def clean_whitespace(text: str) -> str:
 	return text.strip()
 
 
+def find_spaceless_target_index(spaced_text: str, target_len: int) -> int:
+	"""Find the index in a spaced string that corresponds to a spaceless length.
+
+	Args:
+		spaced_text (str): The text containing spaces.
+		target_len (int): The target number of non-space characters.
+
+	Returns:
+		int: The index in the spaced text corresponding to the target length.
+
+	"""
+	non_space_count = 0
+	
+	for i, char in enumerate(spaced_text):
+		if char.strip():
+			non_space_count += 1
+		if non_space_count == target_len:
+			return i
+			
+	return len(spaced_text)
+
+
 def extract_random_chunk(
 	text: str,
 	zone_start: int,
 	zone_size: int,
 	len_bounds: tuple[int, int],
 ) -> str:
-	"""Extract a random chunk of text from the provided text.
-
-	The chunk is aligned to word boundaries and has a random length between the
-	provided min and max length bounds.
+	"""Extract a random chunk of text dynamically while preserving word boundaries.
 
 	Args:
 		text (str): The input text to extract the chunk from.
 		zone_start (int): The start index of the zone to extract the chunk from.
 		zone_size (int): The size of the zone to extract the chunk from.
-		len_bounds (tuple[int, int]): The minimum and maximum length bounds for the
-			chunk.
+		len_bounds (tuple[int, int]): The minimum and maximum length bounds.
 
 	Returns:
-		str: The extracted chunk of text.
+		str: The extracted, cleanly cut, and spaceless chunk of text.
 
 	"""
 	min_len, max_len = len_bounds
-	target_len = random.randint(min_len, max_len)
+	target_len = random.randint(min_len + 50, max_len - 50)
 
 	max_start = max(0, zone_size - target_len)
 	raw_start = zone_start + random.randint(0, max_start)
+	
+	spaced_window = ""
+	raw_end = min(len(text), raw_start + (target_len * 2))
+	
+	while True:
+		raw_window = text[raw_start:raw_end]
+		spaced_window = format_text(raw_window)
+		
+		if len(clean_spaces(spaced_window)) >= target_len + 200 or raw_end >= len(text):
+			break
+			
+		raw_end = min(len(text), raw_end + target_len)
 
-	start_idx, end_idx = find_boundaries(text, raw_start, target_len)
-	return text[start_idx:end_idx]
+	if len(clean_spaces(spaced_window)) < min_len:
+		return clean_spaces(spaced_window).strip()
+
+	spaced_target_len = find_spaceless_target_index(spaced_window, target_len)
+	start_idx, end_idx = find_boundaries(spaced_window, 0, spaced_target_len)
+	
+	final_chunk = spaced_window[start_idx:end_idx]
+	
+	return clean_spaces(final_chunk).strip()
 
 
 def get_split(idx: int) -> str:
@@ -167,7 +204,7 @@ def get_split(idx: int) -> str:
 
 
 def get_book_chunks(
-	book_text: str,
+	text: str,
 	actual_take: int,
 	len_bounds: tuple[int, int],
 ) -> Iterator[str]:
@@ -177,7 +214,7 @@ def get_book_chunks(
 	provided min and max length bounds.
 
 	Args:
-		book_text (str): The entire text of the book.
+		text (str): The entire text of the book.
 		actual_take (int): The number of chunks to extract.
 		len_bounds (tuple[int, int]): The minimum and maximum length bounds for the
 			chunks.
@@ -186,26 +223,22 @@ def get_book_chunks(
 		Iterator[str]: An iterator of text chunks.
 
 	"""
-	total_len = len(book_text)
-
-	start_trim = min(int(total_len * 0.02), 10000)
-	end_trim = min(int(total_len * 0.01), 5000)
-
-	if total_len < len_bounds[1] * 3:
-		usable_text = book_text
-	else:
-		usable_text = book_text[start_trim : total_len - end_trim]
-
-	zone_size = len(usable_text) // actual_take
+	zone_size = len(text) // actual_take
 
 	for i in range(actual_take):
-		raw_chunk = extract_random_chunk(
-			usable_text,
+		chunk = extract_random_chunk(
+			text,
 			i * zone_size,
 			zone_size,
 			len_bounds,
 		)
-		yield clean_spaces(format_text(raw_chunk))
+
+		chunk_len = len(chunk)
+
+		if len_bounds[0] - 0.05 * len_bounds[0] <= chunk_len <= len_bounds[1]:
+			yield chunk
+		elif chunk_len > len_bounds[1]:
+			yield chunk[:len_bounds[1]]
 
 
 def validate_targets(targets: dict[str, int]) -> None:
@@ -239,6 +272,27 @@ def get_actual_take(split: str, debts: dict[str, float], capacity: int) -> int:
 	"""
 	actual_take = max(min(int(debts[split]), capacity), 1) if capacity > 0 else 0
 	return actual_take
+
+def get_usable_text(raw_text: str, len_bounds: tuple[int, int]) -> str:
+	"""Get the usable text from the raw text.
+	
+	Args:
+		raw_text (str): The raw text to get the usable text from.
+		len_bounds (tuple[int, int]): The minimum and maximum length bounds for the
+			text.
+	
+	Returns:
+		str: The usable text.
+	
+	"""
+	total_len = len(raw_text)
+	start_trim = min(int(total_len * 0.02), 10000)
+	end_trim = min(int(total_len * 0.01), 5000)
+	if total_len < len_bounds[1] * 3:
+		usable_text = raw_text
+	else:
+		usable_text = raw_text[start_trim : total_len - end_trim]
+	return usable_text
 
 
 def text_streams_generator(
@@ -285,7 +339,10 @@ def text_streams_generator(
 			continue
 
 		raw_text = book["text"]
-		capacity = len(raw_text) // len_bounds[1]
+		usable_text = get_usable_text(raw_text, len_bounds)
+
+		safe_capacity_req = int(len_bounds[1] * 1.5)
+		capacity = len(usable_text) // safe_capacity_req
 
 		debts[split] += means[split]
 
@@ -297,7 +354,7 @@ def text_streams_generator(
 		take_limit = min(actual_take, total_samples_map[split] - counts[split])
 
 		for chunk in islice(
-			get_book_chunks(raw_text, actual_take, len_bounds),
+			get_book_chunks(usable_text, actual_take, len_bounds),
 			take_limit,
 		):
 			yield (
