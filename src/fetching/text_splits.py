@@ -238,7 +238,7 @@ def get_book_chunks(
 		if len_bounds[0] - 0.05 * len_bounds[0] <= chunk_len <= len_bounds[1]:
 			yield chunk
 		elif chunk_len > len_bounds[1]:
-			yield chunk[:len_bounds[1]]
+			yield chunk[: len_bounds[1]]
 
 
 def validate_targets(targets: dict[str, int]) -> None:
@@ -272,6 +272,7 @@ def get_actual_take(split: str, debts: dict[str, float], capacity: int) -> int:
 	"""
 	actual_take = max(min(int(debts[split]), capacity), 1) if capacity > 0 else 0
 	return actual_take
+
 
 def get_usable_text(raw_text: str, len_bounds: tuple[int, int]) -> str:
 	"""Get the usable text from the raw text.
