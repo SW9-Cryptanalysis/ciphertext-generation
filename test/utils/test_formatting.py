@@ -36,6 +36,10 @@ def test_numbers_to_words():
 		numbers_to_words("He came from the 10th floor.")
 		== "He came from the tenth floor."
 	)
+	assert (
+		numbers_to_words("He was the 1.949th man in the room.")
+		== "He was the one thousand, nine hundred and forty-ninth man in the room."
+	)
 
 
 def test_format_text():

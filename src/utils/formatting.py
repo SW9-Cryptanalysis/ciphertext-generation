@@ -8,6 +8,8 @@ from gutenberg_cleaner import simple_cleaner
 def numbers_to_words(text: str) -> str:
 	"""Convert all numbers in the input text to their word representations.
 
+	Note: This function converts decimal numbers to integers if they have a suffix.
+
 	Args:
 			text (str): The input text containing numbers.
 
@@ -21,10 +23,11 @@ def numbers_to_words(text: str) -> str:
 		number_str = groups["number"]
 		suffix = groups["suffix"]
 
-		number_val = float(number_str) if "." in number_str else int(number_str)
-
 		if suffix:
-			return num2words(number_val, ordinal=True)
+			sanitized_number = number_str.replace(".", "")
+			return num2words(int(sanitized_number), ordinal=True)
+
+		number_val = float(number_str) if "." in number_str else int(number_str)
 		return num2words(number_val)
 
 	pattern = r"(?P<number>\d+(\.\d+)?)(?P<suffix>st|nd|rd|th)?"
