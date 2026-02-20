@@ -285,15 +285,15 @@ class TestHomophonicCipher:
 			assert cipher.key["a"] == [1]
 			assert cipher.key["b"] == [2]
 			assert 77 not in cipher.key["a"]
-   
+
 	class TestRemappingIntegrity:
 		def test_first_seen_is_always_one(self, sample_stream_short):
 			"""
-			Tests that the actual value of the original symbol doesn't matter; 
+			Tests that the actual value of the original symbol doesn't matter;
 			the first one encountered in the stream MUST become '1'.
 			"""
 			cipher = HomophonicCipher(sample_stream_short)
-			
+
 			# Scenario A: 'z' is 500, 'a' is 10. Text starts with 'z'.
 			cipher.key = {"z": [500], "a": [10]}
 			cipher.ciphertext = "500 10 500"
@@ -312,16 +312,16 @@ class TestHomophonicCipher:
 
 		def test_key_value_consistency(self, sample_stream_short):
 			"""
-			Verify that if a letter has multiple homophones, the remapping 
+			Verify that if a letter has multiple homophones, the remapping
 			correctly updates all of them within the key list.
 			"""
 			cipher = HomophonicCipher(sample_stream_short)
 			# 'e' has three homophones. We use them in a specific order.
 			cipher.key = {"e": [100, 200, 300]}
 			cipher.ciphertext = "300 100 200"
-			
+
 			cipher._apply_recurrence_and_remap_key()
-			
+
 			# Appearance: 300->1, 100->2, 200->3
 			assert cipher.ciphertext == "1 2 3"
 			# The list in the key should now reflect these new values
@@ -337,9 +337,9 @@ class TestHomophonicCipher:
 			cipher.key = {"a": [1], "b": [2], "c": [3]}
 			# Ciphertext where they appear in reverse order
 			cipher.ciphertext = "3 2 1"
-			
+
 			cipher._apply_recurrence_and_remap_key()
-			
+
 			# If mapping is done correctly: 3->1, 2->2, 1->3
 			assert cipher.ciphertext == "1 2 3"
 			assert cipher.key["c"] == [1]
@@ -348,15 +348,15 @@ class TestHomophonicCipher:
 
 		def test_key_remains_int_types(self, sample_stream_short):
 			"""
-			Ensure the remapped key contains integers (for JSON) 
+			Ensure the remapped key contains integers (for JSON)
 			while the ciphertext remains a string of numbers.
 			"""
 			cipher = HomophonicCipher(sample_stream_short)
 			cipher.key = {"a": [123]}
 			cipher.ciphertext = "123"
-			
+
 			cipher._apply_recurrence_and_remap_key()
-			
+
 			assert isinstance(cipher.key["a"][0], int)
 			assert isinstance(cipher.ciphertext.split()[0], str)
 

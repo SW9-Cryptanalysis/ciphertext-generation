@@ -76,11 +76,11 @@ class SubstitutionCipher(ABC):
 		new_key = {}
 		for char, homophones in self.key.items():
 			remapped_homophones = [
-				int(symbol_map[str(h)]) 
-				for h in homophones 
+				int(symbol_map[str(h)])
+				for h in homophones
 				if str(h) in symbol_map
 			]
-			
+
 			new_key[char] = remapped_homophones
 
 		self.key = new_key
@@ -348,5 +348,5 @@ class MonoalphabeticCipher(SubstitutionCipher):
 
 		self.ciphertext = " ".join(ciphertext_numbers)
 		self._apply_recurrence_and_remap_key()
-  
+
 		return self.ciphertext
