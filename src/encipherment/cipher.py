@@ -23,10 +23,8 @@ class SubstitutionCipher(ABC):
 			or spaces.
 		difficulty (int): The difficulty level of the cipher (4-20).
 		key (dict): A dictionary mapping each letter to a list of its homophones.
-		ciphertext (str): The resulting ciphertext as a string of numbers separated
-			by spaces.
-		recurrence_encoding (str): A string representing the recurrence encoding of
-			the ciphertext.
+		ciphertext (str): The resulting ciphertext as a string of reccurence encoded
+			numbers separated by spaces.
 
 	Methods:
 		generate_key(): Generate a homophonic substitution cipher key based on a
@@ -57,31 +55,35 @@ class SubstitutionCipher(ABC):
 		self.num_symbols = 0
 		self.key = {}
 		self.ciphertext = ""
-		self.recurrence_encoding = ""
 		self.source_id = text_obj["source_id"]
 		self.source_name = text_obj["source_name"]
 		raise NotImplementedError("This is an abstract base class.")
 
-	def _generate_recurrence_encoding(self) -> str:
-		"""Generate recurrence encoding for the ciphertext based on the homophones used.
+	def _apply_recurrence_and_remap_key(self) -> None:
+		"""Apply recurrence encoding and remap the key using character keys."""
+		original_numbers = self.ciphertext.split()
+		new_ciphertext = []
+		symbol_map = {}
 
-		Each homophone is represented by a unique symbol, and the encoder gives the next
-		number each time a new symbol is encountered.
+		for symbol in original_numbers:
+			if symbol not in symbol_map:
+				symbol_map[symbol] = str(len(symbol_map) + 1)
+			new_ciphertext.append(symbol_map[symbol])
 
-		Example:
-			`83 45 12 123 45 -> 1 2 3 4 2`
+		self.ciphertext = " ".join(new_ciphertext)
+		self.recurrence_encoding = self.ciphertext
 
-		"""
-		ciphertext_numbers = self.ciphertext.split()
-		recurrence_encoding = []
-		encountered_symbols = {}
+		new_key = {}
+		for char, homophones in self.key.items():
+			remapped_homophones = [
+				int(symbol_map[str(h)]) 
+				for h in homophones 
+				if str(h) in symbol_map
+			]
+			
+			new_key[char] = remapped_homophones
 
-		for number in ciphertext_numbers:
-			if number not in encountered_symbols:
-				encountered_symbols[number] = len(encountered_symbols) + 1
-			recurrence_encoding.append(str(encountered_symbols[number]))
-
-		return " ".join(recurrence_encoding)
+		self.key = new_key
 
 	def __json__(self) -> dict:
 		"""Return a JSON-serializable representation of the Cipher object.
@@ -96,7 +98,7 @@ class SubstitutionCipher(ABC):
 			"num_symbols": self.num_symbols,
 			"difficulty": self.difficulty,
 			"key": self.key,
-			"ciphertext": self.recurrence_encoding,
+			"ciphertext": self.ciphertext,
 			"source_id": self.source_id,
 			"source_name": self.source_name,
 		}
@@ -113,7 +115,6 @@ class SubstitutionCipher(ABC):
 			Difficulty: {self.difficulty}
 			Key: {self.key}
 			Ciphertext: "{self.ciphertext}"
-			Recurrence Encoding: "{self.recurrence_encoding}")
 			'''
 
 	@abstractmethod
@@ -133,7 +134,6 @@ class SubstitutionCipher(ABC):
 		cipher = cls(data["plaintext"])
 		cipher.key = data["key"]
 		cipher.ciphertext = data["ciphertext"]
-		cipher.recurrence_encoding = data["recurrence_encoding"]
 		cipher.num_symbols = data["num_symbols"]
 		cipher.difficulty = data["difficulty"]
 		cipher.source_id = data["source_id"]
@@ -195,7 +195,6 @@ class HomophonicCipher(SubstitutionCipher):
 		self.num_symbols = 0
 		self.key: dict[str, list] = {}
 		self.ciphertext: str = ""
-		self.recurrence_encoding: str = ""
 		self.source_id = text_obj["source_id"]
 		self.source_name = text_obj["source_name"]
 
@@ -253,7 +252,8 @@ class HomophonicCipher(SubstitutionCipher):
 			ciphertext_numbers.append(str(homophones[char][ptr[char]]))
 			ptr[char] += 1
 		self.ciphertext = " ".join(ciphertext_numbers)
-		self.recurrence_encoding = self._generate_recurrence_encoding()
+
+		self._apply_recurrence_and_remap_key()
 		return self.ciphertext
 
 	def generate_difficulty(self) -> int:
@@ -307,9 +307,7 @@ class MonoalphabeticCipher(SubstitutionCipher):
 		self.num_symbols = 0
 		self.key = self.generate_key()
 		self.difficulty = 1
-		self.ciphertext = self.encipher()
-		self.recurrence_encoding = self._generate_recurrence_encoding()
-		self.ciphertext = self.recurrence_encoding
+		self.encipher()
 		self.source_id = text_obj["source_id"]
 		self.source_name = text_obj["source_name"]
 
@@ -348,4 +346,7 @@ class MonoalphabeticCipher(SubstitutionCipher):
 					str(self.key[char][0]),
 				)
 
-		return " ".join(ciphertext_numbers)
+		self.ciphertext = " ".join(ciphertext_numbers)
+		self._apply_recurrence_and_remap_key()
+  
+		return self.ciphertext
