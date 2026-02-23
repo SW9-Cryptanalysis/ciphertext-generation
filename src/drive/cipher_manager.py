@@ -55,6 +55,9 @@ class CipherManager:
 		self.job_queue = self.manager.Queue(maxsize=1000)
 		self.result_queue = self.manager.Queue()
 
+		self.max_symbol_id = self.manager.Value("i", 0)
+		self.max_lock = self.manager.Lock()
+
 	def execute(self) -> None:
 		"""Execute the cipher generation process."""
 		log.info(
@@ -75,8 +78,8 @@ class CipherManager:
 		workers = []
 		for i in range(self.num_workers):
 			p = CipherProducer(
-				input_queue=self.job_queue,  # type: ignore
-				output_queue=self.result_queue,  # type: ignore
+				queues=(self.job_queue, self.result_queue),  # type: ignore
+				tracker=(self.max_symbol_id, self.max_lock),
 				name=f"Worker-{i + 1}",
 			)
 			workers.append(p)
@@ -108,4 +111,11 @@ class CipherManager:
 		self.result_queue.put(self.SENTINEL)
 
 		uploader.join()
-		log.info("Job complete.")
+
+		peak_value = self.max_symbol_id.value
+
+		log.info("=" * 40)
+		log.info("JOB COMPLETE")
+		log.info(f"Total ciphers fed: {count_fed}")
+		log.info(f"Peak homophone ID (Vocab Size): {peak_value}")
+		log.info("=" * 40)
