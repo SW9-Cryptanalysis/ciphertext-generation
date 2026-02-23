@@ -4,6 +4,9 @@ import queue
 from typing import Any
 from multiprocessing.queues import Queue as MPQueue
 
+from multiprocessing.managers import ValueProxy
+from threading import Lock
+
 from utils.drive import create_cipher_json
 from utils.logging import get_colored_logger
 from encipherment.cipher import SubstitutionCipher, HomophonicCipher
@@ -25,8 +28,8 @@ class CipherProducer(mp.Process):
 
 	def __init__(
 		self,
-		input_queue: MPQueue[Any],
-		output_queue: MPQueue[Any],
+		queues: tuple[MPQueue[Any], MPQueue[Any]],
+		tracker: tuple[ValueProxy[int], Lock],
 		*args: Any,
 		**kwargs: Any,
 	) -> None:
@@ -40,8 +43,8 @@ class CipherProducer(mp.Process):
 
 		"""
 		super().__init__(*args, **kwargs)
-		self.input_queue = input_queue
-		self.output_queue = output_queue
+		self.input_queue, self.output_queue = queues
+		self.max_symbol_tracker, self.max_lock = tracker
 
 	def run(self) -> None:
 		"""Execute the cipher generation process loop."""
@@ -63,6 +66,8 @@ class CipherProducer(mp.Process):
 				if cipher is None:
 					continue
 
+				self._update_max_symbol_id(cipher.num_symbols)
+
 				_, file_bytes = create_cipher_json(cipher)
 
 				filename = (
@@ -79,6 +84,20 @@ class CipherProducer(mp.Process):
 
 		log.info(f"{process_name} finished generation.")
 
+	def _update_max_symbol_id(self, symbol_id: int) -> None:
+		"""Update the max symbol ID tracker.
+
+		Args:
+			symbol_id (int): The new symbol ID to update the tracker with.
+
+		"""
+		if self.max_symbol_tracker is None or self.max_lock is None:
+			return
+
+		with self.max_lock:
+			if symbol_id > self.max_symbol_tracker.value:
+				self.max_symbol_tracker.value = symbol_id
+
 	def generate_cipher(self, text: TextStream) -> SubstitutionCipher | None:
 		"""Generate a cipher from the provided text string.
 
@@ -89,7 +108,6 @@ class CipherProducer(mp.Process):
 		try:
 			cipher = HomophonicCipher(text)
 
-			cipher.generate_difficulty()
 			cipher.generate_key()
 			cipher.encipher()
 
