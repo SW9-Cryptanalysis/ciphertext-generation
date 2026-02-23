@@ -179,21 +179,21 @@ class TestCipherProducerRun:
 		mock_log.error.assert_called()
 		assert "Queue connection lost" in mock_log.error.call_args[0][0]
 		assert mock_input_q.get.call_count == 2
-  
-  
+
+
 class TestUpdateMaxSymbolId:
 	def test_update_when_new_id_is_greater(self, mock_tracker, mock_queues):
 		val_proxy, lock = mock_tracker
 		val_proxy.value = 5  # Initial state
-		
+
 		producer = CipherProducer(
 			queues=mock_queues,
 			tracker=mock_tracker,
 			name="TestProducer"
 		)
-		
+
 		producer._update_max_symbol_id(10)
-		
+
 		# The value should be updated to 10
 		assert val_proxy.value == 10
 		# Verify the lock was actually acquired
@@ -202,51 +202,51 @@ class TestUpdateMaxSymbolId:
 	def test_ignore_when_new_id_is_lesser_or_equal(self, mock_tracker, mock_queues):
 		val_proxy, lock = mock_tracker
 		val_proxy.value = 20  # Initial state is high
-		
+
 		producer = CipherProducer(
 			queues=mock_queues,
 			tracker=mock_tracker,
 			name="TestProducer"
 		)
-		
+
 		# Try a lesser value
 		producer._update_max_symbol_id(10)
 		assert val_proxy.value == 20
-		
+
 		# Try an equal value
 		producer._update_max_symbol_id(20)
 		assert val_proxy.value == 20
-		
+
 		# Lock should still be acquired both times to check the value safely
 		assert lock.__enter__.call_count == 2
 
 	def test_early_return_if_tracker_or_lock_is_none(self, mock_queues, mock_tracker):
 		_, lock = mock_tracker
-		
+
 		producer = CipherProducer(
 			queues=mock_queues,
 			tracker=(None, lock), # type: ignore
 			name="TestProducerNoTracker"
 		)
-		
+
 		producer._update_max_symbol_id(10)
-		
+
 		# Lock should never be acquired because of the early return
 		lock.__enter__.assert_not_called()
-  
+
 
 	def test_early_return_if_lock_is_none(self, mock_tracker, mock_queues):
 		val_proxy, _ = mock_tracker
 		val_proxy.value = 5
-		
+
 		producer = CipherProducer(
 			queues=mock_queues,
 			tracker=(val_proxy, None), # type: ignore
 			name="TestProducerNoLock"
 		)
-		
+
 		producer._update_max_symbol_id(10)
-		
+
 		# Value should remain unchanged because of the early return
 		assert val_proxy.value == 5
 

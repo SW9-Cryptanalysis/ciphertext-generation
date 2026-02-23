@@ -23,6 +23,8 @@ class CipherProducer(mp.Process):
 		input_queue (MPQueue[Any]): Queue containing tuples of (split, text_data).
 		output_queue (MPQueue[Any]): Queue to send tuples of
 			(split, filename, file_bytes).
+		max_symbol_tracker (tuple[ValueProxy[int], Lock]): A tuple containing a
+			ValueProxy object and a Lock object to track the maximum symbol ID.
 
 	"""
 
@@ -36,8 +38,10 @@ class CipherProducer(mp.Process):
 		"""Initialize the CipherProducer.
 
 		Args:
-			input_queue (MPQueue): Queue to receive split and text chunks from.
-			output_queue (MPQueue): Queue to send split, filename, and bytes to.
+			queues (tuple[MPQueue[Any], MPQueue[Any]]): A tuple containing two queues:
+				input_queue and output_queue.
+			tracker (tuple[ValueProxy[int], Lock]): A tuple containing a ValueProxy
+				object and a Lock object to track the maximum symbol ID.
 			*args: Additional arguments.
 			**kwargs: Additional keyword arguments.
 
