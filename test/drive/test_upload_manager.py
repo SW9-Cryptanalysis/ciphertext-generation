@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import call, MagicMock
 from drive.cipher_manager import CipherManager
+import json
 
 
 @pytest.fixture
@@ -13,6 +14,10 @@ def base_config():
 		"val": {
 			"count": 30,
 			"folder_id": "val_folder"
+		},
+		"metadata": {
+			"folder_id": "metadata_folder",
+			"count": 0
 		}
 	}
 
@@ -26,6 +31,10 @@ class TestCipherManager:
 
 		mock_job_queue = MagicMock(name="job_queue")
 		mock_result_queue = MagicMock(name="result_queue")
+
+		mock_value_proxy = MagicMock(name="max_symbol_id")
+		mock_value_proxy.value = 0
+		mock_manager_inst.Value.return_value = mock_value_proxy
 
 		mock_manager_inst.Queue.side_effect = [mock_job_queue, mock_result_queue]
 
@@ -42,7 +51,7 @@ class TestCipherManager:
 			text_stream_source=dummy_stream
 		)
 
-		assert manager.split_folders == {"train": "train_folder", "val": "val_folder"}
+		assert manager.split_folders == {"train": "train_folder", "val": "val_folder", "metadata": "metadata_folder"}
 		assert manager.total_count == 100
 		assert manager.num_workers == 4
 
@@ -95,7 +104,10 @@ class TestCipherManager:
 
 		assert mock_producer.join.call_count == 2
 
-		mock_result_q.put.assert_called_once_with("STOP")
+		assert mock_result_q.put.call_count == 2
+
+		mock_result_q.put.assert_has_calls([call(("metadata", "metadata.json", b'{"max_symbol_id": 0}')), call("STOP")], any_order=False)
+
 
 		mock_uploader.join.assert_called_once()
 
@@ -129,7 +141,7 @@ class TestCipherManager:
 		# Create a stream of 1001 items to trigger the log at 1000
 		mock_stream = [("train", {"text": "A"}) for _ in range(1001)]
 
-		manager = CipherManager(base_config, mock_stream)
+		manager = CipherManager({"train": {"folder_id": "train_folder", "count": 1001}}, mock_stream)
 		# We can mock start/join to speed up the test
 		mocker.patch("drive.cipher_manager.DriveUploader.start")
 		mocker.patch("drive.cipher_manager.DriveUploader.join")
@@ -161,3 +173,56 @@ class TestCipherManager:
 		mock_log.warning.assert_called_with("Job interrupted! Stopping...")
 		# Verify cleanup (Sentinels) still happened in finally block
 		assert mock_job_q.put.called
+
+class TestCipherManagerPeakUpload:
+	def test_manager_queues_peak_value_metadata(self, mocker):
+		"""Verifies the max_symbol_id is formatted and queued before the sentinel."""
+
+		# 1. Mock the heavy multiprocessing classes so they don't actually run
+		mocker.patch("drive.cipher_manager.DriveUploader")
+		mocker.patch("drive.cipher_manager.CipherProducer")
+
+		# 2. Setup a dummy configuration and tiny stream
+		dummy_config = {
+			"train": {"folder_id": "dummy_folder_abc", "count": 1}
+		}
+		dummy_stream = [
+			("train", {"text": "hello", "source_id": "1", "source_name": "x", "length": 5})
+		]
+
+		# 3. Initialize the Manager
+		manager = CipherManager(
+			config=dummy_config,
+			text_stream_source=dummy_stream,
+			num_workers=1
+		)
+
+		# 4. Simulate the workers finding a high homophone count
+		expected_peak = 2501
+		manager.max_symbol_id.value = expected_peak
+
+		# 5. Execute (Since workers are mocked, this will just process queues instantly)
+		manager.execute()
+
+		# 6. Drain the result queue to inspect what the manager tried to send to the uploader
+		queued_items = []
+		while not manager.result_queue.empty():
+			queued_items.append(manager.result_queue.get())
+
+		# --- ASSERTIONS ---
+
+		# The very last item MUST be the STOP sentinel
+		assert queued_items[-1] == CipherManager.SENTINEL
+
+		# The item immediately preceding the sentinel MUST be the metadata file
+		metadata_task = queued_items[-2]
+
+		# Unpack the tuple: (split, filename, file_bytes)
+		split_name, filename, file_bytes = metadata_task
+
+		assert split_name == "metadata"
+		assert filename == "metadata.json"
+
+		# Decode the bytes back to a dictionary and verify the value
+		payload = json.loads(file_bytes.decode("utf-8"))
+		assert payload["max_symbol_id"] == expected_peak

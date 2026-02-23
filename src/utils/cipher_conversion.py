@@ -180,11 +180,6 @@ class CipherConverter:
 		self._cipher.ciphertext = self.ciphertext
 		self._cipher.key = self.mappings  # type: ignore
 
-		if hasattr(self._cipher, "_generate_recurrence_encoding"):
-			self._cipher.recurrence_encoding = (
-				self._cipher._generate_recurrence_encoding()
-			)
-
 		return self._cipher
 
 	def _is_homophonic(self) -> bool:

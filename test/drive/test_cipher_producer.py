@@ -13,6 +13,7 @@ class MockCipher(SubstitutionCipher):
 	def __init__(self, *args, **kwargs):
 		self.plaintext = "a" * 500
 		self.difficulty = 10
+		self.num_symbols = 3
 
 	def generate_key(self):
 		self.key = {"a": ["1"], "b": ["2"], "c": ["3"]}
@@ -20,7 +21,7 @@ class MockCipher(SubstitutionCipher):
 
 	def encipher(self):
 		self.ciphertext = "1 2 3"
-		self.recurrence_encoding = "1 2 3"
+		self.num_symbols = 3
 		return self.ciphertext
 
 
@@ -38,9 +39,22 @@ def mock_cipher_data():
 	mock_bytes = mock_json.encode("utf-8")
 	return mock_json, mock_bytes
 
+@pytest.fixture
+def mock_tracker(mocker):
+	"""Provides a mock tracker object for CipherProducer."""
+	tracker = mocker.Mock()
+	tracker.value = 0
+	tracker.lock = mocker.MagicMock()
+	return tracker, tracker.lock
+
+@pytest.fixture
+def mock_producer(mock_queues, mock_tracker):
+	"""Provides a mock CipherProducer object for testing."""
+	return CipherProducer(mock_queues, mock_tracker, name="TestProducer")
+
 
 class TestCipherProducerRun:
-	def test_successful_run(self, mocker, mock_queues, mock_cipher_data):
+	def test_successful_run(self, mocker, mock_queues, mock_cipher_data, mock_tracker):
 		input_q, output_q = mock_queues
 
 		sample_item = {
@@ -66,8 +80,8 @@ class TestCipherProducerRun:
 		)
 
 		producer = CipherProducer(
-			input_queue=input_q,
-			output_queue=output_q,
+			queues=(input_q, output_q),
+			tracker=mock_tracker,
 			name="TestProducer"
 		)
 
@@ -92,13 +106,13 @@ class TestCipherProducerRun:
 		assert "123" in last_filename
 		assert last_bytes == mock_cipher_data[1]
 
-	def test_stop_signal(self, mock_queues, caplog):
+	def test_stop_signal(self, mock_queues, mock_tracker, caplog):
 		input_q, output_q = mock_queues
 		input_q.put("STOP")
 
 		producer = CipherProducer(
-			input_queue=input_q,
-			output_queue=output_q,
+			queues=(input_q, output_q),
+			tracker=mock_tracker,
 			name="TestProducer"
 		)
 
@@ -106,7 +120,7 @@ class TestCipherProducerRun:
 
 		assert output_q.empty()
 
-	def test_generation_runtime_failure(self, mocker, mock_queues, caplog):
+	def test_generation_runtime_failure(self, mocker, mock_queues, mock_tracker, caplog):
 		input_q, output_q = mock_queues
 
 		input_q.put(("val", {"text": "fail", "source_id": "1"}))
@@ -121,8 +135,8 @@ class TestCipherProducerRun:
 		)
 
 		producer = CipherProducer(
-			input_queue=input_q,
-			output_queue=output_q,
+			queues=(input_q, output_q),
+			tracker=mock_tracker,
 			name="TestProducer"
 		)
 
@@ -131,15 +145,15 @@ class TestCipherProducerRun:
 		assert output_q.empty()
 		mock_log.info.assert_any_call("TestProducer finished generation.")
 
-	def test_run_handles_queue_empty_and_retries(self, mocker):
+	def test_run_handles_queue_empty_and_retries(self, mocker, mock_tracker):
 		mock_input_q = mocker.Mock()
 		mock_output_q = mocker.Mock()
 
 		mock_input_q.get.side_effect = [queue.Empty, "STOP"]
 
 		producer = CipherProducer(
-			input_queue=mock_input_q,
-			output_queue=mock_output_q,
+			queues=(mock_input_q, mock_output_q),
+			tracker=mock_tracker,
 			name="TestProducer"
 		)
 
@@ -147,7 +161,7 @@ class TestCipherProducerRun:
 
 		assert mock_input_q.get.call_count == 2
 
-	def test_run_handles_unexpected_loop_exception(self, mocker):
+	def test_run_handles_unexpected_loop_exception(self, mocker, mock_tracker):
 		mock_input_q = mocker.Mock()
 		mock_output_q = mocker.Mock()
 		mock_log = mocker.patch("drive.cipher_producer.log")
@@ -155,8 +169,8 @@ class TestCipherProducerRun:
 		mock_input_q.get.side_effect = [Exception("Queue connection lost"), "STOP"]
 
 		producer = CipherProducer(
-			input_queue=mock_input_q,
-			output_queue=mock_output_q,
+			queues=(mock_input_q, mock_output_q),
+			tracker=mock_tracker,
 			name="TestProducer"
 		)
 
@@ -167,9 +181,79 @@ class TestCipherProducerRun:
 		assert mock_input_q.get.call_count == 2
 
 
+class TestUpdateMaxSymbolId:
+	def test_update_when_new_id_is_greater(self, mock_tracker, mock_queues):
+		val_proxy, lock = mock_tracker
+		val_proxy.value = 5  # Initial state
+
+		producer = CipherProducer(
+			queues=mock_queues,
+			tracker=mock_tracker,
+			name="TestProducer"
+		)
+
+		producer._update_max_symbol_id(10)
+
+		# The value should be updated to 10
+		assert val_proxy.value == 10
+		# Verify the lock was actually acquired
+		lock.__enter__.assert_called_once()
+
+	def test_ignore_when_new_id_is_lesser_or_equal(self, mock_tracker, mock_queues):
+		val_proxy, lock = mock_tracker
+		val_proxy.value = 20  # Initial state is high
+
+		producer = CipherProducer(
+			queues=mock_queues,
+			tracker=mock_tracker,
+			name="TestProducer"
+		)
+
+		# Try a lesser value
+		producer._update_max_symbol_id(10)
+		assert val_proxy.value == 20
+
+		# Try an equal value
+		producer._update_max_symbol_id(20)
+		assert val_proxy.value == 20
+
+		# Lock should still be acquired both times to check the value safely
+		assert lock.__enter__.call_count == 2
+
+	def test_early_return_if_tracker_or_lock_is_none(self, mock_queues, mock_tracker):
+		_, lock = mock_tracker
+
+		producer = CipherProducer(
+			queues=mock_queues,
+			tracker=(None, lock), # type: ignore
+			name="TestProducerNoTracker"
+		)
+
+		producer._update_max_symbol_id(10)
+
+		# Lock should never be acquired because of the early return
+		lock.__enter__.assert_not_called()
+
+
+	def test_early_return_if_lock_is_none(self, mock_tracker, mock_queues):
+		val_proxy, _ = mock_tracker
+		val_proxy.value = 5
+
+		producer = CipherProducer(
+			queues=mock_queues,
+			tracker=(val_proxy, None), # type: ignore
+			name="TestProducerNoLock"
+		)
+
+		producer._update_max_symbol_id(10)
+
+		# Value should remain unchanged because of the early return
+		assert val_proxy.value == 5
+
+
 class TestGenerateCipherLogic:
-	def test_generate_cipher_success(self, mocker):
-		producer = CipherProducer(mocker.Mock(), mocker.Mock(), name="Test")
+	def test_generate_cipher_success(self, mocker, mock_producer):
+		producer = mock_producer
 
 		sample_item: TextStream = {
 			"text": "testslice",
@@ -188,14 +272,13 @@ class TestGenerateCipherLogic:
 
 		mocked_homophonic_cipher.assert_called_once_with(sample_item)
 
-		mock_cipher_instance.generate_difficulty.assert_called_once()
 		mock_cipher_instance.generate_key.assert_called_once()
 		mock_cipher_instance.encipher.assert_called_once()
 
 		assert cipher == mock_cipher_instance
 
-	def test_generate_cipher_errors(self, mocker, caplog):
-		producer = CipherProducer(mocker.Mock(), mocker.Mock(), name="Test")
+	def test_generate_cipher_errors(self, mocker, mock_producer, caplog):
+		producer = mock_producer
 
 		sample_item: TextStream = {
 			"text": "invalid",
@@ -217,8 +300,8 @@ class TestGenerateCipherLogic:
 		mock_log.error.assert_called()
 		assert "Error generating cipher" in mock_log.error.call_args[0][0]
 
-	def test_generate_cipher_unexpected_exception(self, mocker):
-		producer = CipherProducer(mocker.Mock(), mocker.Mock(), name="Test")
+	def test_generate_cipher_unexpected_exception(self, mocker, mock_producer):
+		producer = mock_producer
 		sample_item: TextStream = {
 			"text": "crash_test",
 			"source_id": "123",
