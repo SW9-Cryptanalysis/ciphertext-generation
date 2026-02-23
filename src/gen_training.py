@@ -36,9 +36,9 @@ if __name__ == "__main__":
 	text_stream = get_text_stream()
 
 	config = {
-		"train": {"folder_id": folder_id_train, "count": 10},
-		"val": {"folder_id": folder_id_val, "count": 10},
-		"test": {"folder_id": folder_id_test, "count": 10},
+		"train": {"folder_id": folder_id_train, "count": 1_000_000},
+		"val": {"folder_id": folder_id_val, "count": 10_000},
+		"test": {"folder_id": folder_id_test, "count": 10_000},
 		"metadata": {"folder_id": folder_id_metadata, "count": 0},
 	}
 
