@@ -108,7 +108,6 @@ class DriveUploader(mp.Process):
 		self.total_ciphers = config.total_ciphers
 		self.drive_service = None
 		self.uploaded_count = 0
-		self.batch_states = {split: BatchState(split) for split in self.split_folders}
 
 	def run(self) -> None:
 		"""Execute the cipher upload process.
@@ -120,12 +119,17 @@ class DriveUploader(mp.Process):
 			Exception: If any error occurs during the execution.
 
 		"""
+		self.batch_states = {
+			split: BatchState(split)
+			for split in self.split_folders
+			if split != "metadata"
+		}
 		process_name = self.name
 		if not self._authenticate_service():
 			return
 
 		with tqdm(total=self.total_ciphers, desc="Total Ciphers Uploaded") as pbar:
-			while self.uploaded_count < self.total_ciphers:
+			while True:
 				try:
 					item = self.queue.get(timeout=5)
 				except queue.Empty:
@@ -136,7 +140,9 @@ class DriveUploader(mp.Process):
 					break
 
 				split, filename, file_bytes = item
-				if split in self.batch_states:
+				if split == "metadata":
+					self._upload_raw_file(split, filename, file_bytes)
+				elif split in self.batch_states:
 					self._process_cipher_item(split, filename, file_bytes, pbar)
 
 		log.info(
@@ -185,6 +191,41 @@ class DriveUploader(mp.Process):
 			bs.zip_buffer.close()
 			batch_filename = f"{split}_ciphers_batch_{bs.batch_num}.zip"
 			self.batch_states[split] = self._upload_batch(bs, pbar, batch_filename)
+
+	def _upload_raw_file(self, split: str, filename: str, file_bytes: bytes) -> None:
+		"""Upload a raw file directly to Google Drive without zipping.
+
+		Args:
+			split (str): The split identifier (e.g., 'metadata').
+			filename (str): The desired filename on Drive.
+			file_bytes (bytes): The raw file contents.
+
+		"""
+		folder_id = self.split_folders.get(split)
+		if not folder_id:
+			log.error(
+				f"Cannot upload {filename}: No folder ID found for split '{split}'",
+			)
+			return
+
+		try:
+			file_id = upload_to_drive(
+				self.drive_service,
+				file_bytes,
+				filename,
+				folder_id,
+			)
+
+			if file_id:
+				log.info(f"Uploaded raw file {filename} to {split} folder: {file_id}")
+			else:
+				log.error(f"FATAL: Failed to upload raw file {filename} to {split}.")
+
+		except Exception as e:
+			log.error(
+				f"FATAL: Unexpected error uploading raw file {filename}: {e}",
+				exc_info=True,
+			)
 
 	def _upload_all_final_batches(self, pbar: tqdm) -> None:
 		"""Upload any remaining partial batches for all configured splits.
