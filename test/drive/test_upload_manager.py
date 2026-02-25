@@ -15,7 +15,7 @@ def base_config():
 
 class TestCipherManager:
 	@pytest.fixture
-	def mock_mp_manager(self, mocker, mock_queue, mock_tracker):
+	def mock_mp_manager(self, mocker, queue_factory, mock_tracker):
 		"""
 		Patches mp.Manager so CipherManager doesn't spin up real processes,
 		but injects the shared conftest fixtures for standard queue/tracker behavior.
@@ -28,8 +28,8 @@ class TestCipherManager:
 		mock_manager_inst.Value.return_value = tracker_mock
 
 		# Use two instances of the conftest mock_queue
-		mock_job_queue = mocker.MagicMock(wraps=mock_queue)
-		mock_result_queue = mocker.MagicMock(wraps=mock_queue)
+		mock_job_queue = mocker.MagicMock(wraps=queue_factory())
+		mock_result_queue = mocker.MagicMock(wraps=queue_factory())
 
 		# Ensure we can assert calls on them later
 		mock_manager_inst.Queue.side_effect = [mock_job_queue, mock_result_queue]

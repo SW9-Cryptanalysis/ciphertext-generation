@@ -174,12 +174,13 @@ class TestDriveUploaderRunLoop:
 		)
 		mock_upload_raw = mocker.patch.object(DriveUploader, "_upload_raw_file")
 
-		queue_factory().put(
+		mock_queue = queue_factory()
+		mock_queue.put(
 			("metadata", "metadata_vocab_size.json", b'{"max_symbol_id": 100}')
 		)
-		queue_factory().put(SENTINEL)
+		mock_queue.put(SENTINEL)
 
-		uploader = DriveUploader(queue_factory(), uploader_config, name="TestUploader")
+		uploader = DriveUploader(mock_queue, uploader_config, name="TestUploader")
 		mocker.patch("drive.drive_uploader.tqdm")
 
 		uploader.run()
