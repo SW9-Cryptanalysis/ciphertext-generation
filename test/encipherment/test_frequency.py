@@ -30,3 +30,4 @@ def test_frequencies_no_letters():
 	freq = frequencies(text)
 	expected_freq = {char: Decimal("0") for char in "abcdefghijklmnopqrstuvwxyz"}
 	assert freq == expected_freq
+    
