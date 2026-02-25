@@ -48,10 +48,10 @@ class UploaderTestContext:
 
 
 @pytest.fixture
-def ctx(mock_queue, uploader_config, mock_cipher_item, mock_cipher_item_2):
+def ctx(queue_factory, uploader_config, mock_cipher_item, mock_cipher_item_2):
 	"""Bundles common fixtures into a single context object."""
 	return UploaderTestContext(
-		queue=mock_queue,
+		queue=queue_factory(),
 		config=uploader_config,
 		item=mock_cipher_item,
 		item2=mock_cipher_item_2,
@@ -64,8 +64,8 @@ def ctx(mock_queue, uploader_config, mock_cipher_item, mock_cipher_item_2):
 class TestDriveUploaderInitialization:
 	"""Tests covering object initialization and dataclasses."""
 
-	def test_initialization(self, mock_queue, uploader_config):
-		uploader = DriveUploader(mock_queue, uploader_config, name="Test")
+	def test_initialization(self, queue_factory, uploader_config):
+		uploader = DriveUploader(queue_factory(), uploader_config, name="Test")
 		assert uploader.split_folders == MOCK_SPLIT_FOLDERS
 		assert uploader.total_ciphers == 10
 		assert uploader.uploaded_count == 0
@@ -82,7 +82,7 @@ class TestDriveUploaderRunLoop:
 	"""Tests covering the main execution loop, queue pulling, and routing."""
 
 	def test_successful_full_upload(
-		self, mocker, mock_queue, mock_cipher_item, mock_cipher_item_2
+		self, mocker, queue_factory, mock_cipher_item, mock_cipher_item_2
 	):
 		total_to_upload = 2
 		local_config = DriveUploaderConfig(
@@ -105,6 +105,8 @@ class TestDriveUploaderRunLoop:
 				__enter__=lambda self: mock_pbar, __exit__=lambda *args: None
 			),
 		)
+
+		mock_queue = queue_factory()
 
 		mock_queue.put(mock_cipher_item)
 		mock_queue.put(mock_cipher_item_2)
@@ -142,13 +144,15 @@ class TestDriveUploaderRunLoop:
 		assert queue_mock.get.call_count == 4
 
 	def test_authentication_failure(
-		self, mocker, mock_queue, uploader_config, mock_cipher_item
+		self, mocker, queue_factory, uploader_config, mock_cipher_item
 	):
 		mocker.patch(
 			"drive.drive_uploader.authenticate_drive_terminal",
 			side_effect=Exception("Auth failed"),
 		)
 		mock_log = mocker.patch("drive.drive_uploader.log")
+
+		mock_queue = queue_factory()
 
 		mock_queue.put(mock_cipher_item)
 		mock_queue.put(SENTINEL)
@@ -162,7 +166,7 @@ class TestDriveUploaderRunLoop:
 		)
 		assert uploader.uploaded_count == 0
 
-	def test_metadata_routing_in_run(self, mocker, mock_queue, uploader_config):
+	def test_metadata_routing_in_run(self, mocker, queue_factory, uploader_config):
 		"""Test that the 'metadata' split is routed correctly and not batched."""
 		mocker.patch(
 			"drive.drive_uploader.authenticate_drive_terminal",
@@ -170,12 +174,12 @@ class TestDriveUploaderRunLoop:
 		)
 		mock_upload_raw = mocker.patch.object(DriveUploader, "_upload_raw_file")
 
-		mock_queue.put(
+		queue_factory().put(
 			("metadata", "metadata_vocab_size.json", b'{"max_symbol_id": 100}')
 		)
-		mock_queue.put(SENTINEL)
+		queue_factory().put(SENTINEL)
 
-		uploader = DriveUploader(mock_queue, uploader_config, name="TestUploader")
+		uploader = DriveUploader(queue_factory(), uploader_config, name="TestUploader")
 		mocker.patch("drive.drive_uploader.tqdm")
 
 		uploader.run()
