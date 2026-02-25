@@ -169,7 +169,7 @@ class TestCipherManager:
 
 		mock_log.warning.assert_called_with("Job interrupted! Stopping...")
 		assert mock_job_q.put.called
-  
+
 	def test_feeder_stream_respects_total_count(self, mocker, mock_mp_manager):
 			_, mock_job_q, _ = mock_mp_manager
 
@@ -181,12 +181,12 @@ class TestCipherManager:
 				"train": {"folder_id": "dummy", "count": 3},
 				"metadata": {"folder_id": "dummy", "count": 0}
 			}
-			
+
 			manager = CipherManager(test_config, large_stream)
 			mock_log = mocker.patch("drive.cipher_manager.log")
-			
+
 			items_fed = manager._feeder_stream()
-			
+
 			assert items_fed == 3
 			assert mock_job_q.put.call_count == 3
 			mock_log.info.assert_any_call("Target of 3 reached. Stopping feeder.")

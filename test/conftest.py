@@ -1,6 +1,5 @@
 import pytest
 import multiprocessing as mp
-from dataclasses import dataclass
 
 
 @pytest.fixture()
