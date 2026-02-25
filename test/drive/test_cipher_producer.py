@@ -41,15 +41,15 @@ class ProducerContext:
 
 
 @pytest.fixture
-def producer_ctx(mock_queue, mock_tracker, mock_cipher_data):
+def producer_ctx(queue_factory, mock_tracker, mock_cipher_data):
 	"""Bundles producer mocks to keep test signatures small."""
-	return ProducerContext(mock_queue, mock_tracker, mock_cipher_data)
+	return ProducerContext(queue_factory(), mock_tracker, mock_cipher_data)
 
 
 @pytest.fixture
-def mock_producer(mock_queue, mock_tracker):
+def mock_producer(queue_factory, mock_tracker):
 	"""Provides a mock CipherProducer object for testing."""
-	return CipherProducer((mock_queue, mock_queue), mock_tracker, name="TestProducer")
+	return CipherProducer((queue_factory(), queue_factory()), mock_tracker, name="TestProducer")
 
 
 class TestCipherProducerRun:
@@ -97,8 +97,8 @@ class TestCipherProducerRun:
 		assert "123" in last_filename
 		assert last_bytes == producer_ctx.cipher_data[1]
 
-	def test_stop_signal(self, mock_queue, mock_tracker, caplog):
-		input_q, output_q = mock_queue, mock_queue
+	def test_stop_signal(self, queue_factory, mock_tracker, caplog):
+		input_q, output_q = queue_factory(), queue_factory()
 		input_q.put("STOP")
 
 		producer = CipherProducer(
@@ -109,8 +109,8 @@ class TestCipherProducerRun:
 
 		assert output_q.empty()
 
-	def test_generation_runtime_failure(self, mocker, mock_queue, mock_tracker, caplog):
-		input_q, output_q = mock_queue, mock_queue
+	def test_generation_runtime_failure(self, mocker, queue_factory, mock_tracker):
+		input_q, output_q = queue_factory(), queue_factory()
 
 		input_q.put(("val", {"text": "fail", "source_id": "1"}))
 		input_q.put("STOP")
@@ -165,12 +165,12 @@ class TestCipherProducerRun:
 
 
 class TestUpdateMaxSymbolId:
-	def test_update_when_new_id_is_greater(self, mock_tracker, mock_queue):
+	def test_update_when_new_id_is_greater(self, mock_tracker, queue_factory):
 		val_proxy, lock = mock_tracker
 		val_proxy.value = 5  # Initial state
 
 		producer = CipherProducer(
-			queues=(mock_queue, mock_queue), tracker=mock_tracker, name="TestProducer"
+			queues=(queue_factory(), queue_factory()), tracker=mock_tracker, name="TestProducer"
 		)
 
 		producer._update_max_symbol_id(10)
@@ -180,12 +180,12 @@ class TestUpdateMaxSymbolId:
 		# Verify the lock was actually acquired
 		lock.__enter__.assert_called_once()
 
-	def test_ignore_when_new_id_is_lesser_or_equal(self, mock_tracker, mock_queue):
+	def test_ignore_when_new_id_is_lesser_or_equal(self, mock_tracker, queue_factory):
 		val_proxy, lock = mock_tracker
 		val_proxy.value = 20  # Initial state is high
 
 		producer = CipherProducer(
-			queues=(mock_queue, mock_queue), tracker=mock_tracker, name="TestProducer"
+			queues=(queue_factory(), queue_factory()), tracker=mock_tracker, name="TestProducer"
 		)
 
 		# Try a lesser value
@@ -199,11 +199,11 @@ class TestUpdateMaxSymbolId:
 		# Lock should still be acquired both times to check the value safely
 		assert lock.__enter__.call_count == 2
 
-	def test_early_return_if_tracker_or_lock_is_none(self, mock_queue, mock_tracker):
+	def test_early_return_if_tracker_or_lock_is_none(self, queue_factory, mock_tracker):
 		_, lock = mock_tracker
 
 		producer = CipherProducer(
-			queues=(mock_queue, mock_queue),
+			queues=(queue_factory(), queue_factory()),
 			tracker=(None, lock),  # type: ignore
 			name="TestProducerNoTracker",
 		)
@@ -213,12 +213,12 @@ class TestUpdateMaxSymbolId:
 		# Lock should never be acquired because of the early return
 		lock.__enter__.assert_not_called()
 
-	def test_early_return_if_lock_is_none(self, mock_tracker, mock_queue):
+	def test_early_return_if_lock_is_none(self, mock_tracker, queue_factory):
 		val_proxy, _ = mock_tracker
 		val_proxy.value = 5
 
 		producer = CipherProducer(
-			queues=(mock_queue, mock_queue),
+			queues=(queue_factory(), queue_factory()),
 			tracker=(val_proxy, None),  # type: ignore
 			name="TestProducerNoLock",
 		)
