@@ -28,12 +28,12 @@ def queue_factory():
     """Returns a factory function that creates fresh queues."""
     manager = mp.Manager()
     queues = []
-    
+
     def _create_queue():
         q = manager.Queue()
         queues.append(q)
         return q
-        
+
     return _create_queue
 
 
