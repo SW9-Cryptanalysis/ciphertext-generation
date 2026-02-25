@@ -1,35 +1,12 @@
 import pytest
 import os
-import multiprocessing as mp
 import queue
 from drive.cipher_producer import CipherProducer
-from encipherment.cipher import SubstitutionCipher, HomophonicCipher
+from encipherment.cipher import HomophonicCipher
 from fetching.text_splits import TextStream
-
-
-class MockCipher(SubstitutionCipher):
-	"""Mock object to simulate a fully generated cipher."""
-
-	def __init__(self, *args, **kwargs):
-		self.plaintext = "a" * 500
-		self.difficulty = 10
-		self.num_symbols = 3
-
-	def generate_key(self):
-		self.key = {"a": ["1"], "b": ["2"], "c": ["3"]}
-		return self.key
-
-	def encipher(self):
-		self.ciphertext = "1 2 3"
-		self.num_symbols = 3
-		return self.ciphertext
-
-
-@pytest.fixture
-def mock_queues():
-	"""Provides thread-safe multiprocessing queues."""
-	manager = mp.Manager()
-	return manager.Queue(), manager.Queue()
+from test_helpers import MockCipher
+from dataclasses import dataclass
+import multiprocessing as mp
 
 
 @pytest.fixture
@@ -39,55 +16,53 @@ def mock_cipher_data():
 	mock_bytes = mock_json.encode("utf-8")
 	return mock_json, mock_bytes
 
-@pytest.fixture
-def mock_tracker(mocker):
-	"""Provides a mock tracker object for CipherProducer."""
-	tracker = mocker.Mock()
-	tracker.value = 0
-	tracker.lock = mocker.MagicMock()
-	return tracker, tracker.lock
+
+@dataclass
+class ProducerContext:
+	queue: mp.Queue
+	tracker: tuple
+	cipher_data: tuple
+
 
 @pytest.fixture
-def mock_producer(mock_queues, mock_tracker):
+def producer_ctx(mock_queue, mock_tracker, mock_cipher_data):
+	"""Bundles producer mocks to keep test signatures small."""
+	return ProducerContext(mock_queue, mock_tracker, mock_cipher_data)
+
+
+@pytest.fixture
+def mock_producer(mock_queue, mock_tracker):
 	"""Provides a mock CipherProducer object for testing."""
-	return CipherProducer(mock_queues, mock_tracker, name="TestProducer")
+	return CipherProducer((mock_queue, mock_queue), mock_tracker, name="TestProducer")
 
 
 class TestCipherProducerRun:
-	def test_successful_run(self, mocker, mock_queues, mock_cipher_data, mock_tracker):
-		input_q, output_q = mock_queues
+	def test_successful_run(self, mocker, producer_ctx, valid_text_stream):
+		input_q, output_q = producer_ctx.queue, producer_ctx.queue
 
-		sample_item = {
-			"text": "sample text",
-			"source_id": "123",
-			"source_name": "Book",
-			"length": 11
-		}
-		input_q.put(("train", sample_item))
+		input_q.put(("train", valid_text_stream))
 		input_q.put("STOP")
 
 		mock_cipher_return = MockCipher()
 
 		mock_generate_cipher = mocker.patch.object(
-			CipherProducer,
-			"generate_cipher",
-			return_value=mock_cipher_return
+			CipherProducer, "generate_cipher", return_value=mock_cipher_return
 		)
 
 		mock_create_json = mocker.patch(
 			"drive.cipher_producer.create_cipher_json",
-			return_value=mock_cipher_data
+			return_value=producer_ctx.cipher_data,
 		)
 
 		producer = CipherProducer(
 			queues=(input_q, output_q),
-			tracker=mock_tracker,
-			name="TestProducer"
+			tracker=producer_ctx.tracker,
+			name="TestProducer",
 		)
 
 		producer.run()
 
-		mock_generate_cipher.assert_called_once_with(sample_item)
+		mock_generate_cipher.assert_called_once_with(valid_text_stream)
 		mock_create_json.assert_called_once_with(mock_cipher_return)
 
 		items_in_queue = []
@@ -104,40 +79,32 @@ class TestCipherProducerRun:
 		assert last_split == "train"
 		assert f"_{expected_pid}.json" in last_filename
 		assert "123" in last_filename
-		assert last_bytes == mock_cipher_data[1]
+		assert last_bytes == producer_ctx.cipher_data[1]
 
-	def test_stop_signal(self, mock_queues, mock_tracker, caplog):
-		input_q, output_q = mock_queues
+	def test_stop_signal(self, mock_queue, mock_tracker, caplog):
+		input_q, output_q = mock_queue, mock_queue
 		input_q.put("STOP")
 
 		producer = CipherProducer(
-			queues=(input_q, output_q),
-			tracker=mock_tracker,
-			name="TestProducer"
+			queues=(input_q, output_q), tracker=mock_tracker, name="TestProducer"
 		)
 
 		producer.run()
 
 		assert output_q.empty()
 
-	def test_generation_runtime_failure(self, mocker, mock_queues, mock_tracker, caplog):
-		input_q, output_q = mock_queues
+	def test_generation_runtime_failure(self, mocker, mock_queue, mock_tracker, caplog):
+		input_q, output_q = mock_queue, mock_queue
 
 		input_q.put(("val", {"text": "fail", "source_id": "1"}))
 		input_q.put("STOP")
 
 		mock_log = mocker.patch("drive.cipher_producer.log")
 
-		mocker.patch.object(
-			CipherProducer,
-			"generate_cipher",
-			return_value=None
-		)
+		mocker.patch.object(CipherProducer, "generate_cipher", return_value=None)
 
 		producer = CipherProducer(
-			queues=(input_q, output_q),
-			tracker=mock_tracker,
-			name="TestProducer"
+			queues=(input_q, output_q), tracker=mock_tracker, name="TestProducer"
 		)
 
 		producer.run()
@@ -154,7 +121,7 @@ class TestCipherProducerRun:
 		producer = CipherProducer(
 			queues=(mock_input_q, mock_output_q),
 			tracker=mock_tracker,
-			name="TestProducer"
+			name="TestProducer",
 		)
 
 		producer.run()
@@ -171,7 +138,7 @@ class TestCipherProducerRun:
 		producer = CipherProducer(
 			queues=(mock_input_q, mock_output_q),
 			tracker=mock_tracker,
-			name="TestProducer"
+			name="TestProducer",
 		)
 
 		producer.run()
@@ -182,14 +149,12 @@ class TestCipherProducerRun:
 
 
 class TestUpdateMaxSymbolId:
-	def test_update_when_new_id_is_greater(self, mock_tracker, mock_queues):
+	def test_update_when_new_id_is_greater(self, mock_tracker, mock_queue):
 		val_proxy, lock = mock_tracker
 		val_proxy.value = 5  # Initial state
 
 		producer = CipherProducer(
-			queues=mock_queues,
-			tracker=mock_tracker,
-			name="TestProducer"
+			queues=(mock_queue, mock_queue), tracker=mock_tracker, name="TestProducer"
 		)
 
 		producer._update_max_symbol_id(10)
@@ -199,14 +164,12 @@ class TestUpdateMaxSymbolId:
 		# Verify the lock was actually acquired
 		lock.__enter__.assert_called_once()
 
-	def test_ignore_when_new_id_is_lesser_or_equal(self, mock_tracker, mock_queues):
+	def test_ignore_when_new_id_is_lesser_or_equal(self, mock_tracker, mock_queue):
 		val_proxy, lock = mock_tracker
 		val_proxy.value = 20  # Initial state is high
 
 		producer = CipherProducer(
-			queues=mock_queues,
-			tracker=mock_tracker,
-			name="TestProducer"
+			queues=(mock_queue, mock_queue), tracker=mock_tracker, name="TestProducer"
 		)
 
 		# Try a lesser value
@@ -220,13 +183,13 @@ class TestUpdateMaxSymbolId:
 		# Lock should still be acquired both times to check the value safely
 		assert lock.__enter__.call_count == 2
 
-	def test_early_return_if_tracker_or_lock_is_none(self, mock_queues, mock_tracker):
+	def test_early_return_if_tracker_or_lock_is_none(self, mock_queue, mock_tracker):
 		_, lock = mock_tracker
 
 		producer = CipherProducer(
-			queues=mock_queues,
-			tracker=(None, lock), # type: ignore
-			name="TestProducerNoTracker"
+			queues=(mock_queue, mock_queue),
+			tracker=(None, lock),  # type: ignore
+			name="TestProducerNoTracker",
 		)
 
 		producer._update_max_symbol_id(10)
@@ -234,15 +197,14 @@ class TestUpdateMaxSymbolId:
 		# Lock should never be acquired because of the early return
 		lock.__enter__.assert_not_called()
 
-
-	def test_early_return_if_lock_is_none(self, mock_tracker, mock_queues):
+	def test_early_return_if_lock_is_none(self, mock_tracker, mock_queue):
 		val_proxy, _ = mock_tracker
 		val_proxy.value = 5
 
 		producer = CipherProducer(
-			queues=mock_queues,
-			tracker=(val_proxy, None), # type: ignore
-			name="TestProducerNoLock"
+			queues=(mock_queue, mock_queue),
+			tracker=(val_proxy, None),  # type: ignore
+			name="TestProducerNoLock",
 		)
 
 		producer._update_max_symbol_id(10)
@@ -259,13 +221,12 @@ class TestGenerateCipherLogic:
 			"text": "testslice",
 			"source_id": "123",
 			"source_name": "Book",
-			"length": 9
+			"length": 9,
 		}
 
 		mock_cipher_instance = mocker.Mock(spec=HomophonicCipher)
 		mocked_homophonic_cipher = mocker.patch(
-			"drive.cipher_producer.HomophonicCipher",
-			return_value=mock_cipher_instance
+			"drive.cipher_producer.HomophonicCipher", return_value=mock_cipher_instance
 		)
 
 		cipher = producer.generate_cipher(sample_item)
@@ -284,7 +245,7 @@ class TestGenerateCipherLogic:
 			"text": "invalid",
 			"source_id": "123",
 			"source_name": "Book",
-			"length": 9
+			"length": 9,
 		}
 
 		mock_log = mocker.patch("drive.cipher_producer.log")
@@ -306,7 +267,7 @@ class TestGenerateCipherLogic:
 			"text": "crash_test",
 			"source_id": "123",
 			"source_name": "Book",
-			"length": 10
+			"length": 10,
 		}
 
 		mock_log = mocker.patch("drive.cipher_producer.log")
