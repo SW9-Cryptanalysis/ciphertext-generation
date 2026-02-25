@@ -90,7 +90,7 @@ class CipherManager:
 
 		count_fed = 0
 		try:
-			self._feeder_stream()
+			count_fed = self._feeder_stream()
 
 		except KeyboardInterrupt:
 			log.warning("Job interrupted! Stopping...")
@@ -129,7 +129,7 @@ class CipherManager:
 		)
 		self.result_queue.put(("metadata", metadata_filename, metadata_bytes))
 
-	def _feeder_stream(self) -> None:
+	def _feeder_stream(self) -> int:
 		"""Feed the ciphers to the workers using the job queue.
 
 		This method feeds the ciphers to the workers using the job queue. It
@@ -141,7 +141,10 @@ class CipherManager:
 		"""
 		log.info("Feeding ciphers to workers...")
 
-		for count_fed, (split, text_data) in enumerate(self.stream):
+		count_fed = 0
+
+		for split, text_data in self.stream:
+			count_fed += 1
 			self.job_queue.put((split, text_data))
 
 			if count_fed % 1000 == 0:
@@ -150,3 +153,5 @@ class CipherManager:
 			if count_fed >= self.total_count:
 				log.info(f"Target of {self.total_count} reached. Stopping feeder.")
 				break
+
+		return count_fed
