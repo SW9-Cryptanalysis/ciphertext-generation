@@ -1,5 +1,4 @@
 import pytest
-import multiprocessing as mp
 import io
 import queue
 from typing import Final, Any
@@ -23,12 +22,6 @@ SENTINEL: Final[str] = "STOP"
 def silent_zipfile(mocker):
 	"""Prevents any real ZipFile from being opened during tests."""
 	return mocker.patch("zipfile.ZipFile")
-
-
-@pytest.fixture
-def mock_queue():
-	manager = mp.Manager()
-	return manager.Queue()
 
 
 @pytest.fixture
