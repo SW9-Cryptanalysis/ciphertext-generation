@@ -143,8 +143,7 @@ class CipherManager:
 
 		count_fed = 0
 
-		for split, text_data in self.stream:
-			count_fed += 1
+		for count_fed, (split, text_data) in enumerate(self.stream, start=1):
 			self.job_queue.put((split, text_data))
 
 			if count_fed % 1000 == 0:
