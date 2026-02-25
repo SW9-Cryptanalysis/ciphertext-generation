@@ -1,12 +1,28 @@
 import pytest
 import os
 import queue
-from drive.cipher_producer import CipherProducer
+from drive.cipher_producer import SubstitutionCipher, CipherProducer
 from encipherment.cipher import HomophonicCipher
 from fetching.text_splits import TextStream
-from test_helpers import MockCipher
 from dataclasses import dataclass
 import multiprocessing as mp
+
+class MockCipher(SubstitutionCipher):
+	"""Mock object to simulate a fully generated cipher."""
+
+	def __init__(self, *args, **kwargs):
+		self.plaintext = "a" * 500
+		self.difficulty = 10
+		self.num_symbols = 3
+
+	def generate_key(self):
+		self.key = {"a": ["1"], "b": ["2"], "c": ["3"]}
+		return self.key
+
+	def encipher(self):
+		self.ciphertext = "1 2 3"
+		self.num_symbols = 3
+		return self.ciphertext
 
 
 @pytest.fixture
