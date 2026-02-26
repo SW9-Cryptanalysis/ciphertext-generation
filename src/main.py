@@ -7,6 +7,7 @@ from tqdm import tqdm
 from utils.constants import DIFFICULTIES, LENGTHS
 from utils.z408 import (
 	plaintext_str as z408_plaintext,
+	plaintext_str_with_boundaries as z408_plaintext_with_boundaries,
 	cipher_str as z408_cipher,
 	key_formatted as z408_key,
 )
@@ -43,6 +44,7 @@ def generate_cipher(
 	try:
 		text_obj: TextStream = {
 			"text": cleaned_text,
+			"text_with_boundaries": sliced_text,
 			"source_id": fetcher.book_id,
 			"source_name": "Test",
 			"length": len(cleaned_text),
@@ -73,6 +75,7 @@ def generate_monoalphabetic_cipher(min_len: int, max_len: int, filename: str) ->
 	cleaned_text = clean_spaces(sliced_text)
 	text_obj: TextStream = {
 		"text": cleaned_text,
+		"text_with_boundaries": sliced_text,
 		"source_id": fetcher.book_id,
 		"source_name": "Test",
 		"length": len(cleaned_text),
@@ -104,6 +107,7 @@ if __name__ == "__main__":  # pragma: no cover
 		# Z408 Cipher
 		z408_text_obj: TextStream = {
 			"text": z408_plaintext,
+			"text_with_boundaries": z408_plaintext_with_boundaries,
 			"source_id": "z408",
 			"source_name": "Test",
 			"length": len(z408_plaintext),
