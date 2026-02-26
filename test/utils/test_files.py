@@ -8,6 +8,7 @@ from fetching.text_splits import TextStream
 def sample_cipher():
 	text_obj: TextStream = {
 		"text": "thisisatestcipher",
+		"text_with_boundaries": "this_is_a_test_cipher",
 		"source_id": "13031",
 		"source_name": "The Daily Telegraph",
 		"length": 20,
