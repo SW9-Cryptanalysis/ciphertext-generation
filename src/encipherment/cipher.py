@@ -51,6 +51,7 @@ class SubstitutionCipher(ABC):
 	) -> None:  # pragma: no cover
 		"""Initialize the Cipher object with the given plaintext."""
 		self.plaintext = text_obj["text"]
+		self.plaintext_with_boundaries = text_obj["text_with_boundaries"]
 		self.difficulty = difficulty
 		self.num_symbols = 0
 		self.key = {}
@@ -94,6 +95,7 @@ class SubstitutionCipher(ABC):
 		"""
 		return {
 			"plaintext": self.plaintext,
+			"plaintext_with_boundaries": self.plaintext_with_boundaries,
 			"length": len(self.plaintext),
 			"num_symbols": self.num_symbols,
 			"difficulty": self.difficulty,
@@ -132,6 +134,7 @@ class SubstitutionCipher(ABC):
 		"""Create a cipher object from a JSON string."""
 		data = json.loads(json_data)
 		cipher = cls(data["plaintext"])
+		cipher.plaintext_with_boundaries = data["plaintext_with_boundaries"]
 		cipher.key = data["key"]
 		cipher.ciphertext = data["ciphertext"]
 		cipher.num_symbols = data["num_symbols"]
@@ -188,6 +191,7 @@ class HomophonicCipher(SubstitutionCipher):
 
 		"""
 		self.plaintext = text_obj["text"]
+		self.plaintext_with_boundaries = text_obj["text_with_boundaries"]
 		if not difficulty:
 			self.difficulty = self.generate_difficulty()
 		else:
@@ -304,6 +308,7 @@ class MonoalphabeticCipher(SubstitutionCipher):
 
 		"""
 		self.plaintext = text_obj["text"]
+		self.plaintext_with_boundaries = text_obj["text_with_boundaries"]
 		self.num_symbols = 0
 		self.key = self.generate_key()
 		self.difficulty = 1
