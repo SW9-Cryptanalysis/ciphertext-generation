@@ -1,7 +1,6 @@
 import pytest
 from encipherment.cipher import HomophonicCipher, MonoalphabeticCipher
 from utils.constants import MIN_DIFFICULTY, MAX_DIFFICULTY
-from fetching.text_splits import TextStream
 
 # --- Fixtures ---
 
