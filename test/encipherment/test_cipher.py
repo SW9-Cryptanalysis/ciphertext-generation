@@ -4,28 +4,6 @@ from utils.constants import MIN_DIFFICULTY, MAX_DIFFICULTY
 
 # --- Fixtures ---
 
-
-@pytest.fixture(scope="module")
-def sample_text_content():
-	return (
-		"thisisatestplaintextthatneedstobeencrypteditisjustarandomstringoflowercaselettersthatshouldworkfineanditislong"
-		"enoughtotestthecipherwiththelengthshouldbeoverfourhundredcharactersmaybeevenfivehundredduetothistweneedtoensure"
-		"thecipherworksasexpectedandcanhandlelargerinputswithoutanyissuesandthatthistextisextremelylongsoitcanbeusedtotest"
-		"theperformanceoftheciphergenerationprocess"
-	)
-
-
-@pytest.fixture(scope="module")
-def sample_stream_legal(sample_text_content):
-	"""Returns a valid TextStream dictionary for HomophonicCipher."""
-	return {
-		"text": sample_text_content,
-		"source_id": "book_123",
-		"source_name": "Test Book",
-		"length": len(sample_text_content),
-	}
-
-
 @pytest.fixture(scope="module")
 def sample_text_short():
 	return "abcdefghijklmnopqrstuvwxyz"
@@ -96,15 +74,15 @@ def bad_streams():
 
 class TestHomophonicCipher:
 	class TestHomophonicCipherInit:
-		def test_legal_plaintext(self, sample_stream_legal):
+		def test_legal_plaintext(self, valid_text_stream):
 			# Pass the stream object (dict), not just the string
-			cipher = HomophonicCipher(sample_stream_legal)
+			cipher = HomophonicCipher(valid_text_stream)
 			cipher.generate_key()
 			cipher.encipher()
 
-			assert cipher.plaintext == sample_stream_legal["text"]
-			assert cipher.source_id == sample_stream_legal["source_id"]
-			assert cipher.source_name == sample_stream_legal["source_name"]
+			assert cipher.plaintext == valid_text_stream["text"]
+			assert cipher.source_id == valid_text_stream["source_id"]
+			assert cipher.source_name == valid_text_stream["source_name"]
 
 			assert MIN_DIFFICULTY <= cipher.difficulty <= MAX_DIFFICULTY
 			assert isinstance(cipher.key, dict)
@@ -112,8 +90,8 @@ class TestHomophonicCipher:
 			assert isinstance(cipher.ciphertext, str)
 			assert all(num.isdigit() for num in cipher.ciphertext.split())
 
-		def test_all_homophones_used(self, sample_stream_legal):
-			cipher = HomophonicCipher(sample_stream_legal)
+		def test_all_homophones_used(self, valid_text_stream):
+			cipher = HomophonicCipher(valid_text_stream)
 			used_homophones = set(int(num) for num in cipher.ciphertext.split())
 			all_homophones = set()
 			for homophones in cipher.key.values():
@@ -134,20 +112,20 @@ class TestHomophonicCipher:
 				assert "source_id" in str(excinfo.value)
 				assert "source_name" in str(excinfo.value)
 
-		def test_defined_difficulty(self, sample_stream_legal):
+		def test_defined_difficulty(self, valid_text_stream):
 			for difficulty in range(4, 11):
-				cipher = HomophonicCipher(sample_stream_legal, difficulty=difficulty)
+				cipher = HomophonicCipher(valid_text_stream, difficulty=difficulty)
 				assert cipher.difficulty == difficulty
 
-		def test_key_homophones_count(self, sample_stream_legal):
-			cipher = HomophonicCipher(sample_stream_legal)
+		def test_key_homophones_count(self, valid_text_stream):
+			cipher = HomophonicCipher(valid_text_stream)
 			cipher.generate_key()
 			total_homophones = sum(len(v) for v in cipher.key.values())
 			expected_homophones = round(
-				len(sample_stream_legal["text"]) / cipher.difficulty
+				len(valid_text_stream["text"]) / cipher.difficulty
 			)
 
-			unique_letters = len(set(sample_stream_legal["text"]))
+			unique_letters = len(set(valid_text_stream["text"]))
 
 			assert total_homophones >= unique_letters, (
 				f"Total homophones {total_homophones} is less than unique letters {unique_letters}"
@@ -158,32 +136,32 @@ class TestHomophonicCipher:
 				f"Total homophones {total_homophones} not within acceptable range."
 			)
 
-		def test_ciphertext_numbers_within_range(self, sample_stream_legal):
-			cipher = HomophonicCipher(sample_stream_legal)
+		def test_ciphertext_numbers_within_range(self, valid_text_stream):
+			cipher = HomophonicCipher(valid_text_stream)
 			ciphertext_numbers = list(map(int, cipher.ciphertext.split()))
 			total_homophones = sum(len(v) for v in cipher.key.values())
 			assert all(1 <= num <= total_homophones for num in ciphertext_numbers)
 
-		def test_ciphertext_length(self, sample_stream_legal):
-			cipher = HomophonicCipher(sample_stream_legal)
+		def test_ciphertext_length(self, valid_text_stream):
+			cipher = HomophonicCipher(valid_text_stream)
 			cipher.generate_key()
 			cipher.encipher()
 			ciphertext_numbers = cipher.ciphertext.split()
-			assert len(ciphertext_numbers) == len(sample_stream_legal["text"])
+			assert len(ciphertext_numbers) == len(valid_text_stream["text"])
 
-		def test_invalid_difficulty(self, sample_stream_legal):
+		def test_invalid_difficulty(self, valid_text_stream):
 			for invalid_difficulty in [3, 31, -1, 0]:
 				with pytest.raises(ValueError) as excinfo:
-					HomophonicCipher(sample_stream_legal, difficulty=invalid_difficulty)
+					HomophonicCipher(valid_text_stream, difficulty=invalid_difficulty)
 				assert (
 					f"Parameter `difficulty` must be between {MIN_DIFFICULTY} and {MAX_DIFFICULTY}."
 					in str(excinfo.value)
 				)
 
-		def test_non_integer_difficulty(self, sample_stream_legal):
+		def test_non_integer_difficulty(self, valid_text_stream):
 			for non_integer in [5.5, "ten"]:
 				with pytest.raises(TypeError) as excinfo:
-					HomophonicCipher(sample_stream_legal, difficulty=non_integer)
+					HomophonicCipher(valid_text_stream, difficulty=non_integer)
 				assert "Parameter `difficulty` must be of type int, or None." in str(
 					excinfo.value
 				)
@@ -205,33 +183,33 @@ class TestHomophonicCipher:
 				)
 
 	class TestHomophonicSerialization:
-		def test_json_serialization(self, sample_stream_legal):
-			cipher = HomophonicCipher(sample_stream_legal)
+		def test_json_serialization(self, valid_text_stream):
+			cipher = HomophonicCipher(valid_text_stream)
 			json_data = cipher.__json__()
 			assert isinstance(json_data, dict)
-			assert json_data["plaintext"] == sample_stream_legal["text"]
-			assert json_data["source_id"] == sample_stream_legal["source_id"]
-			assert json_data["source_name"] == sample_stream_legal["source_name"]
+			assert json_data["plaintext"] == valid_text_stream["text"]
+			assert json_data["source_id"] == valid_text_stream["source_id"]
+			assert json_data["source_name"] == valid_text_stream["source_name"]
 			assert json_data["difficulty"] == cipher.difficulty
 			assert json_data["key"] == cipher.key
 			assert json_data["ciphertext"] == cipher.ciphertext
 
-		def test_str_representation(self, sample_stream_legal):
-			cipher = HomophonicCipher(sample_stream_legal)
+		def test_str_representation(self, valid_text_stream):
+			cipher = HomophonicCipher(valid_text_stream)
 			str_repr = str(cipher)
 			assert 'HomophonicCipher(Plaintext: "' in str_repr
-			assert f'"{sample_stream_legal["text"]}"' in str_repr
+			assert f'"{valid_text_stream["text"]}"' in str_repr
 			assert f"Difficulty: {cipher.difficulty}" in str_repr
 			assert f"Key: {cipher.key}" in str_repr
 			assert f'Ciphertext: "{cipher.ciphertext}"' in str_repr
 
-	def test_recurrence_encoding(self, sample_stream_legal):
-		cipher = HomophonicCipher(sample_stream_legal)
+	def test_recurrence_encoding(self, valid_text_stream):
+		cipher = HomophonicCipher(valid_text_stream)
 		cipher.generate_key()
 		cipher.encipher()
 		encoding = cipher.recurrence_encoding
 		assert isinstance(encoding, str)
-		assert len(encoding.split()) == len(sample_stream_legal["text"])
+		assert len(encoding.split()) == len(valid_text_stream["text"])
 
 		encoding_numbers = list(map(int, encoding.split()))
 		assert all(num >= 1 for num in encoding_numbers)
