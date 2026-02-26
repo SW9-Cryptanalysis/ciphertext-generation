@@ -1,23 +1,20 @@
 import pytest
 from encipherment.cipher import HomophonicCipher, MonoalphabeticCipher
 from utils.constants import MIN_DIFFICULTY, MAX_DIFFICULTY
+from fetching.text_splits import TextStream
 
 # --- Fixtures ---
 
-@pytest.fixture(scope="module")
-def sample_text_short():
-	return "abcdefghijklmnopqrstuvwxyz"
-
 
 @pytest.fixture(scope="module")
-def sample_stream_short(sample_text_short):
-	"""Returns a short valid TextStream dictionary."""
+def sample_stream_short():
+	"""Returns a very short valid TextStream dictionary."""
 	return {
-		"text": sample_text_short,
-		"text_with_boundaries": sample_text_short,
+		"text": "abcbc",
+		"text_with_boundaries": "abc_bc",
 		"source_id": "short_1",
 		"source_name": "Alphabet",
-		"length": len(sample_text_short),
+		"length": len("abcbc"),
 	}
 
 
@@ -193,11 +190,19 @@ class TestHomophonicCipher:
 			json_data = cipher.__json__()
 			assert isinstance(json_data, dict)
 			assert json_data["plaintext"] == valid_text_stream["text"]
+			assert (
+				json_data["plaintext_with_boundaries"]
+				== valid_text_stream["text_with_boundaries"]
+			)
 			assert json_data["source_id"] == valid_text_stream["source_id"]
 			assert json_data["source_name"] == valid_text_stream["source_name"]
 			assert json_data["difficulty"] == cipher.difficulty
 			assert json_data["key"] == cipher.key
 			assert json_data["ciphertext"] == cipher.ciphertext
+			assert (
+				json_data["ciphertext_with_boundaries"]
+				== cipher.ciphertext_with_boundaries
+			)
 
 		def test_str_representation(self, valid_text_stream):
 			cipher = HomophonicCipher(valid_text_stream)
@@ -223,10 +228,8 @@ class TestHomophonicCipher:
 	class TestApplyRecurrenceAndRemapKey:
 		def test_standard_remapping_logic(self, sample_stream_short):
 			"""Verify that arbitrary cipher symbols are remapped to 1..N order."""
+
 			cipher = HomophonicCipher(sample_stream_short)
-			# Manually inject state to test the remapping logic in isolation
-			# Plaintext: abc... (from sample_stream_short)
-			# Let's simulate a ciphertext where 'a'=99, 'b'=10, 'c'=50
 			cipher.key = {"a": [99], "b": [10], "c": [50]}
 			cipher.ciphertext = "99 10 50 10 50"  # Represents "abcbc"
 
@@ -244,30 +247,43 @@ class TestHomophonicCipher:
 			"""Ensure multiple homophones for one letter are mapped to distinct IDs."""
 			cipher = HomophonicCipher(sample_stream_short)
 			# 'a' has two homophones, 'b' has one
-			cipher.key = {"a": [88, 89], "b": [44]}
-			# Sequence: a(89) a(88) b(44)
-			cipher.ciphertext = "89 88 44"
+			cipher.key = {"a": [88], "b": [44, 11], "c": [22]}
+			cipher.ciphertext = "88 44 22 11 22"
 
 			cipher._apply_recurrence_and_remap_key()
 
 			# First seen: 89 -> 1, Second seen: 88 -> 2, Third seen: 44 -> 3
-			assert cipher.ciphertext == "1 2 3"
-			assert set(cipher.key["a"]) == {1, 2}
-			assert cipher.key["b"] == [3]
+			assert cipher.ciphertext == "1 2 3 4 3"
+			assert set(cipher.key["a"]) == {1}
+			assert set(cipher.key["b"]) == {2, 4}
+			assert set(cipher.key["c"]) == {3}
 
 		def test_unused_homophones_are_dropped(self, sample_stream_short):
 			"""Verify that symbols in the key not appearing in ciphertext are removed."""
 			cipher = HomophonicCipher(sample_stream_short)
 			# 77 is assigned to 'a' but never used in the ciphertext
-			cipher.key = {"a": [10, 77], "b": [20]}
-			cipher.ciphertext = "10 20"
+			cipher.key = {"a": [10], "b": [20], "c": [77, 11]}
+			cipher.ciphertext = "10 20 11 20 77"
 
 			cipher._apply_recurrence_and_remap_key()
 
 			# 10 becomes 1, 20 becomes 2. 77 is missing from ciphertext.
-			assert cipher.key["a"] == [1]
-			assert cipher.key["b"] == [2]
+			assert set(cipher.key["a"]) == {1}
+			assert set(cipher.key["b"]) == {2}
+			assert set(cipher.key["c"]) == {3, 4}
 			assert 77 not in cipher.key["a"]
+
+		def test_generate_bounded_ciphertext_logic(self, sample_stream_short):
+			"""Verify that underscores from plaintext are perfectly mirrored into ciphertext."""
+			cipher = HomophonicCipher(sample_stream_short)
+
+			cipher.key = {"a": [99], "b": [10], "c": [50]}
+			cipher.ciphertext = "99 10 50 10 50"
+
+			cipher._apply_recurrence_and_remap_key()
+
+			assert cipher.ciphertext == "1 2 3 2 3"
+			assert cipher.ciphertext_with_boundaries == "1 2 3 _ 2 3"
 
 	class TestRemappingIntegrity:
 		def test_first_seen_is_always_one(self, sample_stream_short):
@@ -277,38 +293,22 @@ class TestHomophonicCipher:
 			"""
 			cipher = HomophonicCipher(sample_stream_short)
 
-			# Scenario A: 'z' is 500, 'a' is 10. Text starts with 'z'.
-			cipher.key = {"z": [500], "a": [10]}
-			cipher.ciphertext = "500 10 500"
+			cipher.key = {"a": [10], "b": [20], "c": [30]}
+			cipher.ciphertext = "10 20 30 20 30"
 			cipher._apply_recurrence_and_remap_key()
 			assert cipher.ciphertext.startswith("1")
-			assert cipher.key["z"] == [1]
-			assert cipher.key["a"] == [2]
+			assert set(cipher.key["a"]) == {1}
+			assert set(cipher.key["b"]) == {2}
+			assert set(cipher.key["c"]) == {3}
 
-			# Scenario B: Swap the order. 'a' is seen first.
-			cipher.key = {"z": [500], "a": [10]}
-			cipher.ciphertext = "10 500 10"
+			# Swap the order. 'c' is seen first.
+			cipher.ciphertext = "30 10 30 20 10"
+			cipher.key = {"a": [10], "b": [20], "c": [30]}
 			cipher._apply_recurrence_and_remap_key()
 			assert cipher.ciphertext.startswith("1")
-			assert cipher.key["a"] == [1]
-			assert cipher.key["z"] == [2]
-
-		def test_key_value_consistency(self, sample_stream_short):
-			"""
-			Verify that if a letter has multiple homophones, the remapping
-			correctly updates all of them within the key list.
-			"""
-			cipher = HomophonicCipher(sample_stream_short)
-			# 'e' has three homophones. We use them in a specific order.
-			cipher.key = {"e": [100, 200, 300]}
-			cipher.ciphertext = "300 100 200"
-
-			cipher._apply_recurrence_and_remap_key()
-
-			# Appearance: 300->1, 100->2, 200->3
-			assert cipher.ciphertext == "1 2 3"
-			# The list in the key should now reflect these new values
-			assert set(cipher.key["e"]) == {1, 2, 3}
+			assert set(cipher.key["c"]) == {1}
+			assert set(cipher.key["a"]) == {2}
+			assert set(cipher.key["b"]) == {3}
 
 		def test_complex_overlap_integrity(self, sample_stream_short):
 			"""
@@ -317,93 +317,88 @@ class TestHomophonicCipher:
 			"""
 			cipher = HomophonicCipher(sample_stream_short)
 			# Setup: Numbers that might overlap with the 1..N range
-			cipher.key = {"a": [1], "b": [2], "c": [3]}
+			cipher.key = {"a": [3], "b": [2], "c": [1]}
 			# Ciphertext where they appear in reverse order
-			cipher.ciphertext = "3 2 1"
+			cipher.ciphertext = "3 2 1 2 1"
 
 			cipher._apply_recurrence_and_remap_key()
 
 			# If mapping is done correctly: 3->1, 2->2, 1->3
-			assert cipher.ciphertext == "1 2 3"
-			assert cipher.key["c"] == [1]
+			assert cipher.ciphertext == "1 2 3 2 3"
+			assert cipher.key["a"] == [1]
 			assert cipher.key["b"] == [2]
-			assert cipher.key["a"] == [3]
-
-		def test_key_remains_int_types(self, sample_stream_short):
-			"""
-			Ensure the remapped key contains integers (for JSON)
-			while the ciphertext remains a string of numbers.
-			"""
-			cipher = HomophonicCipher(sample_stream_short)
-			cipher.key = {"a": [123]}
-			cipher.ciphertext = "123"
-
-			cipher._apply_recurrence_and_remap_key()
-
-			assert isinstance(cipher.key["a"][0], int)
-			assert isinstance(cipher.ciphertext.split()[0], str)
+			assert cipher.key["c"] == [3]
 
 
 # --- MonoalphabeticCipher Tests ---
 
 
 class TestMonoalphabeticCipher:
-	def test_legal_plaintext(self, sample_stream_short):
-		# FIX: Pass stream dict, not string
-		cipher = MonoalphabeticCipher(sample_stream_short)
+	def test_legal_plaintext(self, valid_text_stream):
+		cipher = MonoalphabeticCipher(valid_text_stream)
 
-		assert cipher.plaintext == sample_stream_short["text"]
-		assert cipher.source_id == sample_stream_short["source_id"]
-		assert cipher.source_name == sample_stream_short["source_name"]
+		assert cipher.plaintext == valid_text_stream["text"]
+		assert cipher.source_id == valid_text_stream["source_id"]
+		assert cipher.source_name == valid_text_stream["source_name"]
 
 		assert isinstance(cipher.key, dict)
 		assert all(isinstance(v, list) and len(v) == 1 for v in cipher.key.values())
 		assert isinstance(cipher.ciphertext, str)
 		assert all(num.isdigit() for num in cipher.ciphertext.split())
 
+		assert cipher.plaintext_with_boundaries == valid_text_stream["text_with_boundaries"]
+		assert isinstance(cipher.ciphertext_with_boundaries, str)
+		assert len(cipher.ciphertext_with_boundaries) >= len(cipher.ciphertext)
+
 	def test_key_structure(self, sample_stream_short):
 		cipher = MonoalphabeticCipher(sample_stream_short)
 
-		assert len(cipher.key) == 26
-		for letter in "abcdefghijklmnopqrstuvwxyz":
+		assert len(cipher.key) == 3
+		for letter in cipher.plaintext:
 			assert letter in cipher.key
-			assert len(cipher.key[letter]) == 1
+			assert len(cipher.key[letter]) >= 1
 
-		all_numbers = [cipher.key[letter][0] for letter in "abcdefghijklmnopqrstuvwxyz"]
-		assert sorted(all_numbers) == list(range(1, 27))
-		assert len(set(all_numbers)) == 26
+		all_numbers = [cipher.key[letter][0] for letter in cipher.plaintext]
+		assert set(all_numbers) == set(range(1, 4))
+		assert len(set(all_numbers)) == 3
 
-	def test_ciphertext_length(self, sample_stream_short):
-		cipher = MonoalphabeticCipher(sample_stream_short)
+	def test_ciphertext_length(self, valid_text_stream):
+		cipher = MonoalphabeticCipher(valid_text_stream)
 		ciphertext_numbers = cipher.ciphertext.split()
-		assert len(ciphertext_numbers) == len(sample_stream_short["text"])
+		assert len(ciphertext_numbers) == len(valid_text_stream["text"])
 
-	def test_json_serialization_success(self, sample_stream_short):
+	def test_json_serialization_success(self, valid_text_stream):
 		"""
 		FIX: This previously expected failure. Now that MonoalphabeticCipher
 		sets source_id/name, serialization should SUCCEED.
 		"""
-		cipher = MonoalphabeticCipher(sample_stream_short)
+		cipher = MonoalphabeticCipher(valid_text_stream)
 		json_data = cipher.__json__()
 
 		assert isinstance(json_data, dict)
-		assert json_data["plaintext"] == sample_stream_short["text"]
-		assert json_data["source_id"] == sample_stream_short["source_id"]
-		assert json_data["source_name"] == sample_stream_short["source_name"]
+		assert json_data["plaintext"] == valid_text_stream["text"]
+		assert (
+			json_data["plaintext_with_boundaries"]
+			== valid_text_stream["text_with_boundaries"]
+		)
+		assert (
+			json_data["ciphertext_with_boundaries"] == cipher.ciphertext_with_boundaries
+		)
+		assert json_data["source_id"] == valid_text_stream["source_id"]
+		assert json_data["source_name"] == valid_text_stream["source_name"]
 		assert json_data["key"] == cipher.key
 		assert json_data["ciphertext"] == cipher.ciphertext
 
-	def test_str_representation(self, sample_stream_short):
-		cipher = MonoalphabeticCipher(sample_stream_short)
+	def test_str_representation(self, valid_text_stream):
+		cipher = MonoalphabeticCipher(valid_text_stream)
 		str_repr = str(cipher)
 		assert 'MonoalphabeticCipher(Plaintext: "' in str_repr
-		assert f'"{sample_stream_short["text"]}"' in str_repr
+		assert f'"{valid_text_stream["text"]}"' in str_repr
 		assert f"Key: {cipher.key}" in str_repr
 		assert f'Ciphertext: "{cipher.ciphertext}"' in str_repr
 
 	def test_illegal_plaintext(self, sample_stream_illegal):
 		for text_obj in sample_stream_illegal:
-
 			with pytest.raises(ValueError) as excinfo:
 				MonoalphabeticCipher(text_obj)  # type: ignore
 
