@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import call
-from drive.cipher_manager import CipherManager
+from cipher_generation.cipher_manager import CipherManager
 import json
 
 
@@ -62,7 +62,7 @@ class TestCipherManager:
 	def test_execute_flow(self, mocker, mock_mp_manager, base_config):
 		_, mock_job_q, mock_result_q = mock_mp_manager
 
-		mocker.patch("drive.drive_uploader.BatchState")
+		mocker.patch("cipher_generation.drive_uploader.BatchState")
 
 		mock_stream = [
 			("train", {"text": "A"}),
@@ -70,10 +70,10 @@ class TestCipherManager:
 			("val", {"text": "C"}),
 		]
 
-		mock_uploader_cls = mocker.patch("drive.cipher_manager.DriveUploader")
+		mock_uploader_cls = mocker.patch("cipher_generation.cipher_manager.DriveUploader")
 		mock_uploader = mock_uploader_cls.return_value
 
-		mock_producer_cls = mocker.patch("drive.cipher_manager.CipherProducer")
+		mock_producer_cls = mocker.patch("cipher_generation.cipher_manager.CipherProducer")
 		mock_producer = mock_producer_cls.return_value
 
 		mocker.patch("os.cpu_count", return_value=4)
@@ -113,14 +113,14 @@ class TestCipherManager:
 		self, mocker, mock_mp_manager, base_config
 	):
 		_, mock_job_q, mock_result_q = mock_mp_manager
-		mock_log = mocker.patch("drive.cipher_manager.log")
+		mock_log = mocker.patch("cipher_generation.cipher_manager.log")
 
 		mock_stream = mocker.MagicMock()
 		mock_stream.__iter__.side_effect = Exception("Stream Failure")
 
 		mocker.patch("os.cpu_count", return_value=3)
-		mocker.patch("drive.cipher_manager.DriveUploader")
-		mocker.patch("drive.cipher_manager.CipherProducer")
+		mocker.patch("cipher_generation.cipher_manager.DriveUploader")
+		mocker.patch("cipher_generation.cipher_manager.CipherProducer")
 
 		manager = CipherManager(base_config, mock_stream)
 		manager.execute()
@@ -134,7 +134,7 @@ class TestCipherManager:
 	def test_execute_logging_progress(self, mocker, mock_mp_manager):
 		"""Line 95: Triggers the progress log every 1000 items."""
 		_, mock_job_q, _ = mock_mp_manager
-		mock_log = mocker.patch("drive.cipher_manager.log")
+		mock_log = mocker.patch("cipher_generation.cipher_manager.log")
 
 		# Create a stream of 1001 items to trigger the log at 1000
 		mock_stream = [("train", {"text": "A"}) for _ in range(1001)]
@@ -143,10 +143,10 @@ class TestCipherManager:
 			{"train": {"folder_id": "train_folder", "count": 1001}}, mock_stream
 		)
 
-		mocker.patch("drive.cipher_manager.DriveUploader.start")
-		mocker.patch("drive.cipher_manager.DriveUploader.join")
-		mocker.patch("drive.cipher_manager.CipherProducer.start")
-		mocker.patch("drive.cipher_manager.CipherProducer.join")
+		mocker.patch("cipher_generation.cipher_manager.DriveUploader.start")
+		mocker.patch("cipher_generation.cipher_manager.DriveUploader.join")
+		mocker.patch("cipher_generation.cipher_manager.CipherProducer.start")
+		mocker.patch("cipher_generation.cipher_manager.CipherProducer.join")
 
 		manager.execute()
 
@@ -155,15 +155,15 @@ class TestCipherManager:
 	def test_execute_keyboard_interrupt(self, mocker, mock_mp_manager, base_config):
 		"""Line 98: Triggers the KeyboardInterrupt warning block."""
 		_, mock_job_q, _ = mock_mp_manager
-		mock_log = mocker.patch("drive.cipher_manager.log")
+		mock_log = mocker.patch("cipher_generation.cipher_manager.log")
 
 		mock_stream = mocker.MagicMock()
 		mock_stream.__iter__.side_effect = KeyboardInterrupt()
 
 		manager = CipherManager(base_config, mock_stream)
 
-		mocker.patch("drive.cipher_manager.DriveUploader")
-		mocker.patch("drive.cipher_manager.CipherProducer")
+		mocker.patch("cipher_generation.cipher_manager.DriveUploader")
+		mocker.patch("cipher_generation.cipher_manager.CipherProducer")
 
 		manager.execute()
 
@@ -183,7 +183,7 @@ class TestCipherManager:
 			}
 
 			manager = CipherManager(test_config, large_stream)
-			mock_log = mocker.patch("drive.cipher_manager.log")
+			mock_log = mocker.patch("cipher_generation.cipher_manager.log")
 
 			items_fed = manager._feeder_stream()
 
@@ -196,8 +196,8 @@ class TestCipherManagerPeakUpload:
 	def test_manager_queues_peak_value_metadata(self, mocker):
 		"""Verifies the max_symbol_id is formatted and queued before the sentinel."""
 
-		mocker.patch("drive.cipher_manager.DriveUploader")
-		mocker.patch("drive.cipher_manager.CipherProducer")
+		mocker.patch("cipher_generation.cipher_manager.DriveUploader")
+		mocker.patch("cipher_generation.cipher_manager.CipherProducer")
 
 		dummy_config = {"train": {"folder_id": "dummy_folder_abc", "count": 1}}
 		dummy_stream = [

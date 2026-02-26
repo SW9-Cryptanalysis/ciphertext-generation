@@ -1,6 +1,6 @@
 import os
 from utils.logging import get_colored_logger
-from drive.cipher_manager import CipherManager
+from cipher_generation.cipher_manager import CipherManager
 from fetching.text_splits import get_text_stream
 
 if __name__ == "__main__":
