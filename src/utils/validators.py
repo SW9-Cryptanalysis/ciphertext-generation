@@ -2,6 +2,7 @@ from parameter_validator import validator
 from typing import Callable, Any, get_origin, get_args
 from types import UnionType
 from utils.constants import ALPHABET
+from fetching.text_splits import TextStream
 
 
 def in_range(min_value: int, max_value: int) -> Callable:
@@ -106,11 +107,11 @@ def validate_text_obj(value: Any, name: str) -> None:
 	if not isinstance(value, dict):
 		raise TypeError(f"Parameter `{name}` must be of type dict.")
 
-	required_keys = ["text", "source_id", "source_name", "length"]
+	required_keys = TextStream.__annotations__.keys()
 	if set(value.keys()) != set(required_keys):
 		raise KeyError(
 			f"Parameter `{name}` must contain the following keys: {str(required_keys)}."
-			f" Missing keys: {set(value.keys()) - set(required_keys)}",
+			f" Missing keys: {set(required_keys) - set(value.keys())}."
 		)
 
 	text_content = value["text"]
