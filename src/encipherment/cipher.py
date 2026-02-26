@@ -85,8 +85,26 @@ class SubstitutionCipher(ABC):
 
 			new_key[char] = remapped_homophones
 
+		self.ciphertext_with_boundaries = self._generate_bounded_ciphertext()
 
 		self.key = new_key
+
+	def _generate_bounded_ciphertext(self) -> str:
+		"""Generate a ciphertext with spaces replaced with underscores.
+
+		Returns:
+			str: The ciphertext with spaces replaced with underscores.
+
+		"""
+		ciphertext = iter(self.ciphertext.split())
+		bounded_ciphertext = []
+		for char in self.plaintext_with_boundaries:
+			if char == "_":
+				bounded_ciphertext.append("_")
+			else:
+				bounded_ciphertext.append(next(ciphertext))
+
+		return " ".join(bounded_ciphertext)
 
 	def __json__(self) -> dict:
 		"""Return a JSON-serializable representation of the Cipher object.
