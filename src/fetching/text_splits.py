@@ -1,7 +1,6 @@
 import os
 import dotenv
 import random
-import re
 from itertools import islice
 
 from typing import Iterator, Iterable
@@ -48,6 +47,7 @@ class TextStream(TypedDict):
 	"""
 
 	text: str
+	text_with_boundaries: str
 	source_id: str
 	source_name: str
 	length: int
@@ -97,22 +97,6 @@ def randomize_stream(stream: IterableDataset) -> IterableDataset:
 	return stream.shuffle(seed=42, buffer_size=100)
 
 
-def clean_whitespace(text: str) -> str:
-	"""Remove newlines, tabs, and multiple spaces from the input text.
-
-	Args:
-		text (str): The input text.
-
-	Returns:
-		str: The text with all unnecessary whitespace removed.
-
-	"""
-	# NOTE: Perhaps just remove all whitespace? Depends on num2words #noqa: ERA001
-	text = text.replace("\n", " ").replace("\r", " ").replace("\t", " ")
-	text = re.sub(r"\s+", " ", text)
-	return text.strip()
-
-
 def find_spaceless_target_index(spaced_text: str, target_len: int) -> int:
 	"""Find the index in a spaced string that corresponds to a spaceless length.
 
@@ -140,8 +124,12 @@ def extract_random_chunk(
 	zone_start: int,
 	zone_size: int,
 	len_bounds: tuple[int, int],
-) -> str:
+) -> tuple[str, str]:
 	"""Extract a random chunk of text dynamically while preserving word boundaries.
+
+	The chunk is aligned to word boundaries and has a random length between the
+	provided min and max length bounds. The chunk is also returned with spaces
+	replaced with underscores.
 
 	Args:
 		text (str): The input text to extract the chunk from.
@@ -150,7 +138,8 @@ def extract_random_chunk(
 		len_bounds (tuple[int, int]): The minimum and maximum length bounds.
 
 	Returns:
-		str: The extracted, cleanly cut, and spaceless chunk of text.
+		tuple[str, str]: A tuple containing the cleaned chunk of text both with
+			spaces replaced with underscores and the spaces removed.
 
 	"""
 	min_len, max_len = len_bounds
@@ -172,14 +161,19 @@ def extract_random_chunk(
 		raw_end = min(len(text), raw_end + target_len)
 
 	if len(clean_spaces(spaced_window)) < min_len:
-		return clean_spaces(spaced_window).strip()
+		return clean_spaces(spaced_window).strip(), spaced_window.strip().replace(
+			" ", "_",
+		)
 
 	spaced_target_len = find_spaceless_target_index(spaced_window, target_len)
 	start_idx, end_idx = find_boundaries(spaced_window, 0, spaced_target_len)
 
 	final_chunk = spaced_window[start_idx:end_idx]
 
-	return clean_spaces(final_chunk).strip()
+	unbounded_text = clean_spaces(final_chunk).strip()
+	bounded_text = final_chunk.strip().replace(" ", "_")
+
+	return unbounded_text, bounded_text
 
 
 def get_split(idx: int) -> str:
@@ -207,7 +201,7 @@ def get_book_chunks(
 	text: str,
 	actual_take: int,
 	len_bounds: tuple[int, int],
-) -> Iterator[str]:
+) -> Iterator[tuple[str, str]]:
 	"""Extract a random chunk of text from the provided book text.
 
 	The chunk is aligned to word boundaries and has a random length between the
@@ -220,13 +214,14 @@ def get_book_chunks(
 			chunks.
 
 	Yields:
-		Iterator[str]: An iterator of text chunks.
+		Iterator[tuple[str, str]]: An iterator of text chunks with the clean text
+			with spaces replaced with underscores and the spaces removed.
 
 	"""
 	zone_size = len(text) // actual_take
 
 	for i in range(actual_take):
-		chunk = extract_random_chunk(
+		chunk, bounded_chunk = extract_random_chunk(
 			text,
 			i * zone_size,
 			zone_size,
@@ -236,9 +231,7 @@ def get_book_chunks(
 		chunk_len = len(chunk)
 
 		if len_bounds[0] - 0.05 * len_bounds[0] <= chunk_len <= len_bounds[1]:
-			yield chunk
-		elif chunk_len > len_bounds[1]:
-			yield chunk[: len_bounds[1]]
+			yield chunk, bounded_chunk
 
 
 def validate_targets(targets: dict[str, int]) -> None:
@@ -354,7 +347,7 @@ def text_streams_generator(
 
 		take_limit = min(actual_take, total_samples_map[split] - counts[split])
 
-		for chunk in islice(
+		for chunk, bounded_chunk in islice(
 			get_book_chunks(usable_text, actual_take, len_bounds),
 			take_limit,
 		):
@@ -362,6 +355,7 @@ def text_streams_generator(
 				split,
 				{
 					"text": chunk,
+					"text_with_boundaries": bounded_chunk,
 					"source_id": book.get("id", "unknown"),
 					"source_name": book.get("metadata", {}).get("title", "unknown"),
 					"length": len(chunk),

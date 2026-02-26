@@ -3,7 +3,6 @@ import os
 import queue
 from drive.cipher_producer import CipherProducer
 from encipherment.cipher import SubstitutionCipher, HomophonicCipher
-from fetching.text_splits import TextStream
 from dataclasses import dataclass
 import multiprocessing as mp
 
@@ -230,39 +229,25 @@ class TestUpdateMaxSymbolId:
 
 
 class TestGenerateCipherLogic:
-	def test_generate_cipher_success(self, mocker, mock_producer):
+	def test_generate_cipher_success(self, mocker, mock_producer, valid_text_stream):
 		producer = mock_producer
-
-		sample_item: TextStream = {
-			"text": "testslice",
-			"source_id": "123",
-			"source_name": "Book",
-			"length": 9,
-		}
 
 		mock_cipher_instance = mocker.Mock(spec=HomophonicCipher)
 		mocked_homophonic_cipher = mocker.patch(
 			"drive.cipher_producer.HomophonicCipher", return_value=mock_cipher_instance
 		)
 
-		cipher = producer.generate_cipher(sample_item)
+		cipher = producer.generate_cipher(valid_text_stream)
 
-		mocked_homophonic_cipher.assert_called_once_with(sample_item)
+		mocked_homophonic_cipher.assert_called_once_with(valid_text_stream)
 
 		mock_cipher_instance.generate_key.assert_called_once()
 		mock_cipher_instance.encipher.assert_called_once()
 
 		assert cipher == mock_cipher_instance
 
-	def test_generate_cipher_errors(self, mocker, mock_producer, caplog):
+	def test_generate_cipher_errors(self, mocker, mock_producer, valid_text_stream):
 		producer = mock_producer
-
-		sample_item: TextStream = {
-			"text": "invalid",
-			"source_id": "123",
-			"source_name": "Book",
-			"length": 9,
-		}
 
 		mock_log = mocker.patch("drive.cipher_producer.log")
 
@@ -271,20 +256,14 @@ class TestGenerateCipherLogic:
 			side_effect=ValueError("Invalid cipher setup"),
 		)
 
-		result = producer.generate_cipher(sample_item)
+		result = producer.generate_cipher(valid_text_stream)
 
 		assert result is None
 		mock_log.error.assert_called()
 		assert "Error generating cipher" in mock_log.error.call_args[0][0]
 
-	def test_generate_cipher_unexpected_exception(self, mocker, mock_producer):
+	def test_generate_cipher_unexpected_exception(self, mocker, mock_producer, valid_text_stream):
 		producer = mock_producer
-		sample_item: TextStream = {
-			"text": "crash_test",
-			"source_id": "123",
-			"source_name": "Book",
-			"length": 10,
-		}
 
 		mock_log = mocker.patch("drive.cipher_producer.log")
 
@@ -293,7 +272,7 @@ class TestGenerateCipherLogic:
 			side_effect=Exception("Critical system failure"),
 		)
 
-		result = producer.generate_cipher(sample_item)
+		result = producer.generate_cipher(valid_text_stream)
 
 		assert result is None
 		mock_log.error.assert_called()

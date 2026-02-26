@@ -9,18 +9,12 @@ from fetching.text_splits import (
 	get_usable_text,
 	get_actual_take,
 	validate_targets,
-	clean_whitespace,
 	text_streams_generator,
 	get_text_stream,
 	randomize_stream,
 )
 
 # --- Fixtures ---
-
-
-@pytest.fixture
-def sample_text():
-	return "This is a sample text used for testing boundaries and extraction logic."
 
 
 @pytest.fixture
@@ -48,9 +42,9 @@ def mock_book_stream():
 
 
 class TestTextHelpers:
-	def test_find_boundaries_standard(self, sample_text):
-		start, end = find_boundaries(sample_text, 10, 11)
-		assert sample_text[start:end] == "sample text"
+	def test_find_boundaries_standard(self, sample_text_with_spaces):
+		start, end = find_boundaries(sample_text_with_spaces, 10, 11)
+		assert sample_text_with_spaces[start:end] == "test plaintext"
 
 	def test_find_spaceless_target_index(self):
 		text = "a b c d e"  # Spaced
@@ -62,16 +56,6 @@ class TestTextHelpers:
 		assert get_split(1) == "test"
 		assert get_split(2) == "train"
 		assert get_split(100) == "val"
-
-	def test_clean_whitespace(self):
-		raw = "Line\nBreak\tTab   Multiple  Spaces"
-		expected = "Line Break Tab Multiple Spaces"
-		assert clean_whitespace(raw) == expected
-
-	def test_clean_whitespace_multiple_regex_spaces(self):
-		"""Line 90: Ensure regex replacement of multiple spaces is hit."""
-		text = "word    word"
-		assert clean_whitespace(text) == "word word"
 
 	def test_validate_targets_valid(self):
 		targets = {"train": 100, "val": 10, "test": 10}
@@ -115,43 +99,47 @@ class TestTextHelpers:
 class TestChunkExtraction:
 	def test_extract_random_chunk_logic_flow(self, mocker):
 		text = "wordone wordtwo wordthree wordfour"
-		mocker.patch("random.randint", side_effect=[7, 0, 0, 0])
+		mocker.patch("random.randint", side_effect=[12, 0, 0, 0])
 		mocker.patch("fetching.text_splits.format_text", side_effect=lambda x: x)
 
-		chunk = extract_random_chunk(text, 0, len(text), (5, 15))
+		chunk, bounded_chunk = extract_random_chunk(text, 0, len(text), (10, 20))
 
 		assert " " not in chunk
-		assert chunk == "wordone"
+		assert chunk == "wordonewordtwo"
 
-	def test_get_book_chunks_filters_length(self, mocker):
-		min_bound = 1000
-		# 960 is within 5% of 1000 (threshold 950)
-		valid_chunk = "a" * 960
-		invalid_chunk = "a" * 940
+		assert bounded_chunk == "wordone_wordtwo"
+
+	def test_get_book_chunks_filters_length(self, mocker, sample_text, sample_text_with_boundaries):
+		min_bound = int(len(sample_text) - 0.05 * len(sample_text))
 
 		mocker.patch(
 			"fetching.text_splits.extract_random_chunk",
-			side_effect=[valid_chunk, invalid_chunk],
+			side_effect=[(sample_text, sample_text_with_boundaries), (sample_text, sample_text_with_boundaries)],
 		)
 
 		chunks = list(
 			get_book_chunks("dummy text", actual_take=2, len_bounds=(min_bound, 2000))
 		)
 
-		assert len(chunks) == 1
-		assert chunks[0] == valid_chunk
+		assert len(chunks) == 2
+		assert chunks[0][0] == sample_text
+		assert chunks[0][1] == sample_text_with_boundaries
+		assert chunks[1][0] == sample_text
+		assert chunks[1][1] == sample_text_with_boundaries
 
-	def test_get_book_chunks_clamping(self, mocker):
-		# Test that chunks longer than max_len are clamped
+	def test_get_book_chunks_drops_oversized(self, mocker):
+		# Test that chunks longer than max_len are completely dropped to prevent broken words
 		max_bound = 50
 		long_chunk = "a" * 100
 		mocker.patch(
 			"fetching.text_splits.extract_random_chunk",
-			return_value=long_chunk,
+			return_value=(long_chunk, long_chunk),
 		)
 
 		chunks = list(get_book_chunks("text", 1, (10, max_bound)))
-		assert len(chunks[0]) == max_bound
+
+		# Since 100 > 50, it should yield nothing.
+		assert len(chunks) == 0
 
 	def test_extract_random_chunk_reaches_end_of_text(self, mocker):
 		"""Line 175: Test when raw_end >= len(text) breaks the loop."""
@@ -171,8 +159,10 @@ class TestChunkExtraction:
 		mocker.patch("fetching.text_splits.format_text", side_effect=lambda x: x)
 
 		# min_len is 5, text is 4 chars
-		chunk = extract_random_chunk(text, 0, 5, (5, 15))
+		chunk, chunk_bounded = extract_random_chunk(text, 0, 5, (5, 15))
 		assert chunk == "tiny"
+
+		assert chunk_bounded == "tiny"
 
 
 # --- Stream Generator Tests ---
