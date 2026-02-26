@@ -56,6 +56,7 @@ class SubstitutionCipher(ABC):
 		self.num_symbols = 0
 		self.key = {}
 		self.ciphertext = ""
+		self.ciphertext_with_boundaries = ""
 		self.source_id = text_obj["source_id"]
 		self.source_name = text_obj["source_name"]
 		raise NotImplementedError("This is an abstract base class.")
@@ -84,6 +85,7 @@ class SubstitutionCipher(ABC):
 
 			new_key[char] = remapped_homophones
 
+
 		self.key = new_key
 
 	def __json__(self) -> dict:
@@ -101,6 +103,7 @@ class SubstitutionCipher(ABC):
 			"difficulty": self.difficulty,
 			"key": self.key,
 			"ciphertext": self.ciphertext,
+			"ciphertext_with_boundaries": self.ciphertext_with_boundaries,
 			"source_id": self.source_id,
 			"source_name": self.source_name,
 		}
@@ -137,6 +140,7 @@ class SubstitutionCipher(ABC):
 		cipher.plaintext_with_boundaries = data["plaintext_with_boundaries"]
 		cipher.key = data["key"]
 		cipher.ciphertext = data["ciphertext"]
+		cipher.ciphertext_with_boundaries = data["ciphertext_with_boundaries"]
 		cipher.num_symbols = data["num_symbols"]
 		cipher.difficulty = data["difficulty"]
 		cipher.source_id = data["source_id"]
@@ -199,6 +203,7 @@ class HomophonicCipher(SubstitutionCipher):
 		self.num_symbols = 0
 		self.key: dict[str, list] = {}
 		self.ciphertext: str = ""
+		self.ciphertext_with_boundaries: str = ""
 		self.source_id = text_obj["source_id"]
 		self.source_name = text_obj["source_name"]
 
