@@ -5,7 +5,7 @@ from typing import Final, Any
 from dataclasses import dataclass
 from multiprocessing.queues import Queue as MPQueue
 
-from drive.drive_uploader import DriveUploader, DriveUploaderConfig, BatchState
+from cipher_generation.drive_uploader import DriveUploader, DriveUploaderConfig, BatchState
 
 # --- Constants & Test Data ---
 BATCH_SIZE: Final[int] = 2
@@ -90,17 +90,17 @@ class TestDriveUploaderRunLoop:
 		)
 
 		mocker.patch(
-			"drive.drive_uploader.authenticate_drive_terminal",
+			"cipher_generation.drive_uploader.authenticate_drive_terminal",
 			return_value=mocker.Mock(),
 		)
 		mock_upload_drive = mocker.patch(
-			"drive.drive_uploader.upload_to_drive",
+			"cipher_generation.drive_uploader.upload_to_drive",
 			side_effect=["file_id_1", "file_id_2"],
 		)
 
 		mock_pbar = mocker.Mock(total=total_to_upload)
 		mocker.patch(
-			"drive.drive_uploader.tqdm",
+			"cipher_generation.drive_uploader.tqdm",
 			return_value=mocker.MagicMock(
 				__enter__=lambda self: mock_pbar, __exit__=lambda *args: None
 			),
@@ -125,7 +125,7 @@ class TestDriveUploaderRunLoop:
 		queue_mock.get.side_effect = [queue.Empty, SENTINEL]
 
 		mocker.patch(
-			"drive.drive_uploader.authenticate_drive_terminal",
+			"cipher_generation.drive_uploader.authenticate_drive_terminal",
 			return_value=mocker.Mock(),
 		)
 
@@ -147,10 +147,10 @@ class TestDriveUploaderRunLoop:
 		self, mocker, queue_factory, uploader_config, mock_cipher_item
 	):
 		mocker.patch(
-			"drive.drive_uploader.authenticate_drive_terminal",
+			"cipher_generation.drive_uploader.authenticate_drive_terminal",
 			side_effect=Exception("Auth failed"),
 		)
-		mock_log = mocker.patch("drive.drive_uploader.log")
+		mock_log = mocker.patch("cipher_generation.drive_uploader.log")
 
 		mock_queue = queue_factory()
 
@@ -169,7 +169,7 @@ class TestDriveUploaderRunLoop:
 	def test_metadata_routing_in_run(self, mocker, queue_factory, uploader_config):
 		"""Test that the 'metadata' split is routed correctly and not batched."""
 		mocker.patch(
-			"drive.drive_uploader.authenticate_drive_terminal",
+			"cipher_generation.drive_uploader.authenticate_drive_terminal",
 			return_value=mocker.Mock(),
 		)
 		mock_upload_raw = mocker.patch.object(DriveUploader, "_upload_raw_file")
@@ -181,7 +181,7 @@ class TestDriveUploaderRunLoop:
 		mock_queue.put(SENTINEL)
 
 		uploader = DriveUploader(mock_queue, uploader_config, name="TestUploader")
-		mocker.patch("drive.drive_uploader.tqdm")
+		mocker.patch("cipher_generation.drive_uploader.tqdm")
 
 		uploader.run()
 
@@ -197,10 +197,10 @@ class TestDriveUploaderBatchHelpers:
 
 	def test_upload_failure(self, mocker, ctx: UploaderTestContext):
 		mocker.patch(
-			"drive.drive_uploader.authenticate_drive_terminal",
+			"cipher_generation.drive_uploader.authenticate_drive_terminal",
 			return_value=mocker.Mock(),
 		)
-		mock_log = mocker.patch("drive.drive_uploader.log")
+		mock_log = mocker.patch("cipher_generation.drive_uploader.log")
 
 		ctx.queue.put(ctx.item)
 		ctx.queue.put(ctx.item2)
@@ -217,19 +217,19 @@ class TestDriveUploaderBatchHelpers:
 	def test_partial_final_batch(self, mocker, ctx: UploaderTestContext):
 		total_expected = 3
 		ctx.config.total_ciphers = total_expected
-		mocker.patch("drive.drive_uploader.BATCH_SIZE", 2)
+		mocker.patch("cipher_generation.drive_uploader.BATCH_SIZE", 2)
 
 		mocker.patch(
-			"drive.drive_uploader.authenticate_drive_terminal",
+			"cipher_generation.drive_uploader.authenticate_drive_terminal",
 			return_value=mocker.Mock(),
 		)
 		mock_upload_drive = mocker.patch(
-			"drive.drive_uploader.upload_to_drive",
+			"cipher_generation.drive_uploader.upload_to_drive",
 			side_effect=["file_id_full", "file_id_final"],
 		)
 		mock_pbar = mocker.Mock(total=total_expected)
 		mocker.patch(
-			"drive.drive_uploader.tqdm",
+			"cipher_generation.drive_uploader.tqdm",
 			return_value=mocker.MagicMock(
 				__enter__=lambda self: mock_pbar, __exit__=lambda *args: None
 			),
@@ -259,7 +259,7 @@ class TestDriveUploaderBatchHelpers:
 		uploader.drive_service = mocker.Mock()
 
 		mock_upload = mocker.patch(
-			"drive.drive_uploader.upload_to_drive", return_value="file_id_successful"
+			"cipher_generation.drive_uploader.upload_to_drive", return_value="file_id_successful"
 		)
 		mock_pbar = mocker.Mock()
 
@@ -280,10 +280,10 @@ class TestDriveUploaderBatchHelpers:
 	def test_upload_batch_helper_failure(self, mocker, uploader_config):
 		uploader = DriveUploader(mocker.Mock(), uploader_config, name="TestUploader")
 		uploader.drive_service = mocker.Mock()
-		mock_log = mocker.patch("drive.drive_uploader.log")
+		mock_log = mocker.patch("cipher_generation.drive_uploader.log")
 
 		mock_upload = mocker.patch(
-			"drive.drive_uploader.upload_to_drive", return_value=""
+			"cipher_generation.drive_uploader.upload_to_drive", return_value=""
 		)
 		mock_pbar = mocker.Mock()
 
@@ -302,7 +302,7 @@ class TestDriveUploaderBatchHelpers:
 		new_bs.zip_buffer.close()
 
 	def test_upload_batch_exception_handling(self, mocker, uploader_config):
-		mock_bs_class = mocker.patch("drive.drive_uploader.BatchState")
+		mock_bs_class = mocker.patch("cipher_generation.drive_uploader.BatchState")
 		mock_new_bs = mocker.Mock()
 		mock_new_bs.batch_num = 8
 		mock_new_bs.current_batch_count = 0
@@ -310,10 +310,10 @@ class TestDriveUploaderBatchHelpers:
 
 		uploader = DriveUploader(mocker.Mock(), uploader_config, name="TestUploader")
 		uploader.drive_service = mocker.Mock()
-		mock_log = mocker.patch("drive.drive_uploader.log")
+		mock_log = mocker.patch("cipher_generation.drive_uploader.log")
 
 		mocker.patch(
-			"drive.drive_uploader.upload_to_drive",
+			"cipher_generation.drive_uploader.upload_to_drive",
 			side_effect=Exception("Unexpected API Crash"),
 		)
 		mock_pbar = mocker.Mock()
@@ -338,10 +338,10 @@ class TestDriveUploaderRawFileHelpers:
 	def test_upload_raw_file_success(self, mocker, uploader_config):
 		uploader = DriveUploader(mocker.Mock(), uploader_config, name="TestUploader")
 		uploader.drive_service = mocker.Mock()
-		mock_log = mocker.patch("drive.drive_uploader.log")
+		mock_log = mocker.patch("cipher_generation.drive_uploader.log")
 
 		mock_upload = mocker.patch(
-			"drive.drive_uploader.upload_to_drive", return_value="raw_file_id_1"
+			"cipher_generation.drive_uploader.upload_to_drive", return_value="raw_file_id_1"
 		)
 
 		uploader._upload_raw_file("metadata", "meta.json", b"raw_data")
@@ -355,8 +355,8 @@ class TestDriveUploaderRawFileHelpers:
 
 	def test_upload_raw_file_missing_folder(self, mocker, uploader_config):
 		uploader = DriveUploader(mocker.Mock(), uploader_config, name="TestUploader")
-		mock_log = mocker.patch("drive.drive_uploader.log")
-		mock_upload = mocker.patch("drive.drive_uploader.upload_to_drive")
+		mock_log = mocker.patch("cipher_generation.drive_uploader.log")
+		mock_upload = mocker.patch("cipher_generation.drive_uploader.upload_to_drive")
 
 		uploader._upload_raw_file("unknown_split", "meta.json", b"raw_data")
 
@@ -368,9 +368,9 @@ class TestDriveUploaderRawFileHelpers:
 	def test_upload_raw_file_api_rejection(self, mocker, uploader_config):
 		uploader = DriveUploader(mocker.Mock(), uploader_config, name="TestUploader")
 		uploader.drive_service = mocker.Mock()
-		mock_log = mocker.patch("drive.drive_uploader.log")
+		mock_log = mocker.patch("cipher_generation.drive_uploader.log")
 
-		mocker.patch("drive.drive_uploader.upload_to_drive", return_value=None)
+		mocker.patch("cipher_generation.drive_uploader.upload_to_drive", return_value=None)
 		uploader._upload_raw_file("metadata", "meta.json", b"raw_data")
 
 		mock_log.error.assert_called_once_with(
@@ -380,10 +380,10 @@ class TestDriveUploaderRawFileHelpers:
 	def test_upload_raw_file_exception_handling(self, mocker, uploader_config):
 		uploader = DriveUploader(mocker.Mock(), uploader_config, name="TestUploader")
 		uploader.drive_service = mocker.Mock()
-		mock_log = mocker.patch("drive.drive_uploader.log")
+		mock_log = mocker.patch("cipher_generation.drive_uploader.log")
 
 		mocker.patch(
-			"drive.drive_uploader.upload_to_drive",
+			"cipher_generation.drive_uploader.upload_to_drive",
 			side_effect=Exception("Network Timeout"),
 		)
 

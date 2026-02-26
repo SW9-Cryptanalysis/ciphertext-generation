@@ -1,7 +1,7 @@
 import pytest
 import os
 import queue
-from drive.cipher_producer import CipherProducer
+from cipher_generation.cipher_producer import CipherProducer
 from encipherment.cipher import SubstitutionCipher, HomophonicCipher
 from dataclasses import dataclass
 import multiprocessing as mp
@@ -65,7 +65,7 @@ class TestCipherProducerRun:
 		)
 
 		mock_create_json = mocker.patch(
-			"drive.cipher_producer.create_cipher_json",
+			"cipher_generation.cipher_producer.create_cipher_json",
 			return_value=producer_ctx.cipher_data,
 		)
 
@@ -114,7 +114,7 @@ class TestCipherProducerRun:
 		input_q.put(("val", {"text": "fail", "source_id": "1"}))
 		input_q.put("STOP")
 
-		mock_log = mocker.patch("drive.cipher_producer.log")
+		mock_log = mocker.patch("cipher_generation.cipher_producer.log")
 
 		mocker.patch.object(CipherProducer, "generate_cipher", return_value=None)
 
@@ -146,7 +146,7 @@ class TestCipherProducerRun:
 	def test_run_handles_unexpected_loop_exception(self, mocker, mock_tracker):
 		mock_input_q = mocker.Mock()
 		mock_output_q = mocker.Mock()
-		mock_log = mocker.patch("drive.cipher_producer.log")
+		mock_log = mocker.patch("cipher_generation.cipher_producer.log")
 
 		mock_input_q.get.side_effect = [Exception("Queue connection lost"), "STOP"]
 
@@ -234,7 +234,7 @@ class TestGenerateCipherLogic:
 
 		mock_cipher_instance = mocker.Mock(spec=HomophonicCipher)
 		mocked_homophonic_cipher = mocker.patch(
-			"drive.cipher_producer.HomophonicCipher", return_value=mock_cipher_instance
+			"cipher_generation.cipher_producer.HomophonicCipher", return_value=mock_cipher_instance
 		)
 
 		cipher = producer.generate_cipher(valid_text_stream)
@@ -249,10 +249,10 @@ class TestGenerateCipherLogic:
 	def test_generate_cipher_errors(self, mocker, mock_producer, valid_text_stream):
 		producer = mock_producer
 
-		mock_log = mocker.patch("drive.cipher_producer.log")
+		mock_log = mocker.patch("cipher_generation.cipher_producer.log")
 
 		mocker.patch(
-			"drive.cipher_producer.HomophonicCipher",
+			"cipher_generation.cipher_producer.HomophonicCipher",
 			side_effect=ValueError("Invalid cipher setup"),
 		)
 
@@ -265,10 +265,10 @@ class TestGenerateCipherLogic:
 	def test_generate_cipher_unexpected_exception(self, mocker, mock_producer, valid_text_stream):
 		producer = mock_producer
 
-		mock_log = mocker.patch("drive.cipher_producer.log")
+		mock_log = mocker.patch("cipher_generation.cipher_producer.log")
 
 		mocker.patch(
-			"drive.cipher_producer.HomophonicCipher",
+			"cipher_generation.cipher_producer.HomophonicCipher",
 			side_effect=Exception("Critical system failure"),
 		)
 

@@ -4,8 +4,8 @@ import os
 from typing import Iterable, Any
 import json
 
-from drive.drive_uploader import DriveUploader, DriveUploaderConfig
-from drive.cipher_producer import CipherProducer
+from cipher_generation.drive_uploader import DriveUploader, DriveUploaderConfig
+from cipher_generation.cipher_producer import CipherProducer
 
 log = get_colored_logger("cipher_manager")
 
