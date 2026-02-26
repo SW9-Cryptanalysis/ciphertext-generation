@@ -1,7 +1,6 @@
 import os
 import dotenv
 import random
-import re
 from itertools import islice
 
 from typing import Iterator, Iterable
@@ -162,7 +161,9 @@ def extract_random_chunk(
 		raw_end = min(len(text), raw_end + target_len)
 
 	if len(clean_spaces(spaced_window)) < min_len:
-		return clean_spaces(spaced_window).strip(), spaced_window.strip().replace(" ", "_")
+		return clean_spaces(spaced_window).strip(), spaced_window.strip().replace(
+			" ", "_",
+		)
 
 	spaced_target_len = find_spaceless_target_index(spaced_window, target_len)
 	start_idx, end_idx = find_boundaries(spaced_window, 0, spaced_target_len)

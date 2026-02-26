@@ -3,7 +3,6 @@ import os
 import queue
 from drive.cipher_producer import CipherProducer
 from encipherment.cipher import SubstitutionCipher, HomophonicCipher
-from fetching.text_splits import TextStream
 from dataclasses import dataclass
 import multiprocessing as mp
 

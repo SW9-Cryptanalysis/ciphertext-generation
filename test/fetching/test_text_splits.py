@@ -137,7 +137,7 @@ class TestChunkExtraction:
 		)
 
 		chunks = list(get_book_chunks("text", 1, (10, max_bound)))
-		
+
 		# Since 100 > 50, it should yield nothing.
 		assert len(chunks) == 0
 

@@ -111,7 +111,7 @@ def validate_text_obj(value: Any, name: str) -> None:
 	if set(value.keys()) != set(required_keys):
 		raise KeyError(
 			f"Parameter `{name}` must contain the following keys: {str(required_keys)}."
-			f" Missing keys: {set(required_keys) - set(value.keys())}."
+			f" Missing keys: {set(required_keys) - set(value.keys())}.",
 		)
 
 	text_content = value["text"]
