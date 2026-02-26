@@ -9,7 +9,6 @@ from fetching.text_splits import (
 	get_usable_text,
 	get_actual_take,
 	validate_targets,
-	clean_whitespace,
 	text_streams_generator,
 	get_text_stream,
 	randomize_stream,
@@ -62,16 +61,6 @@ class TestTextHelpers:
 		assert get_split(1) == "test"
 		assert get_split(2) == "train"
 		assert get_split(100) == "val"
-
-	def test_clean_whitespace(self):
-		raw = "Line\nBreak\tTab   Multiple  Spaces"
-		expected = "Line Break Tab Multiple Spaces"
-		assert clean_whitespace(raw) == expected
-
-	def test_clean_whitespace_multiple_regex_spaces(self):
-		"""Line 90: Ensure regex replacement of multiple spaces is hit."""
-		text = "word    word"
-		assert clean_whitespace(text) == "word word"
 
 	def test_validate_targets_valid(self):
 		targets = {"train": 100, "val": 10, "test": 10}

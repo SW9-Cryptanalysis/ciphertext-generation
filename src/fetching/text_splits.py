@@ -97,22 +97,6 @@ def randomize_stream(stream: IterableDataset) -> IterableDataset:
 	return stream.shuffle(seed=42, buffer_size=100)
 
 
-def clean_whitespace(text: str) -> str:
-	"""Remove newlines, tabs, and multiple spaces from the input text.
-
-	Args:
-		text (str): The input text.
-
-	Returns:
-		str: The text with all unnecessary whitespace removed.
-
-	"""
-	# NOTE: Perhaps just remove all whitespace? Depends on num2words #noqa: ERA001
-	text = text.replace("\n", " ").replace("\r", " ").replace("\t", " ")
-	text = re.sub(r"\s+", " ", text)
-	return text.strip()
-
-
 def find_spaceless_target_index(spaced_text: str, target_len: int) -> int:
 	"""Find the index in a spaced string that corresponds to a spaceless length.
 
