@@ -90,10 +90,13 @@ class SubstitutionCipher(ABC):
 		self.key = new_key
 
 	def _generate_bounded_ciphertext(self) -> str:
-		"""Generate a ciphertext with spaces replaced with underscores.
+		"""Generate a ciphertext based on the plaintext with word boundaries.
+
+		This method maps the plaintext with word boundaries to the ciphertext
+		with underscores left in place.
 
 		Returns:
-			str: The ciphertext with spaces replaced with underscores.
+			str: The ciphertext with underscores left in place.
 
 		"""
 		ciphertext = iter(self.ciphertext.split())
