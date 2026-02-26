@@ -14,6 +14,7 @@ def sample_stream_short(sample_text_short):
 	"""Returns a short valid TextStream dictionary."""
 	return {
 		"text": sample_text_short,
+		"text_with_boundaries": sample_text_short,
 		"source_id": "short_1",
 		"source_name": "Alphabet",
 		"length": len(sample_text_short),
@@ -32,10 +33,11 @@ def sample_texts_illegal():
 
 @pytest.fixture(scope="module")
 def sample_stream_illegal(sample_texts_illegal):
-	"""Returns a valid TextStream dictionary for HomophonicCipher."""
+	"""Returns an invalid TextStream dictionary for HomophonicCipher."""
 	return [
 		{
 			"text": text,
+			"text_with_boundaries": text,
 			"source_id": "book_123",
 			"source_name": "Test Book",
 			"length": len(text),
@@ -50,18 +52,21 @@ def bad_streams():
 	return [
 		{
 			"text": "",
+			"text_with_boundaries": "",
 			"source_id": "book_123",
 			"source_name": "Test Book",
 			"length": len("invalid"),
 		},
 		{
 			"text": " ",
+			"text_with_boundaries": " ",
 			"source_id": "book_123",
 			"source_name": "Test Book",
 			"length": 0,
 		},
 		{
 			"text": "inval id",
+			"text_with_boundaries": "inval_id",
 			"source_id": "book_123",
 			"source_name": "Test Book",
 			"length": None,
@@ -396,18 +401,11 @@ class TestMonoalphabeticCipher:
 		assert f"Key: {cipher.key}" in str_repr
 		assert f'Ciphertext: "{cipher.ciphertext}"' in str_repr
 
-	def test_illegal_plaintext(self, sample_texts_illegal):
-		for text in sample_texts_illegal:
-			# FIX: Wrap illegal text in a TextStream dict structure
-			bad_stream = {
-				"text": text,
-				"source_id": "1",
-				"source_name": "test",
-				"length": len(text),
-			}
+	def test_illegal_plaintext(self, sample_stream_illegal):
+		for text_obj in sample_stream_illegal:
 
 			with pytest.raises(ValueError) as excinfo:
-				MonoalphabeticCipher(bad_stream)  # type: ignore
+				MonoalphabeticCipher(text_obj)  # type: ignore
 
 			# Use the error message from validate_text_obj
 			assert (
