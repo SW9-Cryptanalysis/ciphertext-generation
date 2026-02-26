@@ -1,6 +1,6 @@
 import multiprocessing as mp
 from multiprocessing.queues import Queue as MPQueue
-from utils.logging import get_colored_logger
+from utils.logging import get_logger
 from dataclasses import dataclass
 from utils.drive import (
 	authenticate_drive_terminal,
@@ -14,7 +14,7 @@ import queue
 import io
 import zipfile
 
-log = get_colored_logger("drive_uploader")
+log = get_logger("DriveUploader")
 SENTINEL = "STOP"
 
 

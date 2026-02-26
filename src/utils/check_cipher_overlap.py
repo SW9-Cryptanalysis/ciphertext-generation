@@ -1,8 +1,8 @@
 import os
 import json
-from utils.logging import get_colored_logger
+from utils.logging import get_logger
 
-logger = get_colored_logger("overlapping_ciphers")
+logger = get_logger("OverlappingCiphers")
 
 
 def get_jaccard_similarity(str1: str, str2: str) -> float:

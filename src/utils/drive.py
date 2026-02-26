@@ -12,9 +12,9 @@ from googleapiclient.http import MediaIoBaseUpload
 from encipherment.cipher import SubstitutionCipher
 from typing import Any
 import dotenv
-from utils.logging import get_colored_logger
+from utils.logging import get_logger
 
-log = get_colored_logger("drive")
+log = get_logger("Drive")
 
 dotenv.load_dotenv()
 
