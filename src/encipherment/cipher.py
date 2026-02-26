@@ -51,10 +51,12 @@ class SubstitutionCipher(ABC):
 	) -> None:  # pragma: no cover
 		"""Initialize the Cipher object with the given plaintext."""
 		self.plaintext = text_obj["text"]
+		self.plaintext_with_boundaries = text_obj["text_with_boundaries"]
 		self.difficulty = difficulty
 		self.num_symbols = 0
 		self.key = {}
 		self.ciphertext = ""
+		self.ciphertext_with_boundaries = ""
 		self.source_id = text_obj["source_id"]
 		self.source_name = text_obj["source_name"]
 		raise NotImplementedError("This is an abstract base class.")
@@ -83,7 +85,29 @@ class SubstitutionCipher(ABC):
 
 			new_key[char] = remapped_homophones
 
+		self.ciphertext_with_boundaries = self._generate_bounded_ciphertext()
+
 		self.key = new_key
+
+	def _generate_bounded_ciphertext(self) -> str:
+		"""Generate a ciphertext based on the plaintext with word boundaries.
+
+		This method maps the plaintext with word boundaries to the ciphertext
+		with underscores left in place.
+
+		Returns:
+			str: The ciphertext with underscores left in place.
+
+		"""
+		ciphertext = iter(self.ciphertext.split())
+		bounded_ciphertext = []
+		for char in self.plaintext_with_boundaries:
+			if char == "_":
+				bounded_ciphertext.append("_")
+			else:
+				bounded_ciphertext.append(next(ciphertext))
+
+		return " ".join(bounded_ciphertext)
 
 	def __json__(self) -> dict:
 		"""Return a JSON-serializable representation of the Cipher object.
@@ -94,11 +118,13 @@ class SubstitutionCipher(ABC):
 		"""
 		return {
 			"plaintext": self.plaintext,
+			"plaintext_with_boundaries": self.plaintext_with_boundaries,
 			"length": len(self.plaintext),
 			"num_symbols": self.num_symbols,
 			"difficulty": self.difficulty,
 			"key": self.key,
 			"ciphertext": self.ciphertext,
+			"ciphertext_with_boundaries": self.ciphertext_with_boundaries,
 			"source_id": self.source_id,
 			"source_name": self.source_name,
 		}
@@ -132,8 +158,10 @@ class SubstitutionCipher(ABC):
 		"""Create a cipher object from a JSON string."""
 		data = json.loads(json_data)
 		cipher = cls(data["plaintext"])
+		cipher.plaintext_with_boundaries = data["plaintext_with_boundaries"]
 		cipher.key = data["key"]
 		cipher.ciphertext = data["ciphertext"]
+		cipher.ciphertext_with_boundaries = data["ciphertext_with_boundaries"]
 		cipher.num_symbols = data["num_symbols"]
 		cipher.difficulty = data["difficulty"]
 		cipher.source_id = data["source_id"]
@@ -188,6 +216,7 @@ class HomophonicCipher(SubstitutionCipher):
 
 		"""
 		self.plaintext = text_obj["text"]
+		self.plaintext_with_boundaries = text_obj["text_with_boundaries"]
 		if not difficulty:
 			self.difficulty = self.generate_difficulty()
 		else:
@@ -195,6 +224,7 @@ class HomophonicCipher(SubstitutionCipher):
 		self.num_symbols = 0
 		self.key: dict[str, list] = {}
 		self.ciphertext: str = ""
+		self.ciphertext_with_boundaries: str = ""
 		self.source_id = text_obj["source_id"]
 		self.source_name = text_obj["source_name"]
 
@@ -304,6 +334,7 @@ class MonoalphabeticCipher(SubstitutionCipher):
 
 		"""
 		self.plaintext = text_obj["text"]
+		self.plaintext_with_boundaries = text_obj["text_with_boundaries"]
 		self.num_symbols = 0
 		self.key = self.generate_key()
 		self.difficulty = 1
