@@ -139,8 +139,8 @@ def extract_random_chunk(
 		len_bounds (tuple[int, int]): The minimum and maximum length bounds.
 
 	Returns:
-		tuple[str, str]: Both the extracted, cleanly cut, and spaceless chunk of text
-			and the clean text with spaces replaced with underscores.
+		tuple[str, str]: A tuple containing the cleaned chunk of text both with
+			spaces replaced with underscores and the spaces removed.
 
 	"""
 	min_len, max_len = len_bounds
