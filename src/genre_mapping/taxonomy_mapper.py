@@ -56,13 +56,6 @@ class TaxonomyMapper:
 
 		return list(matched_genres)
 
-	def _match_shelf(self, shelf: str, keywords: list[str]) -> bool:
-		"""Check if a shelf matches any of the provided keywords."""
-		for keyword in keywords:
-			if keyword.lower() in shelf.lower():
-				return True
-		return False
-
 	def log_unmapped(self, raw_shelves: list[str]) -> None:
 		"""Log unmapped bookshelves to a file.
 
