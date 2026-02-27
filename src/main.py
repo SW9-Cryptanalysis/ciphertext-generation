@@ -1,8 +1,8 @@
-import logging
 from text_fetching.fetcher import Fetcher
 from encipherment.cipher import HomophonicCipher, MonoalphabeticCipher
 from utils.files import save_cipher
 from utils.formatting import clean_spaces
+from utils.logging import get_logger
 from tqdm import tqdm
 from utils.constants import DIFFICULTIES, LENGTHS
 from utils.z408 import (
@@ -13,11 +13,7 @@ from utils.z408 import (
 )
 from fetching.text_splits import TextStream
 
-
-logging.basicConfig(
-	level=logging.INFO,
-	format="%(asctime)s - %(levelname)s - %(message)s",
-)
+logger = get_logger("Main")
 
 
 def generate_cipher(
@@ -54,7 +50,7 @@ def generate_cipher(
 		cipher.generate_key()
 		cipher.encipher()
 	except ValueError as e:
-		logging.error(f"Error generating cipher for book id: {fetcher.book_id}")
+		logger.error(f"Error generating cipher for book id: {fetcher.book_id}")
 		raise e
 
 	save_cipher(cipher_data=cipher, filename=filename)
@@ -83,7 +79,7 @@ def generate_monoalphabetic_cipher(min_len: int, max_len: int, filename: str) ->
 	try:
 		cipher = MonoalphabeticCipher(text_obj)
 	except ValueError as e:
-		logging.error(
+		logger.error(
 			f"Error generating monoalphabetic cipher for book id: {fetcher.book_id}",
 		)
 		raise e

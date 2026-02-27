@@ -17,6 +17,7 @@ dependencies = [
     "tqdm>=4.67.1",
     "typing-extensions>=4.15.0",
     "unidecode>=1.4.0",
+	"easy-logging-formatter>=0.1.1",
 ]
 
 [tool.pytest.ini_options]
@@ -65,6 +66,7 @@ ignore = [
 	"E501",   # Line too long
 	"COM812",  # Missing trailing comma in a list or dict
 	"ERA001", # Found commented-out code
+	"S106",   # Possible hardcoded password
 ]
 [tool.ruff.format]
 indent-style = "tab"

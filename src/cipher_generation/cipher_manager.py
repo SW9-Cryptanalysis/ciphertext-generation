@@ -1,5 +1,5 @@
 import multiprocessing as mp
-from utils.logging import get_colored_logger
+from utils.logging import get_logger
 import os
 from typing import Iterable, Any
 import json
@@ -7,7 +7,7 @@ import json
 from cipher_generation.drive_uploader import DriveUploader, DriveUploaderConfig
 from cipher_generation.cipher_producer import CipherProducer
 
-log = get_colored_logger("cipher_manager")
+log = get_logger("CipherManager")
 
 
 class CipherManager:
