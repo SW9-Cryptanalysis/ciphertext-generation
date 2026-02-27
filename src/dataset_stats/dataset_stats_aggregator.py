@@ -1,5 +1,5 @@
 from collections import defaultdict
-from split_stats import SplitStats
+from dataset_stats.split_stats import SplitStats
 
 class DatasetStatsAggregator:
 	"""A class for aggregating dataset statistics."""
@@ -7,6 +7,13 @@ class DatasetStatsAggregator:
 	def __init__(self) -> None:
 		"""Initialize the DatasetStatsAggregator with default values."""
 		self.splits = defaultdict(SplitStats)
+
+	@property
+	def global_max_homophones(self) -> int:
+		"""Get the absolute maximum number of homophones across all splits."""
+		if not self.splits:
+			return 0
+		return max(split_stats.max_homophones for split_stats in self.splits.values())
 
 	def record(self, split: str, **kwargs) -> None:
 		"""Record a new item (cipher) in the dataset.
