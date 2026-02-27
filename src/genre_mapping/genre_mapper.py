@@ -4,9 +4,9 @@ import json
 from utils.constants import DATASET_NAME
 from utils.logging import get_logger
 
-from fetching.gutendex_client import GutendexClient
+from genre_mapping.gutendex_client import GutendexClient
 from fetching.dataset_extractor import DatasetExtractor
-from fetching.taxonomy_mapper import TaxonomyMapper
+from genre_mapping.taxonomy_mapper import TaxonomyMapper
 
 class GenreMapper:
 	"""Orchestrates the extraction, API requests, and taxonomy mapping."""
