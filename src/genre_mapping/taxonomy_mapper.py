@@ -1,4 +1,6 @@
 from utils.constants import DEFAULT_TAXONOMY
+from pathlib import Path
+
 
 class TaxonomyMapper:
 	"""Handles the transformation of raw bookshelves into a standardized genre taxonomy."""
@@ -6,7 +8,7 @@ class TaxonomyMapper:
 	def __init__(
 		self,
 		taxonomy: dict[str, list[str]] | None = None,
-		unmapped_log_file: str = "data/unmapped_bookshelves.txt",
+		unmapped_log_file: Path = Path("data/unmapped_bookshelves.txt"),
 	) -> None:
 		"""Initialize the TaxonomyMapper with a custom taxonomy or the default one.
 
@@ -53,14 +55,10 @@ class TaxonomyMapper:
 					matched_genres.add(self.keyword_to_genre[keyword])
 					working_shelf = working_shelf.replace(keyword, "")
 
-
 		return list(matched_genres)
 
-	def log_unmapped(self, raw_shelves: list[str]) -> None:
-		"""Log unmapped bookshelves to a file.
-
-		Args:
-			raw_shelves (list[str]): The list of raw bookshelves to log.
-		"""
-		with open(self.unmapped_log_file, "a", encoding="utf-8") as f:
-			f.write(f"{raw_shelves}\n")
+	def dump_unmapped_to_file(self) -> None:
+		"""Dump unmapped bookshelves to a file."""
+		with open(self.unmapped_log_file, "w", encoding="utf-8") as f:
+			for shelf in self._unmapped_genres:
+				f.write(f"{shelf}\n")
