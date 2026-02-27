@@ -14,7 +14,13 @@ class TaxonomyMapper:
 			taxonomy (dict[str, list[str]] | None, optional): The custom taxonomy to use. Defaults to None.
 			unmapped_log_file (str, optional): The file to log unmapped bookshelves to. Defaults to "data/unmapped_bookshelves.txt".
 		"""
-		self.taxonomy = taxonomy or DEFAULT_TAXONOMY
+		if not taxonomy:
+			taxonomy = DEFAULT_TAXONOMY
+		self.keyword_to_genre = {}
+		for genre, keywords in taxonomy.items():
+			for keyword in keywords:
+				self.keyword_to_genre[keyword.lower()] = genre
+		self.sorted_keywords = sorted(self.keyword_to_genre, key=len, reverse=True)
 		self.unmapped_log_file = unmapped_log_file
 		self._unmapped_genres = set()
 
@@ -41,9 +47,12 @@ class TaxonomyMapper:
 		matched_genres = set()
 
 		for shelf in raw_shelves:
-			for target_genre, keywords in self.taxonomy.items():
-				if self._match_shelf(shelf, keywords):
-					matched_genres.add(target_genre)
+			working_shelf = shelf.lower()
+			for keyword in self.sorted_keywords:
+				if keyword in working_shelf:
+					matched_genres.add(self.keyword_to_genre[keyword])
+					working_shelf = working_shelf.replace(keyword, "")
+
 
 		return list(matched_genres)
 
