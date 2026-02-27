@@ -6,7 +6,7 @@ from typing import Iterator, Iterable
 from typing_extensions import TypedDict
 
 from datasets.iterable_dataset import IterableDataset
-from dataset_extractor import DatasetExtractor
+from fetching.dataset_extractor import DatasetExtractor
 
 from utils.formatting import format_text, clean_spaces
 from utils.constants import BOOK_IDS_VALIDATION, TOTAL_BOOKS, DATASET_NAME
