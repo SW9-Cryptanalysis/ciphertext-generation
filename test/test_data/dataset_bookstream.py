@@ -1,0 +1,67 @@
+BOOK_STREAM_HF = [
+	{
+		"added": "2024-05-14T12:56:48.592044",
+		"id": "1",
+		"metadata": {
+			"language": "en",
+			"license": "Public Domain",
+			"provenance": "project_gutenberg-test-0000.json.gz:1",
+			"title": "A Test Book",
+			"url": "https://example.com/test.txt",
+		},
+		"source": "project gutenberg",
+		"text": "This is a test book with a single sentence.",
+	},
+	{
+		"added": "2024-05-14T12:56:48.592044",
+		"id": "2",
+		"metadata": {
+			"language": "en",
+			"license": "Public Domain",
+			"provenance": "project_gutenberg-test-0000.json.gz:2",
+			"title": "Another Test Book",
+			"url": "https://example.com/test2.txt",
+		},
+		"source": "project gutenberg",
+		"text": "This is another test book with a single sentence.",
+	},
+	{
+		"added": "2024-05-14T12:56:48.592044",
+		"id": "3",
+		"metadata": {
+			"language": "en",
+			"license": "Public Domain",
+			"provenance": "project_gutenberg-test-0000.json.gz:3",
+			"title": "Yet Another Test Book",
+			"url": "https://example.com/test3.txt",
+		},
+		"source": "project gutenberg",
+		"text": "This is yet another test book with a single sentence.",
+	},
+	{
+		"added": "2024-05-14T12:56:48.592044",
+		"id": "4",
+		"metadata": {
+			"language": "en",
+			"license": "Public Domain",
+			"provenance": "project_gutenberg-test-0000.json.gz:4",
+			"title": "One More Test Book",
+			"url": "https://example.com/test4.txt",
+		},
+		"source": "project gutenberg",
+		"text": "This is one more test book with a single sentence.",
+	},
+	{
+		"added": "2024-05-14T12:56:48.592044",
+		"id": "5",
+		"metadata": {
+			"language": "en",
+			"license": "Public Domain",
+			"provenance": "project_gutenberg-test-0000.json.gz:5",
+			"title": "Testing For Dummies",
+			"url": "https://example.com/test5.txt",
+		},
+		"source": "project gutenberg",
+		"text": "This is a test book again. Now it has two sentences.",
+	},
+]

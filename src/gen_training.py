@@ -1,10 +1,10 @@
 import os
-from utils.logging import get_colored_logger
+from utils.logging import get_logger
 from cipher_generation.cipher_manager import CipherManager
 from fetching.text_splits import get_text_stream
 
 if __name__ == "__main__":
-	log = get_colored_logger("gen_training")
+	log = get_logger("TrainingGeneration")
 	folder_id_train = os.getenv("FOLDER_ID_TRAIN")
 	folder_id_val = os.getenv("FOLDER_ID_VAL")
 	folder_id_test = os.getenv("FOLDER_ID_TEST")

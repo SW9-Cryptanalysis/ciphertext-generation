@@ -8,12 +8,12 @@ from multiprocessing.managers import ValueProxy
 from threading import Lock
 
 from utils.drive import create_cipher_json
-from utils.logging import get_colored_logger
+from utils.logging import get_logger
 from encipherment.cipher import SubstitutionCipher, HomophonicCipher
 from fetching.text_splits import TextStream
 
 
-log = get_colored_logger("cipher_producer")
+log = get_logger("CipherProducer")
 
 
 class CipherProducer(mp.Process):

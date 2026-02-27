@@ -1,5 +1,4 @@
 import pytest
-import os
 from fetching.text_splits import (
 	find_boundaries,
 	find_spaceless_target_index,
@@ -254,26 +253,44 @@ class TestStreamGenerator:
 
 
 class TestGetTextStream:
-	def test_get_text_stream_integration(self, mocker):
-		mocker.patch("fetching.text_splits.load_dataset")
-		mocker.patch("fetching.text_splits.randomize_stream")
-		mock_gen = mocker.patch("fetching.text_splits.text_streams_generator")
-		mocker.patch.dict(os.environ, {"HF_TOKEN": "mock_token"})
+    def test_get_text_stream_integration(self, mocker):
+        """Test the standard flow when no extractor is provided (default initialization)."""
+        mock_extractor_cls = mocker.patch("fetching.text_splits.DatasetExtractor")
+        mock_extractor_instance = mock_extractor_cls.return_value
+        mock_extractor_instance.get_full_stream.return_value = ["dummy_stream_data"]
 
-		result = get_text_stream(targets={"train": 10, "val": 1, "test": 1})
+        mocker.patch("fetching.text_splits.randomize_stream")
+        mock_gen = mocker.patch("fetching.text_splits.text_streams_generator")
 
-		assert result == mock_gen.return_value
-		mock_gen.assert_called_once()
+        result = get_text_stream(targets={"train": 10, "val": 1, "test": 1})
 
-	def test_get_text_stream_none_targets(self, mocker):
-		"""Line 386: Test default targets assignment."""
-		mocker.patch("fetching.text_splits.load_dataset")
-		mocker.patch("fetching.text_splits.randomize_stream")
-		mock_gen = mocker.patch("fetching.text_splits.text_streams_generator")
-		mocker.patch.dict(os.environ, {"HF_TOKEN": "mock"})
+        assert result == mock_gen.return_value
+        mock_gen.assert_called_once()
+        mock_extractor_cls.assert_called_once()
+        mock_extractor_instance.get_full_stream.assert_called_once()
 
-		get_text_stream(targets=None)
+    def test_get_text_stream_none_targets(self, mocker):
+        """Line 386: Test default targets assignment."""
+        mocker.patch("fetching.text_splits.DatasetExtractor")
+        mocker.patch("fetching.text_splits.randomize_stream")
+        mock_gen = mocker.patch("fetching.text_splits.text_streams_generator")
 
-		# Verify the default dict was passed to the generator
-		passed_targets = mock_gen.call_args[0][1]
-		assert passed_targets == {"train": 1_000_000, "val": 10000, "test": 10000}
+        get_text_stream(targets=None)
+
+        passed_targets = mock_gen.call_args[0][1]
+        assert passed_targets == {"train": 1_000_000, "val": 10000, "test": 10000}
+
+    def test_get_text_stream_with_injected_extractor(self, mocker):
+        """Test that we can safely inject a custom/mocked extractor."""
+        mock_extractor = mocker.Mock()
+        mock_extractor.get_full_stream.return_value = ["dummy_stream_data"]
+
+        mocker.patch("fetching.text_splits.randomize_stream")
+        mocker.patch("fetching.text_splits.text_streams_generator")
+
+        get_text_stream(
+            targets={"train": 1, "val": 1, "test": 1},
+            extractor=mock_extractor
+        )
+
+        mock_extractor.get_full_stream.assert_called_once()
