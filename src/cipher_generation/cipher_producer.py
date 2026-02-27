@@ -11,6 +11,7 @@ from utils.drive import create_cipher_json
 from utils.logging import get_logger
 from encipherment.cipher import SubstitutionCipher, HomophonicCipher
 from fetching.text_splits import TextStream
+from dataset_stats import DatasetStatsAggregator
 
 
 log = get_logger("CipherProducer")
@@ -30,8 +31,7 @@ class CipherProducer(mp.Process):
 
 	def __init__(
 		self,
-		queues: tuple[MPQueue[Any], MPQueue[Any]],
-		tracker: tuple[ValueProxy[int], Lock],
+		queues: tuple[MPQueue[Any], MPQueue[Any], MPQueue[Any]],
 		*args: Any,
 		**kwargs: Any,
 	) -> None:
@@ -39,20 +39,19 @@ class CipherProducer(mp.Process):
 
 		Args:
 			queues (tuple[MPQueue[Any], MPQueue[Any]]): A tuple containing two queues:
-				input_queue and output_queue.
-			tracker (tuple[ValueProxy[int], Lock]): A tuple containing a ValueProxy
-				object and a Lock object to track the maximum symbol ID.
+				input_queue, an output_queue, and a stats_queue.
 			*args: Additional arguments.
 			**kwargs: Additional keyword arguments.
 
 		"""
 		super().__init__(*args, **kwargs)
-		self.input_queue, self.output_queue = queues
-		self.max_symbol_tracker, self.max_lock = tracker
+		self.input_queue, self.output_queue, self.stats_queue = queues
 
 	def run(self) -> None:
 		"""Execute the cipher generation process loop."""
+		stats = DatasetStatsAggregator()
 		process_name = self.name
+
 		log.info(f"{process_name} started.")
 
 		while True:
@@ -61,6 +60,7 @@ class CipherProducer(mp.Process):
 
 				if item == "STOP":
 					log.info(f"{process_name} received STOP signal.")
+					self.stats_queue.put(stats)
 					break
 
 				split, text_obj = item
@@ -70,8 +70,12 @@ class CipherProducer(mp.Process):
 				if cipher is None:
 					continue
 
-				self._update_max_symbol_id(cipher.num_symbols)
-
+				stats.record(
+					split=split,
+					length=len(cipher.plaintext),
+					homophones=cipher.num_symbols,
+					difficulty=cipher.difficulty,
+				)
 				_, file_bytes = create_cipher_json(cipher)
 
 				filename = (
@@ -87,20 +91,6 @@ class CipherProducer(mp.Process):
 				log.error(f"Producer {process_name} failed: {e}")
 
 		log.info(f"{process_name} finished generation.")
-
-	def _update_max_symbol_id(self, symbol_id: int) -> None:
-		"""Update the max symbol ID tracker.
-
-		Args:
-			symbol_id (int): The new symbol ID to update the tracker with.
-
-		"""
-		if self.max_symbol_tracker is None or self.max_lock is None:
-			return
-
-		with self.max_lock:
-			if symbol_id > self.max_symbol_tracker.value:
-				self.max_symbol_tracker.value = symbol_id
 
 	def generate_cipher(self, text: TextStream) -> SubstitutionCipher | None:
 		"""Generate a cipher from the provided text string.
