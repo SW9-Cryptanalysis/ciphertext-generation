@@ -91,6 +91,7 @@ def mock_dataset_stream(mocker):
 	mock_stream.select_columns.return_value = book_stream
 	return mock_stream
 
+
 @pytest.fixture
 def mock_dataset_stream_long(mocker):
 	"""Provides a mock dataset stream for DatasetExtractor."""
@@ -107,3 +108,78 @@ def mock_dataset_stream_long(mocker):
 
 	mock_stream.select_columns.side_effect = dynamic_select_columns
 	return mock_stream
+
+
+@pytest.fixture
+def mock_gutendex_bookshelves() -> list[dict]:
+	"""Provide a diverse set of mocked book metadata to test the TaxonomyMapper.
+
+	This includes standard categories, missing prefixes, multiple genres,
+	unknown categories, empty lists, and complex edge cases.
+	"""
+	return [
+		{
+			"id": "1001",
+			"title": "The Standard Genre Book",
+			"bookshelves": ["Category: Science Fiction", "Category: Fantasy"],
+		},
+		{
+			"id": "1002",
+			"title": "The Prefix-less Book",
+			"bookshelves": ["Mystery", "Crime", "Detective Fiction"],
+		},
+		{
+			"id": "1003",
+			"title": "The Multi-Genre Book",
+			"bookshelves": ["Category: Historical Fiction", "Category: Romance"],
+		},
+		{
+			"id": "1004",
+			"title": "The Completely Unknown Book",
+			"bookshelves": [
+				"Category: 19th Century Basket Weaving",
+				"My Custom Book Club",
+			],
+		},
+		{
+			"id": "1005",
+			"title": "The Mixed Bag Book",
+			"bookshelves": ["Category: Science", "Some Highly Specific Niche Topic"],
+		},
+		{"id": "1006", "title": "The Empty Metadata Book", "bookshelves": []},
+		{
+			"id": "1007",
+			"title": "The Edge Case Periodical",
+			"bookshelves": ["Punchinello", "Category: Humour"],
+		},
+		{
+			"id": "1008",
+			"title": "The Complex Academic Text",
+			"bookshelves": [
+				"Banned Books from Anne Haight's list",
+				"Category: Psychiatry/Psychology",
+				"Psychology",
+			],
+		},
+		{
+			"id": "1009",
+			"title": "The Case Insensitivity Test",
+			"bookshelves": ["category: BRITISH literature", "ART"],
+		},
+	]
+
+
+@pytest.fixture
+def expected_taxonomy_mappings() -> dict[str, list[str]]:
+	"""Provide the expected mapped outputs for the mock_gutendex_bookshelves fixture."""
+	return {
+		"1001": ["Sci-Fi & Fantasy"],
+		"1002": ["Mystery & Fiction"],
+		"1003": ["History", "Romance"],
+		"1004": ["Other / Uncategorized"],
+		"1005": ["Science & Tech"],
+		"1006": ["Other / Uncategorized"],
+		"1007": ["Journalism & Periodicals", "Humor"],
+		"1008": ["Classic & General Literature", "Psychology & Health"],
+		"1009": ["Classic & General Literature", "Fine Arts & Architecture"],
+	}
