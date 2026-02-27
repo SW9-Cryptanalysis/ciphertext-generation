@@ -8,11 +8,26 @@ from genre_mapping.gutendex_client import GutendexClient
 from fetching.dataset_extractor import DatasetExtractor
 from genre_mapping.taxonomy_mapper import TaxonomyMapper
 
+
 class GenreMapper:
 	"""Orchestrates the extraction, API requests, and taxonomy mapping."""
 
-	def __init__(self, extractor: DatasetExtractor, api_client: GutendexClient, mapper: TaxonomyMapper, logger: logging.Logger | None = None):
-		"""Initialize the GenreMapper with the default taxonomy and logger."""
+	def __init__(
+		self,
+		extractor: DatasetExtractor,
+		api_client: GutendexClient,
+		mapper: TaxonomyMapper,
+		logger: logging.Logger | None = None,
+	) -> None:
+		"""Initialize the GenreMapper with the default taxonomy and logger.
+
+		Args:
+			extractor (DatasetExtractor): Extractor to use for fetching the dataset.
+			api_client (GutendexClient): GutendexClient to use for fetching the API.
+			mapper (TaxonomyMapper): TaxonomyMapper to use for mapping the API data.
+			logger (logging.Logger | None, optional): Logger to use. Defaults to None.
+
+		"""
 		self.extractor = extractor
 		self.api_client = api_client
 		self.mapper = mapper
@@ -23,16 +38,21 @@ class GenreMapper:
 			self.logger = logger
 
 	def run(
-		self, limit: int | None = None, output_path: str = "data/book_genres.json"
+		self,
+		limit: int | None = None,
+		output_path: str = "data/book_genres.json",
 	) -> dict[str, list[str]]:
 		"""Run the full ETL pipeline to build and save the genre map.
 
 		Args:
-			limit (int | None, optional): The limit to apply to the dataset extractor. Defaults to None.
-			output_path (str, optional): The path to save the genre map to. Defaults to "data/book_genres.json".
+			limit (int | None, optional): The limit to apply to the dataset extractor.
+				Defaults to None.
+			output_path (str, optional): The path to save the genre map to.
+				Defaults to "data/book_genres.json".
 
 		Returns:
 			dict[str, list[str]]: The final genre map.
+
 		"""
 		book_ids = self.extractor.get_all_book_ids(limit=limit)
 
@@ -42,18 +62,21 @@ class GenreMapper:
 		for book_id, raw_shelves in raw_shelves_map.items():
 			final_genre_map[book_id] = self.mapper.extract_mapped_genres(raw_shelves)
 
-		self.logger.info(f"Successfully mapped genres for {len(final_genre_map)} books!")
+		self.logger.info(
+			f"Successfully mapped genres for {len(final_genre_map)} books!",
+		)
 
 		self._save_to_json(final_genre_map, output_path)
 
 		return final_genre_map
 
 	def _save_to_json(self, data: dict, path: str) -> None:
-		"""Helper to save the final dictionary to a JSON file.
+		"""Save the final dictionary to a JSON file.
 
 		Args:
 			data (dict): The dictionary to save.
 			path (str): The path to save the dictionary to.
+
 		"""
 		os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
 		with open(path, "w", encoding="utf-8") as f:
