@@ -3,8 +3,10 @@ import os
 import dotenv
 import logging
 from itertools import islice
+from datasets import IterableDataset
 
 dotenv.load_dotenv()
+
 
 class DatasetExtractor:
 	"""A class for extracting dataset from Hugging Face."""
@@ -27,26 +29,39 @@ class DatasetExtractor:
 		else:
 			self.logger = logger
 
-	def get_all_book_ids(self, limit: int | None = None) -> list[str]:
-		"""Extract book IDs from the dataset while skipping the text payload."""
-		self.logger.info("Initializing Hugging Face stream...")
-		
-		stream = load_dataset(
+	def get_full_stream(self) -> IterableDataset:
+		"""Get the full Hugging Face stream.
+
+		Returns:
+			IterableDataset: The full Hugging Face stream.
+		"""
+		if hasattr(self, "logger"):
+			self.logger.info("Initializing full Hugging Face stream...")
+
+		return load_dataset(
 			self.dataset_name,
 			split="train",
 			streaming=True,
-			token=self.token
+			token=self.token,
+		)
+
+	def get_all_book_ids(self, limit: int | None = None) -> list[str]:
+		"""Extract book IDs from the dataset while skipping the text payload."""
+		self.logger.info("Initializing Hugging Face stream...")
+
+		stream = load_dataset(
+			self.dataset_name, split="train", streaming=True, token=self.token
 		).select_columns(["id"])
 
 		book_ids = []
 		self.logger.info("Extracting IDs (this will be very fast)...")
-		
+
 		# Apply the limit if one is provided, otherwise process the whole stream
 		stream_iter = islice(stream, 0, limit) if limit else stream
-		
+
 		for row in stream_iter:
 			book_ids.append(str(row["id"]))
-			
+
 			if len(book_ids) % 5000 == 0:
 				self.logger.info(f"Extracted {len(book_ids)} IDs...")
 

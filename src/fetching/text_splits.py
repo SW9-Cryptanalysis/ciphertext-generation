@@ -1,4 +1,3 @@
-import os
 import dotenv
 import random
 from itertools import islice
@@ -6,8 +5,8 @@ from itertools import islice
 from typing import Iterator, Iterable
 from typing_extensions import TypedDict
 
-from datasets import load_dataset
 from datasets.iterable_dataset import IterableDataset
+from dataset_extractor import DatasetExtractor
 
 from utils.formatting import format_text, clean_spaces
 from utils.constants import BOOK_IDS_VALIDATION, TOTAL_BOOKS, DATASET_NAME
@@ -162,7 +161,8 @@ def extract_random_chunk(
 
 	if len(clean_spaces(spaced_window)) < min_len:
 		return clean_spaces(spaced_window).strip(), spaced_window.strip().replace(
-			" ", "_",
+			" ",
+			"_",
 		)
 
 	spaced_target_len = find_spaceless_target_index(spaced_window, target_len)
@@ -369,6 +369,7 @@ def text_streams_generator(
 def get_text_stream(
 	targets: dict[str, int] | None = None,
 	len_bounds: tuple[int, int] = (4000, 10000),
+	extractor: DatasetExtractor | None = None,
 ) -> Iterator[tuple[str, TextStream]]:
 	"""Get a stream of text chunks from the dataset.
 
@@ -384,14 +385,10 @@ def get_text_stream(
 			"test": 10000,
 		}
 
-	full_stream = randomize_stream(
-		load_dataset(
-			DATASET_NAME,
-			split="train",
-			streaming=True,
-			token=os.environ["HF_TOKEN"],
-		),
-	)
+	if extractor is None:
+		extractor = DatasetExtractor(DATASET_NAME)
+
+	full_stream = randomize_stream(extractor.get_full_stream())
 
 	text_stream = text_streams_generator(full_stream, targets, len_bounds=len_bounds)
 
