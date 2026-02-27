@@ -20,7 +20,7 @@ class DatasetExtractor:
 
 		"""
 		self.dataset_name = dataset_name
-		self.token = os.environ["HF_TOKEN"]
+		self.token = os.environ.get("HF_TOKEN")
 		# If no logger is provided, create a mock one which will not log anywhere
 		if not logger:
 			self.logger = logging.Logger("DatasetExtractor")
