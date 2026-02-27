@@ -92,4 +92,5 @@ if __name__ == "__main__":
 	mapper = TaxonomyMapper()
 	genre_mapper = GenreMapper(extractor, api_client, mapper, logger=logger)
 
-	genre_map = genre_mapper.run(limit=100, output_path="data/book_genres.json")
+	genre_map = genre_mapper.run(limit=None, output_path="data/book_genres.json")
+	mapper.dump_unmapped_to_file()
