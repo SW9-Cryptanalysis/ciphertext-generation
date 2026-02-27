@@ -42,6 +42,7 @@ def valid_text_stream(sample_text, sample_text_with_boundaries):
 		"source_id": "book_123",
 		"source_name": "Test Book",
 		"length": len(sample_text),
+		"genres": ["Sci-Fi & Fantasy"],
 	}
 
 

@@ -14,6 +14,7 @@ def sample_stream_short():
 		"source_id": "short_1",
 		"source_name": "Alphabet",
 		"length": len("abcbc"),
+		"genres": ["Sci-Fi & Fantasy"],
 	}
 
 
@@ -37,6 +38,7 @@ def sample_stream_illegal(sample_texts_illegal):
 			"source_id": "book_123",
 			"source_name": "Test Book",
 			"length": len(text),
+			"genres": [],
 		}
 		for text in sample_texts_illegal
 	]
@@ -52,6 +54,7 @@ def bad_streams():
 			"source_id": "book_123",
 			"source_name": "Test Book",
 			"length": len("invalid"),
+			"genres": [],
 		},
 		{
 			"text": " ",
@@ -59,6 +62,7 @@ def bad_streams():
 			"source_id": "book_123",
 			"source_name": "Test Book",
 			"length": 0,
+			"genres": [],
 		},
 		{
 			"text": "inval id",
@@ -66,6 +70,7 @@ def bad_streams():
 			"source_id": "book_123",
 			"source_name": "Test Book",
 			"length": None,
+			"genres": [],
 		},
 	]
 
