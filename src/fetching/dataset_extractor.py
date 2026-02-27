@@ -58,18 +58,17 @@ class DatasetExtractor:
 			token=self.token,
 		).select_columns(["id"])
 
-		book_ids = []
 		self.logger.info("Extracting IDs (this will be very fast)...")
 
 		# Apply the limit if one is provided, otherwise process the whole stream
 		stream_iter = islice(stream, 0, limit) if limit else stream
 
+		book_ids = set()
 		for row in stream_iter:
-			book_ids.append(str(row["id"]))
+			book_ids.add(str(row["id"]))
 
 			if len(book_ids) % 5000 == 0:
 				self.logger.info(f"Extracted {len(book_ids)} IDs...")
 
-		unique_ids = list(set(book_ids))
-		self.logger.info(f"Finished! Total distinct books: {len(unique_ids)}")
-		return unique_ids
+		self.logger.info(f"Finished! Total distinct books: {len(book_ids)}")
+		return list(book_ids)
