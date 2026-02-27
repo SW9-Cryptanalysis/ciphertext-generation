@@ -101,7 +101,7 @@ class TestDatasetExtractorGetAllBookIds:
 	def test_logs_every_5000_books(self, mocker, mock_dataset_stream_long):
 		mock_load = mocker.patch("fetching.dataset_extractor.load_dataset")
 		mock_load.return_value = mock_dataset_stream_long
-  
+
 		extractor = DatasetExtractor("test_dataset")
 		extractor.logger = mocker.Mock()
 
@@ -112,5 +112,5 @@ class TestDatasetExtractorGetAllBookIds:
 				mocker.call("Extracting IDs (this will be very fast)..."),
 				mocker.call("Extracted 5000 IDs..."),
 				mocker.call("Finished! Total distinct books: 5000"),
-			]	
+			]
 		)

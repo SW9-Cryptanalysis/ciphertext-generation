@@ -17,6 +17,7 @@ class DatasetExtractor:
 		Args:
 			dataset_name (str): The name of the dataset to extract.
 			split (str): The split of the dataset to extract.
+			logger (logging.Logger | None, optional): Logger to use. Defaults to None.
 
 		"""
 		self.dataset_name = dataset_name
@@ -34,6 +35,7 @@ class DatasetExtractor:
 
 		Returns:
 			IterableDataset: The full Hugging Face stream.
+
 		"""
 		if hasattr(self, "logger"):
 			self.logger.info("Initializing full Hugging Face stream...")
@@ -50,7 +52,10 @@ class DatasetExtractor:
 		self.logger.info("Initializing Hugging Face stream...")
 
 		stream = load_dataset(
-			self.dataset_name, split="train", streaming=True, token=self.token
+			self.dataset_name,
+			split="train",
+			streaming=True,
+			token=self.token,
 		).select_columns(["id"])
 
 		book_ids = []

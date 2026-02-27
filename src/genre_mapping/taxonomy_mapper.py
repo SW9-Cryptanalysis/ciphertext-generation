@@ -3,18 +3,21 @@ from pathlib import Path
 
 
 class TaxonomyMapper:
-	"""Handles the transformation of raw bookshelves into a standardized genre taxonomy."""
+	"""Handle the transformation of raw bookshelves into standardized genre taxonomy."""
 
 	def __init__(
 		self,
 		taxonomy: dict[str, list[str]] | None = None,
 		unmapped_log_file: Path = Path("data/unmapped_bookshelves.txt"),
 	) -> None:
-		"""Initialize the TaxonomyMapper with a custom taxonomy or the default one.
+		"""Initialize the TaxonomyMapper with custom taxonomy or the default one.
 
 		Args:
-			taxonomy (dict[str, list[str]] | None, optional): The custom taxonomy to use. Defaults to None.
-			unmapped_log_file (str, optional): The file to log unmapped bookshelves to. Defaults to "data/unmapped_bookshelves.txt".
+			taxonomy (dict[str, list[str]] | None, optional): Custom taxonomy to use.
+				Defaults to None.
+			unmapped_log_file (str, optional): The file to log unmapped bookshelves to.
+				Defaults to "data/unmapped_bookshelves.txt".
+
 		"""
 		if not taxonomy:
 			taxonomy = DEFAULT_TAXONOMY
@@ -34,6 +37,7 @@ class TaxonomyMapper:
 
 		Returns:
 			list[str]: The list of mapped genres.
+
 		"""
 		matched_genres = self._find_genres(raw_shelves)
 

@@ -1,5 +1,4 @@
 import pytest
-import os
 from fetching.text_splits import (
 	find_boundaries,
 	find_spaceless_target_index,
@@ -285,12 +284,12 @@ class TestGetTextStream:
         """Test that we can safely inject a custom/mocked extractor."""
         mock_extractor = mocker.Mock()
         mock_extractor.get_full_stream.return_value = ["dummy_stream_data"]
-        
+
         mocker.patch("fetching.text_splits.randomize_stream")
         mocker.patch("fetching.text_splits.text_streams_generator")
 
         get_text_stream(
-            targets={"train": 1, "val": 1, "test": 1}, 
+            targets={"train": 1, "val": 1, "test": 1},
             extractor=mock_extractor
         )
 

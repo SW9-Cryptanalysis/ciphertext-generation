@@ -1,4 +1,3 @@
-import os
 import json
 import logging
 import pytest
@@ -108,7 +107,7 @@ class TestGenreMapperSaveToJson:
 
 		assert test_file_path.exists(), "The JSON file should have been created on disk"
 
-		with open(test_file_path, "r", encoding="utf-8") as f:
+		with open(test_file_path, encoding="utf-8") as f:
 			saved_data = json.load(f)
 
 		assert saved_data == test_data, (

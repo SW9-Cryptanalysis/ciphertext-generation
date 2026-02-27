@@ -1,5 +1,3 @@
-import logging
-from easy_logging import EasyFormatter
 from text_fetching.fetcher import Fetcher
 from encipherment.cipher import HomophonicCipher, MonoalphabeticCipher
 from utils.files import save_cipher

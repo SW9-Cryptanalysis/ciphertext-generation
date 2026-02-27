@@ -31,9 +31,6 @@ class TestTaxonomyMapperExtractMappedGenres:
 		"""Test the extraction of mapped genres from the mock_gutendex_bookshelves fixture."""
 		book = mock_gutendex_bookshelves[0]
 
-		print(book)
-		print(expected_taxonomy_mappings[book["id"]])
-
 		mapped_genres = mapper.extract_mapped_genres(book["bookshelves"])
 
 		assert mapped_genres == expected_taxonomy_mappings[book["id"]], (
