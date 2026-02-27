@@ -1,5 +1,6 @@
 import pytest
 import multiprocessing as mp
+from test_data import dataset_bookstream
 
 
 @pytest.fixture()
@@ -11,6 +12,7 @@ def sample_text():
 		"theperformanceoftheciphergenerationprocess"
 	)
 
+
 @pytest.fixture()
 def sample_text_with_boundaries():
 	return (
@@ -20,14 +22,16 @@ def sample_text_with_boundaries():
 		"_the_performance_of_the_cipher_generation_process"
 	)
 
+
 @pytest.fixture()
 def sample_text_with_spaces():
-    return (
+	return (
 		"this is a test plaintext that needs to be encrypted it is just a random string of lowercase letters that should work fine and it is long"
 		" enough to test the cipher with the length should be over four hundred characters maybe even five hundred due to this we need to ensure"
 		" the cipher works as expected and can handle larger inputs without any issues and that this text is extremely long it can be used to test"
 		" the performance of the cipher generation process"
 	)
+
 
 @pytest.fixture()
 def valid_text_stream(sample_text, sample_text_with_boundaries):
@@ -43,16 +47,16 @@ def valid_text_stream(sample_text, sample_text_with_boundaries):
 
 @pytest.fixture
 def queue_factory():
-    """Returns a factory function that creates fresh queues."""
-    manager = mp.Manager()
-    queues = []
+	"""Returns a factory function that creates fresh queues."""
+	manager = mp.Manager()
+	queues = []
 
-    def _create_queue():
-        q = manager.Queue()
-        queues.append(q)
-        return q
+	def _create_queue():
+		q = manager.Queue()
+		queues.append(q)
+		return q
 
-    return _create_queue
+	return _create_queue
 
 
 @pytest.fixture
@@ -62,3 +66,44 @@ def mock_tracker(mocker):
 	tracker.value = 0
 	tracker.lock = mocker.MagicMock()
 	return tracker, tracker.lock
+
+
+@pytest.fixture
+def mock_dataset_stream(mocker):
+	"""Provides a mock dataset stream for DatasetExtractor."""
+	mock_stream = mocker.Mock()
+	mock_stream.select_columns = mocker.Mock()
+
+	book_stream = dataset_bookstream.BOOK_STREAM_HF
+
+	# Only return id columns
+	def dynamic_select_columns(column_names):
+		"""Simulates Hugging Face by returning only the requested keys."""
+		filtered_stream = []
+		for book in book_stream:
+			# Keep only the keys that were asked for
+			filtered_book = {k: v for k, v in book.items() if k in column_names}
+			filtered_stream.append(filtered_book)
+		return filtered_stream
+
+	mock_stream.select_columns.side_effect = dynamic_select_columns
+
+	mock_stream.select_columns.return_value = book_stream
+	return mock_stream
+
+@pytest.fixture
+def mock_dataset_stream_long(mocker):
+	"""Provides a mock dataset stream for DatasetExtractor."""
+	mock_stream = mocker.Mock()
+	mock_stream.select_columns = mocker.Mock()
+
+	book_stream = dataset_bookstream.BOOK_STREAM_HF
+	book_stream.extend(book_stream)
+
+	# Only return id columns
+	def dynamic_select_columns(column_names):
+		"""Simulates Hugging Face by returning only the requested keys."""
+		return [{"id": str(i)} for i in range(5000)]
+
+	mock_stream.select_columns.side_effect = dynamic_select_columns
+	return mock_stream
