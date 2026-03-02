@@ -110,7 +110,6 @@ class GenreMapper:
 		"""
 		path.parent.mkdir(parents=True, exist_ok=True)
 
-		# 'a' opens for appending without truncating the existing file
 		with open(path, "a", encoding="utf-8") as f:
 			for book_id, genres in data_batch.items():
 				line = json.dumps({"id": str(book_id), "genres": genres})
