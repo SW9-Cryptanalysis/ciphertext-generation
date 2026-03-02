@@ -1,12 +1,13 @@
 import logging
-import os
 import json
-from utils.constants import DATASET_NAME
+from utils.constants import DATASET_NAME, GENRE_MAP_PATH
 from utils.logging import get_logger
+from pathlib import Path
 
 from genre_mapping.gutendex_client import GutendexClient
 from fetching.dataset_extractor import DatasetExtractor
 from genre_mapping.taxonomy_mapper import TaxonomyMapper
+from utils.genres import load_existing_genre_map
 
 
 class GenreMapper:
@@ -39,49 +40,82 @@ class GenreMapper:
 
 	def run(
 		self,
-		limit: int | None = None,
-		output_path: str = "data/book_genres.json",
+		output_path: Path,
+		flush_size: int = 35,
 	) -> dict[str, list[str]]:
 		"""Run the full ETL pipeline to build and save the genre map.
 
 		Args:
-			limit (int | None, optional): The limit to apply to the dataset extractor.
-				Defaults to None.
 			output_path (str, optional): The path to save the genre map to.
 				Defaults to "data/book_genres.json".
+			flush_size (int, optional): The number of book IDs to process at a time.
+				Defaults to 35.
 
 		Returns:
 			dict[str, list[str]]: The final genre map.
 
 		"""
-		book_ids = self.extractor.get_all_book_ids(limit=limit)
+		final_genre_map = load_existing_genre_map(output_path, self.logger)
+		id_stream = self.extractor.get_id_stream()
 
-		raw_shelves_map = self.api_client.fetch_raw_bookshelves(book_ids)
+		batch_buffer = []
+		newly_mapped_count = 0
 
-		final_genre_map = {}
-		for book_id, raw_shelves in raw_shelves_map.items():
-			final_genre_map[book_id] = self.mapper.extract_mapped_genres(raw_shelves)
+		for book_id in id_stream:
+			if book_id not in final_genre_map:
+				batch_buffer.append(book_id)
+
+			if len(batch_buffer) >= flush_size:
+				new_data = self._process_batch(batch_buffer)
+				self._append_to_jsonl(new_data, output_path)
+				final_genre_map.update(new_data)
+				newly_mapped_count += len(new_data)
+				batch_buffer = []
+
+		if batch_buffer:
+			new_data = self._process_batch(batch_buffer)
+			self._append_to_jsonl(new_data, output_path)
+			final_genre_map.update(new_data)
+			newly_mapped_count += len(new_data)
 
 		self.logger.info(
-			f"Successfully mapped genres for {len(final_genre_map)} books!",
+			f"Successfully mapped genres for {len(final_genre_map)} books in total!",
 		)
-
-		self._save_to_json(final_genre_map, output_path)
 
 		return final_genre_map
 
-	def _save_to_json(self, data: dict, path: str) -> None:
-		"""Save the final dictionary to a JSON file.
+	def _process_batch(self, batch_buffer: list[str]) -> dict[str, list[str]]:
+		"""Fetch raw data and extract genres for a specific batch.
 
-		Args:
-			data (dict): The dictionary to save.
-			path (str): The path to save the dictionary to.
+		Returns:
+			dict[str, list[str]]: A dictionary of newly mapped book IDs.
 
 		"""
-		os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-		with open(path, "w", encoding="utf-8") as f:
-			json.dump(data, f, indent=4)
-		self.logger.info(f"Genre map saved to {path}")
+		raw_shelves_map = self.api_client.fetch_raw_bookshelves(batch_buffer)
+		new_mappings = {}
+
+		for book_id, raw_shelves in raw_shelves_map.items():
+			new_mappings[str(book_id)] = self.mapper.extract_mapped_genres(raw_shelves)
+
+		self.logger.info(f"Fetched and parsed {len(new_mappings)} books from API.")
+		return new_mappings
+
+	def _append_to_jsonl(self, data_batch: dict[str, list[str]], path: Path) -> None:
+		"""Append a batch of new mappings to the JSONL file.
+
+		Args:
+			data_batch (dict): Dictionary of {id: [genres]} to append.
+			path (str): Path to the .jsonl file.
+
+		"""
+		path.parent.mkdir(parents=True, exist_ok=True)
+
+		with open(path, "a", encoding="utf-8") as f:
+			for book_id, genres in data_batch.items():
+				line = json.dumps({"id": str(book_id), "genres": genres})
+				f.write(line + "\n")
+
+		self.logger.info(f"Appended {len(data_batch)} mappings to {path}")
 
 
 if __name__ == "__main__":
@@ -92,5 +126,5 @@ if __name__ == "__main__":
 	mapper = TaxonomyMapper()
 	genre_mapper = GenreMapper(extractor, api_client, mapper, logger=logger)
 
-	genre_map = genre_mapper.run(limit=None, output_path="data/book_genres.json")
+	genre_map = genre_mapper.run(output_path=GENRE_MAP_PATH)
 	mapper.dump_unmapped_to_file()

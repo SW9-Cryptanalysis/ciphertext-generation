@@ -2,6 +2,11 @@ import os
 from utils.logging import get_logger
 from cipher_generation.cipher_manager import CipherManager
 from fetching.text_splits import get_text_stream
+from utils.constants import (
+	NUM_TRAINING_CIPHERS,
+	NUM_VALIDATION_CIPHERS,
+	NUM_TEST_CIPHERS,
+)
 
 if __name__ == "__main__":
 	log = get_logger("TrainingGeneration")
@@ -33,12 +38,18 @@ if __name__ == "__main__":
 			"Please set it before running.",
 		)
 
-	text_stream = get_text_stream()
+	targets = {
+		"train": NUM_TRAINING_CIPHERS,
+		"val": NUM_VALIDATION_CIPHERS,
+		"test": NUM_TEST_CIPHERS,
+	}
+
+	text_stream = get_text_stream(targets=targets)
 
 	config = {
-		"train": {"folder_id": folder_id_train, "count": 1_000_000},
-		"val": {"folder_id": folder_id_val, "count": 10_000},
-		"test": {"folder_id": folder_id_test, "count": 10_000},
+		"train": {"folder_id": folder_id_train, "count": NUM_TRAINING_CIPHERS},
+		"val": {"folder_id": folder_id_val, "count": NUM_VALIDATION_CIPHERS},
+		"test": {"folder_id": folder_id_test, "count": NUM_TEST_CIPHERS},
 		"metadata": {"folder_id": folder_id_metadata, "count": 0},
 	}
 

@@ -8,8 +8,15 @@ from typing_extensions import TypedDict
 from datasets.iterable_dataset import IterableDataset
 from fetching.dataset_extractor import DatasetExtractor
 
+from utils.genres import load_existing_genre_map
+
 from utils.formatting import format_text, clean_spaces
-from utils.constants import BOOK_IDS_VALIDATION, TOTAL_BOOKS, DATASET_NAME
+from utils.constants import (
+	BOOK_IDS_VALIDATION,
+	TOTAL_BOOKS,
+	DATASET_NAME,
+	GENRE_MAP_PATH,
+)
 
 dotenv.load_dotenv()
 
@@ -267,8 +274,9 @@ def get_usable_text(raw_text: str, len_bounds: tuple[int, int]) -> str:
 
 def text_streams_generator(
 	stream: Iterable,
-	total_samples_map: dict[str, int],  # e.g. {"train": 1000, "val": 15, "test": 15}
+	total_samples_map: dict[str, int],
 	len_bounds: tuple[int, int],
+	genre_map: dict[str, list[str]],
 ) -> Iterator[tuple[str, TextStream]]:
 	"""Generate a stream of text chunks from the provided dataset.
 
@@ -280,8 +288,11 @@ def text_streams_generator(
 		stream (IterableDataset): The dataset to extract the text chunks from.
 		total_samples_map (dict[str, int]): A dictionary mapping each bucket to the
 			total number of chunks to generate.
+			Example: `{"train": 1000, "val": 15, "test": 15}`
 		len_bounds (tuple[int, int]): The minimum and maximum length bounds for
 			the chunks.
+		genre_map (dict[str, list[str]]): A dictionary mapping book IDs to genre
+			categories.
 
 	Yields:
 		Iterator[tuple[str, TextStream]]: An iterator of text chunks.
@@ -335,7 +346,7 @@ def text_streams_generator(
 					"source_id": book.get("id", "unknown"),
 					"source_name": book.get("metadata", {}).get("title", "unknown"),
 					"length": len(chunk),
-					"genres": [], #TODO
+					"genres": genre_map.get(str(book.get("id")), []),
 				},
 			)
 			counts[split] += 1
@@ -344,7 +355,7 @@ def text_streams_generator(
 
 
 def get_text_stream(
-	targets: dict[str, int] | None = None,
+	targets: dict[str, int],
 	len_bounds: tuple[int, int] = (4000, 10000),
 	extractor: DatasetExtractor | None = None,
 ) -> Iterator[tuple[str, TextStream]]:
@@ -355,18 +366,18 @@ def get_text_stream(
 			identifier for the split and the TextStream object.
 
 	"""
-	if targets is None:
-		targets = {
-			"train": 1_000_000,
-			"val": 10000,
-			"test": 10000,
-		}
-
 	if extractor is None:
 		extractor = DatasetExtractor(DATASET_NAME)
 
+	genre_map = load_existing_genre_map(GENRE_MAP_PATH, None)
+
 	full_stream = randomize_stream(extractor.get_full_stream())
 
-	text_stream = text_streams_generator(full_stream, targets, len_bounds=len_bounds)
+	text_stream = text_streams_generator(
+		full_stream,
+		targets,
+		len_bounds=len_bounds,
+		genre_map=genre_map,
+	)
 
 	return text_stream
