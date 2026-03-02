@@ -1,12 +1,14 @@
 import logging
 import os
 import json
-from utils.constants import DATASET_NAME
+from utils.constants import DATASET_NAME, GENRE_MAP_PATH
 from utils.logging import get_logger
+from pathlib import Path
 
 from genre_mapping.gutendex_client import GutendexClient
 from fetching.dataset_extractor import DatasetExtractor
 from genre_mapping.taxonomy_mapper import TaxonomyMapper
+from utils.genres import load_existing_genre_map
 
 
 class GenreMapper:
@@ -39,7 +41,7 @@ class GenreMapper:
 
 	def run(
 		self,
-		output_path: str = "data/book_genres.json",
+		output_path: Path,
 		flush_size: int = 35,
 	) -> dict[str, list[str]]:
 		"""Run the full ETL pipeline to build and save the genre map.
@@ -54,7 +56,7 @@ class GenreMapper:
 			dict[str, list[str]]: The final genre map.
 
 		"""
-		final_genre_map = self._load_existing_genre_map(output_path)
+		final_genre_map = load_existing_genre_map(output_path, self.logger)
 		id_stream = self.extractor.get_id_stream()
 
 		batch_buffer = []
@@ -100,25 +102,8 @@ class GenreMapper:
 
 		return count
 
-	def _load_existing_genre_map(self, path: str) -> dict[str, list[str]]:
-		"""Load an existing genre map from a JSON file.
 
-		Args:
-			path (str): The path to the JSON file.
-
-		Returns:
-			dict[str, list[str]]: The existing genre map.
-
-		"""
-		if os.path.exists(path):
-			try:
-				with open(path, encoding="utf-8") as f:
-					return json.load(f)
-			except json.JSONDecodeError:
-				self.logger.warning(f"Failed to parse {path}. Starting fresh.")
-		return {}
-
-	def _save_to_json(self, data: dict, path: str) -> None:
+	def _save_to_json(self, data: dict, path: Path) -> None:
 		"""Save the final dictionary to a JSON file.
 
 		Args:
@@ -140,5 +125,5 @@ if __name__ == "__main__":
 	mapper = TaxonomyMapper()
 	genre_mapper = GenreMapper(extractor, api_client, mapper, logger=logger)
 
-	genre_map = genre_mapper.run(output_path="data/book_genres.json")
+	genre_map = genre_mapper.run(output_path=GENRE_MAP_PATH)
 	mapper.dump_unmapped_to_file()
