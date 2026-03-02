@@ -18,11 +18,18 @@ def load_existing_genre_map(
 		dict[str, list[str]]: The existing genre map.
 
 	"""
+	genre_map = {}
 	if os.path.exists(path):
 		try:
 			with open(path, encoding="utf-8") as f:
-				return json.load(f)
-		except json.JSONDecodeError:
+				for line in f:
+					if line.strip():
+						# Each line is a standalone JSON object
+						item = json.loads(line)
+						genre_map[str(item["id"])] = item["genres"]
+		except (json.JSONDecodeError, KeyError) as e:
 			if logger:
-				logger.warning(f"Failed to parse {path}. Starting fresh.")
-	return {}
+				logger.warning(
+					f"Error parsing {path}: {e}. Continuing with partial data.",
+				)
+	return genre_map

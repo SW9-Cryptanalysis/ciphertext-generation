@@ -60,20 +60,24 @@ class GenreMapper:
 		id_stream = self.extractor.get_id_stream()
 
 		batch_buffer = []
-		newly_mapped_books = 0
+		newly_mapped_count = 0
 
 		for book_id in id_stream:
 			if book_id not in final_genre_map:
 				batch_buffer.append(book_id)
 
 			if len(batch_buffer) >= flush_size:
-				newly_mapped_books += self._process_batch(batch_buffer, final_genre_map)
-				self._save_to_json(final_genre_map, output_path)
+				new_data = self._process_batch(batch_buffer)
+				self._append_to_jsonl(new_data, output_path)
+				final_genre_map.update(new_data)
+				newly_mapped_count += len(new_data)
 				batch_buffer = []
 
 		if batch_buffer:
-			newly_mapped_books += self._process_batch(batch_buffer, final_genre_map)
-			self._save_to_json(final_genre_map, output_path)
+			new_data = self._process_batch(batch_buffer)
+			self._append_to_jsonl(new_data, output_path)
+			final_genre_map.update(new_data)
+			newly_mapped_count += len(new_data)
 
 		self.logger.info(
 			f"Successfully mapped genres for {len(final_genre_map)} books in total!",
@@ -81,39 +85,39 @@ class GenreMapper:
 
 		return final_genre_map
 
-	def _process_batch(
-		self,
-		batch_buffer: list[str],
-		genre_map: dict[str, list[str]],
-	) -> int:
-		"""Process a batch of book IDs and extract genre data.
+	def _process_batch(self, batch_buffer: list[str]) -> dict[str, list[str]]:
+		"""Fetch raw data and extract genres for a specific batch.
 
-		Args:
-			batch_buffer (list[str]): The list of book IDs to process.
-			genre_map (dict[str, list[str]]): The genre map to update.
+		Returns:
+			dict[str, list[str]]: A dictionary of newly mapped book IDs.
 
 		"""
 		raw_shelves_map = self.api_client.fetch_raw_bookshelves(batch_buffer)
+		new_mappings = {}
 
 		for book_id, raw_shelves in raw_shelves_map.items():
-			genre_map[str(book_id)] = self.mapper.extract_mapped_genres(raw_shelves)
+			new_mappings[str(book_id)] = self.mapper.extract_mapped_genres(raw_shelves)
 
-		new_books = len(raw_shelves_map)
-		self.logger.info(f"Successfully mapped genres for {new_books} new book ids!")
-		return new_books
+		self.logger.info(f"Fetched and parsed {len(new_mappings)} books from API.")
+		return new_mappings
 
-	def _save_to_json(self, data: dict, path: Path) -> None:
-		"""Save the final dictionary to a JSON file.
+	def _append_to_jsonl(self, data_batch: dict[str, list[str]], path: Path) -> None:
+		"""Append a batch of new mappings to the JSONL file.
 
 		Args:
-			data (dict): The dictionary to save.
-			path (str): The path to save the dictionary to.
+			data_batch (dict): Dictionary of {id: [genres]} to append.
+			path (str): Path to the .jsonl file.
 
 		"""
 		os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-		with open(path, "w", encoding="utf-8") as f:
-			json.dump(data, f, indent=4)
-		self.logger.info(f"Genre map saved to {path}")
+
+		# 'a' opens for appending without truncating the existing file
+		with open(path, "a", encoding="utf-8") as f:
+			for book_id, genres in data_batch.items():
+				line = json.dumps({"id": str(book_id), "genres": genres})
+				f.write(line + "\n")
+
+		self.logger.info(f"Appended {len(data_batch)} mappings to {path}")
 
 
 if __name__ == "__main__":
