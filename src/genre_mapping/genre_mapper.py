@@ -82,7 +82,9 @@ class GenreMapper:
 		return final_genre_map
 
 	def _process_batch(
-		self, batch_buffer: list[str], genre_map: dict[str, list[str]],
+		self,
+		batch_buffer: list[str],
+		genre_map: dict[str, list[str]],
 	) -> int:
 		"""Process a batch of book IDs and extract genre data.
 
@@ -93,15 +95,12 @@ class GenreMapper:
 		"""
 		raw_shelves_map = self.api_client.fetch_raw_bookshelves(batch_buffer)
 
-		count = 0
 		for book_id, raw_shelves in raw_shelves_map.items():
 			genre_map[str(book_id)] = self.mapper.extract_mapped_genres(raw_shelves)
-			count += 1
 
-		self.logger.info(f"Successfully mapped genres for {count} new book ids!")
-
-		return count
-
+		new_books = len(raw_shelves_map)
+		self.logger.info(f"Successfully mapped genres for {new_books} new book ids!")
+		return new_books
 
 	def _save_to_json(self, data: dict, path: Path) -> None:
 		"""Save the final dictionary to a JSON file.
