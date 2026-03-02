@@ -355,7 +355,7 @@ def text_streams_generator(
 
 
 def get_text_stream(
-	targets: dict[str, int] | None = None,
+	targets: dict[str, int],
 	len_bounds: tuple[int, int] = (4000, 10000),
 	extractor: DatasetExtractor | None = None,
 ) -> Iterator[tuple[str, TextStream]]:
@@ -366,13 +366,6 @@ def get_text_stream(
 			identifier for the split and the TextStream object.
 
 	"""
-	if targets is None:
-		targets = {
-			"train": 1_000_000,
-			"val": 10000,
-			"test": 10000,
-		}
-
 	if extractor is None:
 		extractor = DatasetExtractor(DATASET_NAME)
 

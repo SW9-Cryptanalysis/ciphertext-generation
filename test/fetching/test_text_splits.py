@@ -246,17 +246,6 @@ class TestGetTextStream:
         mock_extractor_cls.assert_called_once()
         mock_extractor_instance.get_full_stream.assert_called_once()
 
-    def test_get_text_stream_none_targets(self, mocker):
-        mocker.patch("fetching.text_splits.DatasetExtractor")
-        mocker.patch("fetching.text_splits.randomize_stream")
-        mocker.patch("fetching.text_splits.load_existing_genre_map", return_value={})
-        mock_gen = mocker.patch("fetching.text_splits.text_streams_generator")
-
-        get_text_stream(targets=None)
-
-        passed_targets = mock_gen.call_args[0][1]
-        assert passed_targets == {"train": 1_000_000, "val": 10000, "test": 10000}
-
     def test_get_text_stream_with_injected_extractor(self, mocker):
         mock_extractor = mocker.Mock()
         mock_extractor.get_full_stream.return_value = ["dummy_stream_data"]
