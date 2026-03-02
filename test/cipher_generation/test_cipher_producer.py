@@ -14,6 +14,7 @@ class MockCipher(SubstitutionCipher):
 		self.plaintext = "a" * 500
 		self.difficulty = 10
 		self.num_symbols = 3
+		self.genres = ["Sci-Fi & Fantasy"]
 
 	def generate_key(self):
 		self.key = {"a": ["1"], "b": ["2"], "c": ["3"]}

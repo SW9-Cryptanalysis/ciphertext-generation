@@ -75,6 +75,7 @@ class CipherProducer(mp.Process):
 					length=len(cipher.plaintext),
 					homophones=cipher.num_symbols,
 					difficulty=cipher.difficulty,
+					genres=cipher.genres,
 				)
 				_, file_bytes = create_cipher_json(cipher)
 
