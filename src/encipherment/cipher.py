@@ -57,6 +57,7 @@ class SubstitutionCipher(ABC):
 		self.key = {}
 		self.ciphertext = ""
 		self.ciphertext_with_boundaries = ""
+		self.genres = text_obj["genres"]
 		self.source_id = text_obj["source_id"]
 		self.source_name = text_obj["source_name"]
 		raise NotImplementedError("This is an abstract base class.")
@@ -125,6 +126,7 @@ class SubstitutionCipher(ABC):
 			"key": self.key,
 			"ciphertext": self.ciphertext,
 			"ciphertext_with_boundaries": self.ciphertext_with_boundaries,
+			"genres": self.genres,
 			"source_id": self.source_id,
 			"source_name": self.source_name,
 		}
@@ -164,6 +166,7 @@ class SubstitutionCipher(ABC):
 		cipher.ciphertext_with_boundaries = data["ciphertext_with_boundaries"]
 		cipher.num_symbols = data["num_symbols"]
 		cipher.difficulty = data["difficulty"]
+		cipher.genres = data["genres"]
 		cipher.source_id = data["source_id"]
 		cipher.source_name = data["source_name"]
 
@@ -225,6 +228,7 @@ class HomophonicCipher(SubstitutionCipher):
 		self.key: dict[str, list] = {}
 		self.ciphertext: str = ""
 		self.ciphertext_with_boundaries: str = ""
+		self.genres = text_obj["genres"]
 		self.source_id = text_obj["source_id"]
 		self.source_name = text_obj["source_name"]
 
@@ -339,6 +343,7 @@ class MonoalphabeticCipher(SubstitutionCipher):
 		self.key = self.generate_key()
 		self.difficulty = 1
 		self.encipher()
+		self.genres = text_obj["genres"]
 		self.source_id = text_obj["source_id"]
 		self.source_name = text_obj["source_name"]
 
