@@ -346,7 +346,7 @@ def text_streams_generator(
 					"source_id": book.get("id", "unknown"),
 					"source_name": book.get("metadata", {}).get("title", "unknown"),
 					"length": len(chunk),
-					"genres": genre_map.get(book.get("id"), []),
+					"genres": genre_map.get(str(book.get("id")), []),
 				},
 			)
 			counts[split] += 1
