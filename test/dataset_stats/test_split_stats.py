@@ -197,7 +197,7 @@ class TestSplitStatsJson:
 			"Sci-Fi & Fantasy": 2,
 			"Classic & General Literature": 2,
 		}
-  
+
 	def test_split_stats_json_empty(self):
 		"""Test the JSON serialization of the SplitStats class with no data."""
 		split_stats = SplitStats()
