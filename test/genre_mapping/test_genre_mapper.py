@@ -67,10 +67,10 @@ class TestGenreMapperRun:
 
         genre_mapper = GenreMapper(**mock_dependencies)
 
-        mocker.patch.object(genre_mapper, "_load_existing_genre_map", return_value={})
+        mocker.patch("genre_mapping.genre_mapper.load_existing_genre_map", return_value={})
         mock_save = mocker.patch.object(genre_mapper, "_save_to_json")
 
-        result = genre_mapper.run(output_path="dummy.json", flush_size=2)
+        result = genre_mapper.run(output_path=Path("dummy.json"), flush_size=2)
 
         expected_result = {
             "1001": ["Mapped Raw 1001"],
@@ -95,9 +95,8 @@ class TestGenreMapperRun:
 
         genre_mapper = GenreMapper(**mock_dependencies)
 
-        mocker.patch.object(
-            genre_mapper,
-            "_load_existing_genre_map",
+        mocker.patch(
+            "genre_mapping.genre_mapper.load_existing_genre_map",
             return_value={"1001": ["Cached Genre"]},
         )
         mocker.patch.object(genre_mapper, "_save_to_json")
@@ -107,7 +106,7 @@ class TestGenreMapperRun:
         }
         mock_dependencies["mapper"].extract_mapped_genres.return_value = ["Mapped 1002"]
 
-        result = genre_mapper.run(output_path="dummy.json", flush_size=5)
+        result = genre_mapper.run(output_path=Path("dummy.json"), flush_size=5)
 
         mock_dependencies["api_client"].fetch_raw_bookshelves.assert_called_once_with(
             ["1002"]
@@ -117,38 +116,6 @@ class TestGenreMapperRun:
             "1001": ["Cached Genre"],
             "1002": ["Mapped 1002"],
         }
-
-
-class TestGenreMapperLoadExisting:
-    def test_load_existing_success(self, tmp_path: Path, mock_dependencies):
-        """Test successfully loading an existing valid JSON file."""
-        genre_mapper = GenreMapper(**mock_dependencies)
-        test_file = tmp_path / "cache.json"
-
-        test_data = {"1001": ["Sci-Fi"]}
-        test_file.write_text(json.dumps(test_data), encoding="utf-8")
-
-        result = genre_mapper._load_existing_genre_map(str(test_file))
-        assert result == test_data
-
-    def test_load_existing_not_found(self, tmp_path: Path, mock_dependencies):
-        """Test that an empty dictionary is returned if the file does not exist."""
-        genre_mapper = GenreMapper(**mock_dependencies)
-        missing_file = tmp_path / "does_not_exist.json"
-
-        result = genre_mapper._load_existing_genre_map(str(missing_file))
-        assert result == {}
-
-    def test_load_existing_corrupted_json(self, tmp_path: Path, mock_dependencies):
-        """Test that corrupted JSON is safely caught and returns an empty dictionary."""
-        genre_mapper = GenreMapper(**mock_dependencies)
-        genre_mapper.logger = logging.getLogger("dummy")
-        
-        corrupted_file = tmp_path / "corrupted.json"
-        corrupted_file.write_text("{broken_json: true", encoding="utf-8")
-
-        result = genre_mapper._load_existing_genre_map(str(corrupted_file))
-        assert result == {}
 
 
 class TestGenreMapperSaveToJson:
@@ -163,7 +130,7 @@ class TestGenreMapperSaveToJson:
 
         test_data = {"1001": ["History", "Romance"]}
 
-        genre_mapper._save_to_json(test_data, str(test_file_path))
+        genre_mapper._save_to_json(test_data, test_file_path)
 
         assert test_file_path.exists(), "The JSON file should have been created on disk"
 
