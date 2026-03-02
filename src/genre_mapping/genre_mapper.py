@@ -109,7 +109,7 @@ class GenreMapper:
 			path (str): Path to the .jsonl file.
 
 		"""
-		os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+		path.parent.mkdir(parents=True, exist_ok=True)
 
 		# 'a' opens for appending without truncating the existing file
 		with open(path, "a", encoding="utf-8") as f:

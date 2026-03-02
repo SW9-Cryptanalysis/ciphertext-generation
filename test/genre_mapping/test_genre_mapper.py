@@ -68,7 +68,7 @@ class TestGenreMapperRun:
         genre_mapper = GenreMapper(**mock_dependencies)
 
         mocker.patch("genre_mapping.genre_mapper.load_existing_genre_map", return_value={})
-        mock_save = mocker.patch.object(genre_mapper, "_save_to_json")
+        mock_save = mocker.patch.object(genre_mapper, "_append_to_jsonl")
 
         result = genre_mapper.run(output_path=Path("dummy.json"), flush_size=2)
 
@@ -99,7 +99,7 @@ class TestGenreMapperRun:
             "genre_mapping.genre_mapper.load_existing_genre_map",
             return_value={"1001": ["Cached Genre"]},
         )
-        mocker.patch.object(genre_mapper, "_save_to_json")
+        mocker.patch.object(genre_mapper, "_append_to_jsonl")
 
         mock_dependencies["api_client"].fetch_raw_bookshelves.return_value = {
             "1002": ["Raw 1002"]
@@ -119,24 +119,29 @@ class TestGenreMapperRun:
 
 
 class TestGenreMapperSaveToJson:
-    def test_save_to_json_creates_directories_and_file(
+    def test_append_to_jsonl_creates_directories_and_file(
         self, tmp_path: Path, mock_dependencies
     ):
         """Test that data is correctly serialized to disk and nested folders are created."""
         genre_mapper = GenreMapper(**mock_dependencies)
         genre_mapper.logger = logging.getLogger("dummy")
 
-        test_file_path = tmp_path / "deeply" / "nested" / "folder" / "test_output.json"
+        test_file_path = tmp_path / "deeply" / "nested" / "folder" / "test_output.jsonl"
 
         test_data = {"1001": ["History", "Romance"]}
 
-        genre_mapper._save_to_json(test_data, test_file_path)
+        genre_mapper._append_to_jsonl(test_data, test_file_path)
 
         assert test_file_path.exists(), "The JSON file should have been created on disk"
 
         with open(test_file_path, encoding="utf-8") as f:
             saved_data = json.load(f)
+        
+        expected_data =  {"id": "1001", "genres": ["History", "Romance"]}
+    
 
-        assert saved_data == test_data, (
+        assert saved_data == expected_data, (
             "The saved JSON should perfectly match the input dictionary"
+            f"Expected: {test_data}\n"
+            f"Got: {saved_data}"
         )

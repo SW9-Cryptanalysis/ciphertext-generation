@@ -13,7 +13,7 @@ NUM_TRAINING_CIPHERS = 1_000_000
 NUM_VALIDATION_CIPHERS = 10_000
 NUM_TEST_CIPHERS = 10_000
 
-GENRE_MAP_PATH: Path = Path("data/book_genres.json")
+GENRE_MAP_PATH: Path = Path("data/book_genres.jsonl")
 
 BATCH_SIZE = 10000
 

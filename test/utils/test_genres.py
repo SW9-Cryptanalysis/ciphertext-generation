@@ -5,14 +5,13 @@ from pathlib import Path
 
 class TestLoadExistingGenreMap:
 	def test_load_existing_success(self, tmp_path: Path):
-		"""Test successfully loading an existing valid JSON file."""
-		test_file = tmp_path / "cache.json"
+		"""Test successfully loading an existing valid JSONL file."""
+		test_file = tmp_path / "cache.jsonl"
 
-		test_data = {"1001": ["Sci-Fi"]}
-		test_file.write_text(json.dumps(test_data), encoding="utf-8")
+		test_file.write_text('{"id": "1001", "genres": ["Sci-Fi"]}\n', encoding="utf-8")
 
 		result = load_existing_genre_map(test_file, None)
-		assert result == test_data
+		assert result == {"1001": ["Sci-Fi"]}
 
 	def test_load_existing_not_found(self, tmp_path: Path):
 		"""Test that an empty dictionary is returned if the file does not exist."""
@@ -32,4 +31,4 @@ class TestLoadExistingGenreMap:
 
 		assert result == {}
 		mock_logger.warning.assert_called_once()
-		assert "Failed to parse" in mock_logger.warning.call_args[0][0]
+		assert "Expecting property name enclosed in double quotes" in mock_logger.warning.call_args[0][0]
