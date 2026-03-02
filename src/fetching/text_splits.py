@@ -274,7 +274,7 @@ def get_usable_text(raw_text: str, len_bounds: tuple[int, int]) -> str:
 
 def text_streams_generator(
 	stream: Iterable,
-	total_samples_map: dict[str, int], 
+	total_samples_map: dict[str, int],
 	len_bounds: tuple[int, int],
 	genre_map: dict[str, list[str]],
 ) -> Iterator[tuple[str, TextStream]]:
@@ -287,7 +287,7 @@ def text_streams_generator(
 	Args:
 		stream (IterableDataset): The dataset to extract the text chunks from.
 		total_samples_map (dict[str, int]): A dictionary mapping each bucket to the
-			total number of chunks to generate. 
+			total number of chunks to generate.
 			Example: `{"train": 1000, "val": 15, "test": 15}`
 		len_bounds (tuple[int, int]): The minimum and maximum length bounds for
 			the chunks.
@@ -374,7 +374,10 @@ def get_text_stream(
 	full_stream = randomize_stream(extractor.get_full_stream())
 
 	text_stream = text_streams_generator(
-		full_stream, targets, len_bounds=len_bounds, genre_map=genre_map
+		full_stream,
+		targets,
+		len_bounds=len_bounds,
+		genre_map=genre_map,
 	)
 
 	return text_stream

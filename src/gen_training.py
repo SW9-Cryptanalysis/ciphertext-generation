@@ -2,7 +2,11 @@ import os
 from utils.logging import get_logger
 from cipher_generation.cipher_manager import CipherManager
 from fetching.text_splits import get_text_stream
-from utils.constants import NUM_TRAINING_CIPHERS, NUM_VALIDATION_CIPHERS, NUM_TEST_CIPHERS
+from utils.constants import (
+	NUM_TRAINING_CIPHERS,
+	NUM_VALIDATION_CIPHERS,
+	NUM_TEST_CIPHERS,
+)
 
 if __name__ == "__main__":
 	log = get_logger("TrainingGeneration")
@@ -34,7 +38,11 @@ if __name__ == "__main__":
 			"Please set it before running.",
 		)
 
-	targets = {"train": NUM_TRAINING_CIPHERS, "val": NUM_VALIDATION_CIPHERS, "test": NUM_TEST_CIPHERS}
+	targets = {
+		"train": NUM_TRAINING_CIPHERS,
+		"val": NUM_VALIDATION_CIPHERS,
+		"test": NUM_TEST_CIPHERS,
+	}
 
 	text_stream = get_text_stream(targets=targets)
 

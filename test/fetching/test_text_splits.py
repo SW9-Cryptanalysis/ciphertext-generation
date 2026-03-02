@@ -219,7 +219,7 @@ class TestStreamGenerator:
         ]
         targets = {"train": 2, "val": 0, "test": 0}
         genre_map = {"123": ["Sci-Fi & Fantasy"]}
-        
+
         mocker.patch("fetching.text_splits.get_split", return_value="train")
 
         gen = text_streams_generator(stream, targets, (500, 1000), genre_map=genre_map)

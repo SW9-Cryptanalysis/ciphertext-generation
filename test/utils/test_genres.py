@@ -1,7 +1,6 @@
 from utils.genres import load_existing_genre_map
 import json
 from pathlib import Path
-import logging
 
 
 class TestLoadExistingGenreMap:
