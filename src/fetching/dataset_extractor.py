@@ -58,7 +58,7 @@ class DatasetExtractor:
 			token=self.token,
 		).select_columns(["id"])
 
-		self.logger.info("Extracting IDs (this will be very fast)...")
+		self.logger.info("Extracting IDs...")
 
 		# Apply the limit if one is provided, otherwise process the whole stream
 		stream_iter = islice(stream, 0, limit) if limit else stream
