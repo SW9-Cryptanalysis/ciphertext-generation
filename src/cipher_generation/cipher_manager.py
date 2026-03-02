@@ -118,7 +118,7 @@ class CipherManager:
 		log.info("JOB COMPLETE")
 		log.info(f"Total ciphers fed: {count_fed}")
 		log.info(
-			f"Peak homophone ID (Vocab Size): {self.master_stats.global_max_homophones}"
+			f"Peak homophone ID (Vocab Size): {self.master_stats.global_max_homophones}",
 		)
 		log.info("=" * 40)
 
@@ -131,7 +131,7 @@ class CipherManager:
 			{
 				"max_symbol_id": self.master_stats.global_max_homophones,
 				"statistics": self.master_stats.__json__(),
-			}
+			},
 		).encode("utf-8")
 		self.result_queue.put(("metadata", metadata_filename, metadata_bytes))
 

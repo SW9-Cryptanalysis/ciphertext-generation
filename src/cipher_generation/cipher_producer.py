@@ -4,8 +4,6 @@ import queue
 from typing import Any
 from multiprocessing.queues import Queue as MPQueue
 
-from multiprocessing.managers import ValueProxy
-from threading import Lock
 
 from utils.drive import create_cipher_json
 from utils.logging import get_logger

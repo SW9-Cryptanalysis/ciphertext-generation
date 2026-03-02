@@ -1,6 +1,4 @@
-import pytest
 from dataset_stats import DatasetStatsAggregator
-from dataset_stats.split_stats import SplitStats
 
 
 class TestDatasetStatsAggregatorInit:
@@ -50,7 +48,7 @@ class TestDatasetStatsAggregatorRecord:
 			stats_aggregator.global_max_homophones
 			== mock_records_expected["max_homophones"]
 		)
-  
+
 
 class TestDatasetStatsAggregatorMerge:
 	def test_dataset_stats_aggregator_merge(self, mock_records, mock_records_expected):
@@ -84,4 +82,3 @@ class TestDatasetStatsAggregatorJson:
 		for key, value in mock_records_expected_json.items():
 			assert json_data[key] == value
 
-		

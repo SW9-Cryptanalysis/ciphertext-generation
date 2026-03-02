@@ -10,7 +10,7 @@ class BucketSizes:
 	homophones: int = 100
 	redundancy: int = 1
 
-	def __post_init__(self):
+	def __post_init__(self) -> None:
 		"""Validate the bucket sizes."""
 		for size in [self.length, self.homophones, self.redundancy]:
 			if size <= 0:
@@ -23,13 +23,16 @@ class SplitStats:
 	Attributes:
 		total_count (int): The total number of items in the dataset.
 		length_distribution (Counter): A Counter object for the length distribution.
-		homophone_distribution (Counter): A Counter object for the homophone distribution.
-		redundancy_distribution (Counter): A Counter object for the redundancy distribution.
+		homophone_distribution (Counter): A Counter object for the homophone
+			distribution.
+		redundancy_distribution (Counter): A Counter object for the redundancy
+			distribution.
 		genre_distribution (Counter): A Counter object for the genre distribution.
 		min_length (int): The minimum length in the dataset.
 		max_length (int): The maximum length in the dataset.
 		min_homophones (int): The minimum number of homophones in the dataset.
 		max_homophones (int): The maximum number of homophones in the dataset.
+
 	"""
 
 	def __init__(self) -> None:
@@ -55,11 +58,12 @@ class SplitStats:
 
 		Returns:
 			int: The bucket index.
+
 		"""
 		return (value // size) * size
 
 	def update(
-		self, length: int, homophones: int, difficulty: int, genres: list[str]
+		self, length: int, homophones: int, difficulty: int, genres: list[str],
 	) -> None:
 		"""Update the dataset statistics with a new item (cipher).
 
@@ -67,7 +71,9 @@ class SplitStats:
 			length (int): The length of the cipher.
 			homophones (int): The number of homophones in the cipher.
 			difficulty (int): The difficulty level of the cipher.
-			genre (str | None, optional): The genre of the book used to generate the cipher. Defaults to None.
+			genres (list[str]): The genres of the book used to generate the
+				cipher.
+
 		"""
 		self.total_count += 1
 		self.length_distribution[
@@ -93,6 +99,7 @@ class SplitStats:
 
 		Args:
 			other (SplitStats): The other SplitStats to merge into this one.
+
 		"""
 		self.total_count += other.total_count
 		self.length_distribution.update(other.length_distribution)
@@ -105,22 +112,22 @@ class SplitStats:
 		self.max_homophones = max(self.max_homophones, other.max_homophones)
 
 	def __json__(self) -> dict:
-		"""Return a JSON-serializable representation of the DatasetStatsAggregator object.
+		"""Return a JSON-serializable representation of DatasetStatsAggregator object.
 
 		Returns:
-			dict: A dictionary containing the DatasetStatsAggregator object's attributes.
+			dict: A dictionary containing DatasetStatsAggregator object's attributes.
 
 		"""
 		return {
 			"total_count": self.total_count,
 			"length_distribution": self._format_dist(
-				self.length_distribution, self._bucket_sizes.length
+				self.length_distribution, self._bucket_sizes.length,
 			),
 			"homophone_distribution": self._format_dist(
-				self.homophone_distribution, self._bucket_sizes.homophones
+				self.homophone_distribution, self._bucket_sizes.homophones,
 			),
 			"redundancy_distribution": self._format_dist(
-				self.redundancy_distribution, self._bucket_sizes.redundancy
+				self.redundancy_distribution, self._bucket_sizes.redundancy,
 			),
 			"genre_distribution": dict(self.genre_distribution),
 			"min_length": self.min_length,
@@ -138,6 +145,7 @@ class SplitStats:
 
 		Returns:
 			dict: A dictionary with buckets as keys and counts as values.
+
 		"""
 		if not size > 1:
 			return {f"{k}": v for k, v in sorted(counter.items())}

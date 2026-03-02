@@ -1,7 +1,6 @@
 import pytest
 from encipherment.cipher import HomophonicCipher
 from utils.files import save_book, book_is_cached, get_cached_book, save_cipher
-from fetching.text_splits import TextStream
 
 
 @pytest.fixture
