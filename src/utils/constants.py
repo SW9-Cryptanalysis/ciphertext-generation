@@ -45,7 +45,7 @@ DATASET_NAME = "common-pile/project_gutenberg_filtered"
 
 DEFAULT_TAXONOMY = {
 		"Sci-Fi & Fantasy": ["science fiction", "fantasy", "science-fiction"],
-		"Mystery & Fiction": ["crime", "mystery", "detective", "thriller"],
+		"Horror & Mystery": ["crime", "mystery", "detective", "thriller", "horror"],
 		"History": ["history", "historical"],
 		"Romance": ["romance"],
 		"Philosophy & Religion": ["philosophy", "religion", "spirituality"],

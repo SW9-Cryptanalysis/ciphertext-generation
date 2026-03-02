@@ -1,19 +1,11 @@
 import pytest
 from encipherment.cipher import HomophonicCipher
 from utils.files import save_book, book_is_cached, get_cached_book, save_cipher
-from fetching.text_splits import TextStream
 
 
 @pytest.fixture
-def sample_cipher():
-	text_obj: TextStream = {
-		"text": "thisisatestcipher",
-		"text_with_boundaries": "this_is_a_test_cipher",
-		"source_id": "13031",
-		"source_name": "The Daily Telegraph",
-		"length": 20,
-	}
-	return HomophonicCipher(text_obj, difficulty=10)
+def sample_cipher(valid_text_stream):
+	return HomophonicCipher(valid_text_stream, difficulty=10)
 
 
 @pytest.fixture(autouse=True)

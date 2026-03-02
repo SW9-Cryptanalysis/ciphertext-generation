@@ -14,31 +14,6 @@ from utils.constants import BOOK_IDS_VALIDATION, TOTAL_BOOKS, DATASET_NAME
 dotenv.load_dotenv()
 
 
-class BookMetadata(TypedDict):
-	"""A book metadata object.
-
-	A book metadata object contains the title, author, year, genre,
-		and length of a book.
-	"""
-
-	title: str
-	author: str
-	year: int
-	genre: str
-	length: int
-
-
-class Book(TypedDict):
-	"""A book object.
-
-	A book object contains the ID, metadata, and text of a book.
-	"""
-
-	id: str
-	metadata: BookMetadata
-	text: str
-
-
 class TextStream(TypedDict):
 	"""A text stream object.
 
@@ -50,6 +25,7 @@ class TextStream(TypedDict):
 	source_id: str
 	source_name: str
 	length: int
+	genres: list[str]
 
 
 def find_boundaries(
@@ -359,6 +335,7 @@ def text_streams_generator(
 					"source_id": book.get("id", "unknown"),
 					"source_name": book.get("metadata", {}).get("title", "unknown"),
 					"length": len(chunk),
+					"genres": [], #TODO
 				},
 			)
 			counts[split] += 1

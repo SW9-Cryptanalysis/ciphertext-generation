@@ -6,6 +6,7 @@ import json
 
 from cipher_generation.drive_uploader import DriveUploader, DriveUploaderConfig
 from cipher_generation.cipher_producer import CipherProducer
+from dataset_stats import DatasetStatsAggregator
 
 log = get_logger("CipherManager")
 
@@ -55,9 +56,9 @@ class CipherManager:
 		self.manager = mp.Manager()
 		self.job_queue = self.manager.Queue(maxsize=1000)
 		self.result_queue = self.manager.Queue()
+		self.stats_queue = self.manager.Queue()
 
-		self.max_symbol_id = self.manager.Value("i", 0)
-		self.max_lock = self.manager.Lock()
+		self.master_stats = DatasetStatsAggregator()
 
 	def execute(self) -> None:
 		"""Execute the cipher generation process."""
@@ -79,8 +80,7 @@ class CipherManager:
 		workers = []
 		for i in range(self.num_workers):
 			p = CipherProducer(
-				queues=(self.job_queue, self.result_queue),  # type: ignore
-				tracker=(self.max_symbol_id, self.max_lock),
+				queues=(self.job_queue, self.result_queue, self.stats_queue),  # type: ignore
 				name=f"Worker-{i + 1}",
 			)
 			workers.append(p)
@@ -104,6 +104,11 @@ class CipherManager:
 		for p in workers:
 			p.join()
 
+		log.info("Workers finished. Merging statistics from all workers...")
+		for _ in range(self.num_workers):
+			incoming_stats = self.stats_queue.get()
+			self.master_stats.merge(incoming_stats)
+
 		self._upload_metadata()
 		self.result_queue.put(self.SENTINEL)
 
@@ -112,21 +117,23 @@ class CipherManager:
 		log.info("=" * 40)
 		log.info("JOB COMPLETE")
 		log.info(f"Total ciphers fed: {count_fed}")
-		log.info(f"Peak homophone ID (Vocab Size): {self.max_symbol_id.value}")
+		log.info(
+			f"Peak homophone ID (Vocab Size): "
+			f"{self.master_stats.global_max_homophones}",
+		)
 		log.info("=" * 40)
 
 	def _upload_metadata(self) -> None:
-		"""Upload the metadata file to Google Drive.
+		"""Upload the metadata and statistics files to Google Drive."""
+		log.info("Uploading metadata and dataset statistics...")
 
-		This method uploads the metadata file to Google Drive, which contains
-		the peak homophone ID (Vocab Size) of the generated ciphers.
-
-		"""
-		log.info("Uploading metadata file...")
 		metadata_filename = "metadata.json"
-		metadata_bytes = json.dumps({"max_symbol_id": self.max_symbol_id.value}).encode(
-			"utf-8",
-		)
+		metadata_bytes = json.dumps(
+			{
+				"max_symbol_id": self.master_stats.global_max_homophones,
+				"statistics": self.master_stats.__json__(),
+			},
+		).encode("utf-8")
 		self.result_queue.put(("metadata", metadata_filename, metadata_bytes))
 
 	def _feeder_stream(self) -> int:

@@ -83,7 +83,7 @@ class TestDatasetExtractorGetAllBookIds:
 		mock_logger.info.assert_has_calls(
 			[
 				mocker.call("Initializing Hugging Face stream..."),
-				mocker.call("Extracting IDs (this will be very fast)..."),
+				mocker.call("Extracting IDs..."),
 				mocker.call("Finished! Total distinct books: 0"),
 			]
 		)
@@ -109,7 +109,7 @@ class TestDatasetExtractorGetAllBookIds:
 
 		extractor.logger.info.assert_has_calls(
 			[
-				mocker.call("Extracting IDs (this will be very fast)..."),
+				mocker.call("Extracting IDs..."),
 				mocker.call("Extracted 5000 IDs..."),
 				mocker.call("Finished! Total distinct books: 5000"),
 			]
