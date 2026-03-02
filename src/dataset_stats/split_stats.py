@@ -63,7 +63,11 @@ class SplitStats:
 		return (value // size) * size
 
 	def update(
-		self, length: int, homophones: int, difficulty: int, genres: list[str],
+		self,
+		length: int,
+		homophones: int,
+		difficulty: int,
+		genres: list[str],
 	) -> None:
 		"""Update the dataset statistics with a new item (cipher).
 
@@ -118,16 +122,31 @@ class SplitStats:
 			dict: A dictionary containing DatasetStatsAggregator object's attributes.
 
 		"""
+		if self.total_count == 0:
+			return {
+				"total_count": 0,
+				"length_distribution": {},
+				"homophone_distribution": {},
+				"redundancy_distribution": {},
+				"genre_distribution": {},
+				"min_length": 0,
+				"max_length": 0,
+				"min_homophones": 0,
+				"max_homophones": 0,
+			}
 		return {
 			"total_count": self.total_count,
 			"length_distribution": self._format_dist(
-				self.length_distribution, self._bucket_sizes.length,
+				self.length_distribution,
+				self._bucket_sizes.length,
 			),
 			"homophone_distribution": self._format_dist(
-				self.homophone_distribution, self._bucket_sizes.homophones,
+				self.homophone_distribution,
+				self._bucket_sizes.homophones,
 			),
 			"redundancy_distribution": self._format_dist(
-				self.redundancy_distribution, self._bucket_sizes.redundancy,
+				self.redundancy_distribution,
+				self._bucket_sizes.redundancy,
 			),
 			"genre_distribution": dict(self.genre_distribution),
 			"min_length": self.min_length,

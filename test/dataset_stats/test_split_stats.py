@@ -197,3 +197,20 @@ class TestSplitStatsJson:
 			"Sci-Fi & Fantasy": 2,
 			"Classic & General Literature": 2,
 		}
+  
+	def test_split_stats_json_empty(self):
+		"""Test the JSON serialization of the SplitStats class with no data."""
+		split_stats = SplitStats()
+
+		json_data = split_stats.__json__()
+
+		assert isinstance(json_data, dict)
+		assert json_data["total_count"] == 0
+		assert json_data["length_distribution"] == {}
+		assert json_data["homophone_distribution"] == {}
+		assert json_data["redundancy_distribution"] == {}
+		assert json_data["genre_distribution"] == {}
+		assert json_data["min_length"] == 0
+		assert json_data["max_length"] == 0
+		assert json_data["min_homophones"] == 0
+		assert json_data["max_homophones"] == 0
