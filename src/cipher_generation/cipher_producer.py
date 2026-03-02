@@ -72,7 +72,7 @@ class CipherProducer(mp.Process):
 					split=split,
 					length=len(cipher.plaintext),
 					homophones=cipher.num_symbols,
-					difficulty=cipher.difficulty,
+					difficulty=cipher.difficulty or 0,
 					genres=cipher.genres,
 				)
 				_, file_bytes = create_cipher_json(cipher)

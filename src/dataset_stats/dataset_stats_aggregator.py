@@ -4,6 +4,8 @@ from typing import TypedDict, Unpack
 
 
 class UpdateStats(TypedDict):
+	"""A TypedDict for updating the DatasetStatsAggregator."""
+
 	length: int
 	homophones: int
 	difficulty: int
