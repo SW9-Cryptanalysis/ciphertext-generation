@@ -67,14 +67,14 @@ class GenreMapper:
 			if len(batch_buffer) >= flush_size:
 				newly_mapped_books += self._process_batch(batch_buffer, final_genre_map)
 				self._save_to_json(final_genre_map, output_path)
-				batch_buffer.clear()
+				batch_buffer = []
 
 		if batch_buffer:
 			newly_mapped_books += self._process_batch(batch_buffer, final_genre_map)
+			self._save_to_json(final_genre_map, output_path)
 
-		self._save_to_json(final_genre_map, output_path)
 		self.logger.info(
-			f"Successfully mapped genres for {len(final_genre_map)} books!",
+			f"Successfully mapped genres for {len(final_genre_map)} books in total!",
 		)
 
 		return final_genre_map
