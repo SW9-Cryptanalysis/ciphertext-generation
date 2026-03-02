@@ -59,7 +59,7 @@ class SplitStats:
 		return (value // size) * size
 
 	def update(
-		self, length: int, homophones: int, difficulty: int, genre: str | None = None
+		self, length: int, homophones: int, difficulty: int, genres: list[str]
 	) -> None:
 		"""Update the dataset statistics with a new item (cipher).
 
@@ -85,7 +85,7 @@ class SplitStats:
 		self.min_homophones = min(self.min_homophones, homophones)
 		self.max_homophones = max(self.max_homophones, homophones)
 
-		if genre:
+		for genre in genres:
 			self.genre_distribution[genre] += 1
 
 	def merge(self, other: "SplitStats") -> None:

@@ -62,7 +62,7 @@ class TestSplitStatsUpdate:
 					"length": 4018,
 					"homophones": 213,
 					"difficulty": 5,
-					"genre": "Sci-Fi & Fantasy",
+					"genres": ["Sci-Fi & Fantasy"],
 				},
 				"expected": {
 					"total_count": 1,
@@ -81,7 +81,7 @@ class TestSplitStatsUpdate:
 					"length": 5051,
 					"homophones": 59,
 					"difficulty": 25,
-					"genre": "Romance",
+					"genres": ["Romance"],
 				},
 				"expected": {
 					"total_count": 2,
@@ -100,14 +100,18 @@ class TestSplitStatsUpdate:
 					"length": 6518,
 					"homophones": 32,
 					"difficulty": 15,
-					"genre": "Romance",
+					"genres": ["Romance", "Classic & General Literature"],
 				},
 				"expected": {
 					"total_count": 3,
 					"length_distribution": {4000: 1, 5000: 1, 6500: 1},
 					"homophone_distribution": {0: 2, 200: 1},
 					"redundancy_distribution": {5: 1, 15: 1, 25: 1},
-					"genre_distribution": {"Sci-Fi & Fantasy": 1, "Romance": 2},
+					"genre_distribution": {
+						"Sci-Fi & Fantasy": 1,
+						"Romance": 2,
+						"Classic & General Literature": 1,
+					},
 					"min_length": 4018,
 					"max_length": 6518,
 					"min_homophones": 32,
@@ -142,56 +146,30 @@ class TestSplitStatsUpdate:
 
 
 class TestSplitStatsMerge:
-	def test_split_stats_merge(self):
+	def test_split_stats_merge(self, mock_records, mock_records_expected):
 		"""Test the merge method of the SplitStats class."""
 		split_stats_1 = SplitStats()
-		split_stats_1.update(
-			length=4018, homophones=213, difficulty=5, genre="Sci-Fi & Fantasy"
-		)
-		split_stats_1.update(length=5051, homophones=59, difficulty=25, genre="Romance")
-		split_stats_1.update(length=6518, homophones=32, difficulty=15)
-		split_stats_1.update(
-			length=8000, homophones=100, difficulty=10, genre="Romance"
-		)
-
 		split_stats_2 = SplitStats()
-		split_stats_2.update(
-			length=4018, homophones=213, difficulty=5, genre="Sci-Fi & Fantasy"
-		)
-		split_stats_2.update(length=5051, homophones=59, difficulty=25, genre="Romance")
+
+		for idx, record in enumerate(mock_records):
+			if idx % 2 == 0:
+				split_stats_1.update(**record)
+			else:
+				split_stats_2.update(**record)
 
 		split_stats_1.merge(split_stats_2)
 
-		assert split_stats_1.total_count == 6
-		assert split_stats_1.length_distribution == Counter(
-			{4000: 2, 5000: 2, 6500: 1, 8000: 1}
-		)
-		assert split_stats_1.homophone_distribution == Counter({0: 3, 100: 1, 200: 2})
-		assert split_stats_1.redundancy_distribution == Counter(
-			{5: 2, 25: 2, 15: 1, 10: 1}
-		)
-		assert split_stats_1.genre_distribution == Counter(
-			{"Sci-Fi & Fantasy": 2, "Romance": 3}
-		)
-		assert split_stats_1.min_length == 4018
-		assert split_stats_1.max_length == 8000
-		assert split_stats_1.min_homophones == 32
-		assert split_stats_1.max_homophones == 213
+		for key, value in mock_records_expected.items():
+			assert getattr(split_stats_1, key) == value
 
 
 class TestSplitStatsJson:
-	def test_split_stats_json(self):
+	def test_split_stats_json(self, mock_records):
 		"""Test the JSON serialization of the SplitStats class."""
 		split_stats = SplitStats()
-		split_stats.update(
-			length=4018, homophones=213, difficulty=5, genre="Sci-Fi & Fantasy"
-		)
-		split_stats.update(length=5051, homophones=59, difficulty=25, genre="Romance")
-		split_stats.update(length=6518, homophones=32, difficulty=15)
-		split_stats.update(length=8000, homophones=100, difficulty=10, genre="Romance")
-		split_stats.update(
-			length=6618, homophones=45, difficulty=25, genre="Sci-Fi & Fantasy"
-		)
+
+		for record in mock_records:
+			split_stats.update(**record)
 
 		json_data = split_stats.__json__()
 
@@ -214,4 +192,8 @@ class TestSplitStatsJson:
 			"15": 1,
 			"25": 2,
 		}
-		assert json_data["genre_distribution"] == {"Romance": 2, "Sci-Fi & Fantasy": 2}
+		assert json_data["genre_distribution"] == {
+			"Romance": 3,
+			"Sci-Fi & Fantasy": 2,
+			"Classic & General Literature": 2,
+		}
