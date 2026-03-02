@@ -24,7 +24,6 @@ def load_existing_genre_map(
 			with open(path, encoding="utf-8") as f:
 				for line in f:
 					if line.strip():
-						# Each line is a standalone JSON object
 						item = json.loads(line)
 						genre_map[str(item["id"])] = item["genres"]
 		except (json.JSONDecodeError, KeyError) as e:
