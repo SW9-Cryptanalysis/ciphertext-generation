@@ -3,6 +3,7 @@ import os
 import dotenv
 import logging
 from datasets import IterableDataset
+from typing import Iterator
 
 dotenv.load_dotenv()
 
@@ -46,10 +47,8 @@ class DatasetExtractor:
 			token=self.token,
 		)
 
-	def get_id_stream(self) -> IterableDataset:
+	def get_id_stream(self) -> Iterator[str]:
 		"""Extract book IDs from the dataset while skipping the text payload."""
-		self.logger.info("Initializing Hugging Face stream...")
-
 		stream = load_dataset(
 			self.dataset_name,
 			split="train",
@@ -57,4 +56,5 @@ class DatasetExtractor:
 			token=self.token,
 		).select_columns(["id"])
 
-		return stream
+		for item in stream:
+			yield str(item["id"])
