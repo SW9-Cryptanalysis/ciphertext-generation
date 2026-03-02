@@ -136,9 +136,9 @@ class TestGenreMapperSaveToJson:
 
         with open(test_file_path, encoding="utf-8") as f:
             saved_data = json.load(f)
-        
+
         expected_data =  {"id": "1001", "genres": ["History", "Romance"]}
-    
+
 
         assert saved_data == expected_data, (
             "The saved JSON should perfectly match the input dictionary"

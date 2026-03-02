@@ -1,5 +1,4 @@
 import logging
-import os
 import json
 from utils.constants import DATASET_NAME, GENRE_MAP_PATH
 from utils.logging import get_logger
