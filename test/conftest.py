@@ -184,3 +184,93 @@ def expected_taxonomy_mappings() -> dict[str, list[str]]:
 		"1008": ["Classic & General Literature", "Psychology & Health"],
 		"1009": ["Classic & General Literature", "Fine Arts & Architecture"],
 	}
+
+
+@pytest.fixture
+def mock_records():
+	return [
+		{
+			"length": 4018,
+			"homophones": 213,
+			"difficulty": 5,
+			"genres": ["Sci-Fi & Fantasy"],
+		},
+		{
+			"length": 5051,
+			"homophones": 59,
+			"difficulty": 25,
+			"genres": ["Romance", "Classic & General Literature"],
+		},
+		{
+			"length": 6518,
+			"homophones": 32,
+			"difficulty": 15,
+			"genres": ["Romance", "Classic & General Literature"],
+		},
+		{
+			"length": 8000,
+			"homophones": 100,
+			"difficulty": 10,
+			"genres": ["Romance"],
+		},
+		{
+			"length": 6618,
+			"homophones": 45,
+			"difficulty": 25,
+			"genres": ["Sci-Fi & Fantasy"],
+		},
+	]
+
+
+@pytest.fixture
+def mock_records_expected():
+	return {
+		"total_count": 5,
+		"length_distribution": {4000: 1, 5000: 1, 6500: 2, 8000: 1},
+		"homophone_distribution": {0: 3, 100: 1, 200: 1},
+		"redundancy_distribution": {5: 1, 25: 2, 15: 1, 10: 1},
+		"genre_distribution": {
+			"Sci-Fi & Fantasy": 2,
+			"Romance": 3,
+			"Classic & General Literature": 2,
+		},
+		"min_length": 4018,
+		"max_length": 8000,
+		"min_homophones": 32,
+		"max_homophones": 213,
+	}
+
+
+@pytest.fixture
+def mock_records_expected_json():
+	return {
+		"train": {
+			"total_count": 5,
+			"length_distribution": {
+				"4000-4499": 1,
+				"5000-5499": 1,
+				"6500-6999": 2,
+				"8000-8499": 1,
+            },
+			"homophone_distribution": {
+				"0-99": 3,
+				"100-199": 1,
+				"200-299": 1,
+			},
+			"redundancy_distribution": {
+			"5": 1,
+			"25": 2,
+			"15": 1,
+			"10": 1,
+			},
+			"genre_distribution": {
+				"Sci-Fi & Fantasy": 2,
+				"Romance": 3,
+				"Classic & General Literature": 2,
+			},
+			"min_length": 4018,
+			"max_length": 8000,
+			"min_homophones": 32,
+			"max_homophones": 213,
+		},
+	}
