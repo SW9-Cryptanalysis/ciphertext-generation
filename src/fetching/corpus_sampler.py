@@ -33,7 +33,6 @@ class CorpusSampler:
 			genre_map (dict[str, list[str]]): The genre map to use for filtering.
 
 		"""
-		validate_targets(targets)
 		self.targets = targets
 		self.len_bounds = len_bounds
 		self.genre_map = genre_map
