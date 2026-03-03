@@ -8,7 +8,7 @@ from multiprocessing.queues import Queue as MPQueue
 from utils.drive import create_cipher_json
 from utils.logging import get_logger
 from encipherment.cipher import SubstitutionCipher, HomophonicCipher
-from fetching.text_splits import TextStream
+from utils.text_splits import TextStream
 from dataset_stats import DatasetStatsAggregator
 
 
