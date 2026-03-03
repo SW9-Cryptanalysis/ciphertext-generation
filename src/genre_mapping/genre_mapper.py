@@ -1,7 +1,5 @@
 import logging
 import json
-from utils.constants import DATASET_NAME, GENRE_MAP_PATH
-from utils.logging import get_logger
 from pathlib import Path
 
 from genre_mapping.gutendex_client import GutendexClient
@@ -116,15 +114,3 @@ class GenreMapper:
 				f.write(line + "\n")
 
 		self.logger.info(f"Appended {len(data_batch)} mappings to {path}")
-
-
-if __name__ == "__main__":
-	logger = get_logger("GenreMapper")
-
-	extractor = DatasetExtractor(DATASET_NAME, logger=logger)
-	api_client = GutendexClient(logger=logger)
-	mapper = TaxonomyMapper()
-	genre_mapper = GenreMapper(extractor, api_client, mapper, logger=logger)
-
-	genre_map = genre_mapper.run(output_path=GENRE_MAP_PATH)
-	mapper.dump_unmapped_to_file()
