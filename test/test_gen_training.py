@@ -7,15 +7,15 @@ class TestEnvironmentVariables:
     def test_get_folder_id_success(self, monkeypatch):
         """Test that get_folder_id correctly retrieves an existing environment variable."""
         monkeypatch.setenv("TEST_CIPHER_ENV_VAR", "mock_folder_123")
-        
+
         result = get_folder_id("TEST_CIPHER_ENV_VAR")
-        
+
         assert result == "mock_folder_123"
 
     def test_get_folder_id_raises_error(self, monkeypatch):
         """Test that get_folder_id raises an OSError when the variable is missing."""
         monkeypatch.delenv("MISSING_ENV_VAR", raising=False)
-        
+
         with pytest.raises(OSError, match="Environment variable MISSING_ENV_VAR not set"):
             get_folder_id("MISSING_ENV_VAR")
 
@@ -55,35 +55,34 @@ class TestGetTextStream:
 
         mock_dependencies["extractor_cls"].assert_called_once()
         mock_dependencies["load_genres"].assert_called_once()
-        
+
         mock_dependencies["randomize"].assert_called_once_with(
             mock_extractor_instance.get_full_stream.return_value
         )
-        
+
         mock_dependencies["sampler_cls"].assert_called_once_with(
             targets, (4000, 10000), mock_dependencies["load_genres"].return_value
         )
-        
+
         mock_sampler_instance.generate_stream.assert_called_once_with(
             mock_dependencies["randomize"].return_value
         )
-        
+
         assert result == mock_sampler_instance.generate_stream.return_value
 
     def test_get_text_stream_custom_extractor(self, mocker, mock_dependencies):
         """Test that passing a custom extractor bypasses the default initialization."""
         custom_extractor = mocker.Mock()
-        mock_sampler_instance = mock_dependencies["sampler_cls"].return_value
 
         targets = {"train": 5, "val": 1, "test": 1}
         get_text_stream(targets=targets, len_bounds=(100, 500), extractor=custom_extractor)
 
         mock_dependencies["extractor_cls"].assert_not_called()
-        
+
         mock_dependencies["randomize"].assert_called_once_with(
             custom_extractor.get_full_stream.return_value
         )
-        
+
         mock_dependencies["sampler_cls"].assert_called_once_with(
             targets, (100, 500), mock_dependencies["load_genres"].return_value
         )

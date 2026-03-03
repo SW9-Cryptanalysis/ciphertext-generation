@@ -5,7 +5,6 @@ from utils.validators import (
 	strongly_typed_optional,
 	lower_case_no_spaces_alpha_string,
 	is_alpha_lowercase_no_spaces,
-	validate_targets,
 )
 
 
