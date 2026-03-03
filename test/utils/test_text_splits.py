@@ -7,7 +7,6 @@ from utils.text_splits import (
     get_book_chunks,
     get_usable_text,
     get_actual_take,
-    validate_targets,
     randomize_stream,
 )
 
@@ -51,14 +50,6 @@ class TestTextHelpers:
         assert get_split(2) == "train"
         assert get_split(100) == "val"
 
-    def test_validate_targets_valid(self):
-        targets = {"train": 100, "val": 10, "test": 10}
-        validate_targets(targets)
-
-    def test_validate_targets_invalid(self):
-        with pytest.raises(ValueError, match="must contain exactly keys"):
-            validate_targets({"train": 100})
-
     def test_get_actual_take_logic(self):
         debts = {"train": 10.5}
         assert get_actual_take("train", debts, 5) == 5
@@ -86,7 +77,7 @@ class TestChunkExtraction:
     def test_extract_random_chunk_logic_flow(self, mocker):
         text = "wordone wordtwo wordthree wordfour"
         mocker.patch("random.randint", side_effect=[12, 0, 0, 0])
-        mocker.patch("fetching.text_splits.format_text", side_effect=lambda x: x)
+        mocker.patch("utils.text_splits.format_text", side_effect=lambda x: x)
 
         chunk, bounded_chunk = extract_random_chunk(text, 0, len(text), (10, 20))
 
@@ -98,7 +89,7 @@ class TestChunkExtraction:
         min_bound = int(len(sample_text) - 0.05 * len(sample_text))
 
         mocker.patch(
-            "fetching.text_splits.extract_random_chunk",
+            "utils.text_splits.extract_random_chunk",
             side_effect=[(sample_text, sample_text_with_boundaries), (sample_text, sample_text_with_boundaries)],
         )
 
@@ -116,7 +107,7 @@ class TestChunkExtraction:
         max_bound = 50
         long_chunk = "a" * 100
         mocker.patch(
-            "fetching.text_splits.extract_random_chunk",
+            "utils.text_splits.extract_random_chunk",
             return_value=(long_chunk, long_chunk),
         )
 
@@ -127,7 +118,7 @@ class TestChunkExtraction:
     def test_extract_random_chunk_reaches_end_of_text(self, mocker):
         short_text = "This is very short."
         mocker.patch("random.randint", side_effect=[100, 0, 0])
-        mocker.patch("fetching.text_splits.format_text", side_effect=lambda x: x)
+        mocker.patch("utils.text_splits.format_text", side_effect=lambda x: x)
 
         chunk = extract_random_chunk(short_text, 0, 10, (5, 150))
         assert len(chunk) > 0
@@ -135,7 +126,7 @@ class TestChunkExtraction:
     def test_extract_random_chunk_too_small_returns_immediately(self, mocker):
         text = "tiny"
         mocker.patch("random.randint", side_effect=[10, 0, 0])
-        mocker.patch("fetching.text_splits.format_text", side_effect=lambda x: x)
+        mocker.patch("utils.text_splits.format_text", side_effect=lambda x: x)
 
         chunk, chunk_bounded = extract_random_chunk(text, 0, 5, (5, 15))
         assert chunk == "tiny"
