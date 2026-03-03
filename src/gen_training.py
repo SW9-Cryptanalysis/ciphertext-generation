@@ -6,9 +6,14 @@ from utils.constants import (
 	NUM_TRAINING_CIPHERS,
 	NUM_VALIDATION_CIPHERS,
 	NUM_TEST_CIPHERS,
+	GENRE_MAP_PATH,
 )
 
 if __name__ == "__main__":
+	if not os.path.exists(GENRE_MAP_PATH):
+		raise FileNotFoundError(f"Genre map not found at {GENRE_MAP_PATH}")
+
+
 	log = get_logger("TrainingGeneration")
 	folder_id_train = os.getenv("FOLDER_ID_TRAIN")
 	folder_id_val = os.getenv("FOLDER_ID_VAL")
