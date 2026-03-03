@@ -11,7 +11,7 @@ from utils.z408 import (
 	cipher_str as z408_cipher,
 	key_formatted as z408_key,
 )
-from fetching.text_splits import TextStream
+from utils.text_splits import TextStream
 
 logger = get_logger("Main")
 
