@@ -2,7 +2,7 @@ from parameter_validator import validator
 from typing import Callable, Any, get_origin, get_args
 from types import UnionType
 from utils.constants import ALPHABET
-from fetching.text_splits import TextStream
+from utils.text_splits import TextStream
 
 
 def in_range(min_value: int, max_value: int) -> Callable:
@@ -119,4 +119,13 @@ def validate_text_obj(value: Any, name: str) -> None:
 		raise ValueError(
 			f"Parameter `{name}` must include a non-empty, lowercase alphabetic string "
 			"with no spaces in the text field.",
+		)
+
+@validator
+def validate_targets(targets: dict[str, int]) -> None:
+	"""Validate the targets dictionary."""
+	required_keys = {"train", "val", "test"}
+	if set(targets.keys()) != required_keys:
+		raise ValueError(
+			f"total_samples_map must contain exactly keys: {required_keys}",
 		)
