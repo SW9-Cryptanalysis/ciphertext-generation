@@ -4,7 +4,7 @@ from encipherment.cipher import (
 	MonoalphabeticCipher,
 )
 from parameter_validator import parameter_validator, strongly_typed
-from fetching.text_splits import TextStream
+from utils.text_splits import TextStream
 
 
 def _invert_mappings(mappings: dict[str, list[str]]) -> dict[str, str]:
@@ -167,9 +167,11 @@ class CipherConverter:
 
 		text_obj: TextStream = {
 			"text": self.plaintext,
+			"text_with_boundaries": self.plaintext,
 			"source_id": "Unknown",
 			"source_name": "Unknown",
 			"length": len(self.plaintext),
+			"genres": [],
 		}
 
 		if self._is_homophonic():
