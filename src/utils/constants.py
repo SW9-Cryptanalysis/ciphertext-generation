@@ -62,7 +62,7 @@ DATASETS: list[DatasetConfig] = [
 	},
 	{
 		"path": "common-pile/arxiv_papers_filtered",
-		"type": "technical",
+		"type": "arxiv_papers",
 		"split_name": "train",
 		"column": "content",
 		"prefix": "arxiv",
