@@ -101,6 +101,25 @@ class DatasetExtractor:
 
 		return clean_title or "unknown"
 
+	def _normalize_record(self, x: dict, p: str, t: str, fg: list[str]) -> dict:
+		"""Normalize individual records and safely map metadata."""
+		metadata = x.get("metadata", {})
+		source_name = "unknown"
+		if isinstance(metadata, dict):
+			source_name = metadata.get("title", "unknown")
+
+		if source_name == "unknown":
+			source_name = self._extract_title_from_text(x["text"])
+
+		return {
+			"id": str(x.get("id", "unknown")),
+			"text": x["text"],
+			"source_name": source_name,
+			"prefix": p,
+			"source_type": t,
+			"fallback_genres": fg,
+		}
+
 	def get_full_stream(self) -> IterableDataset:
 		"""Get the full Hugging Face stream.
 
@@ -128,31 +147,10 @@ class DatasetExtractor:
 			source_type = config.get("type", "unknown")
 			fallback_genres = config.get("fallback_genres", ["Other / Uncategorized"])
 
-			def _normalize_record(
-				x: dict,
-				p: str = prefix,
-				t: str = source_type,
-				fg: list[str] = fallback_genres,
-			) -> dict:
-				"""Normalize individual records and safely map metadata."""
-				metadata = x.get("metadata", {})
-				source_name = "unknown"
-				if isinstance(metadata, dict):
-					source_name = metadata.get("title", "unknown")
-
-				if source_name == "unknown":
-					source_name = self._extract_title_from_text(x["text"])
-
-				return {
-					"id": str(x.get("id", "unknown")),
-					"text": x["text"],
-					"source_name": source_name,
-					"prefix": p,
-					"source_type": t,
-					"fallback_genres": fg,
-				}
-
-			ds = ds.map(_normalize_record)
+			ds = ds.map(
+				self._normalize_record,
+				fn_kwargs={"p": prefix, "t": source_type, "fg": fallback_genres},
+			)
 
 			columns = [
 				"id",
