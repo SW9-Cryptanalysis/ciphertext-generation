@@ -30,80 +30,6 @@ def valid_multi_config():
 	]
 
 
-TITLE_TEST_CASES = [
-	# --- 1. The "Happy Paths" (Standard Formatting) ---
-	(
-		"# My Perfect Title\n\nThis is the first paragraph.",
-		"My Perfect Title",
-		"Standard Markdown H1",
-	),
-	(
-		"A Standard Plaintext Title\n\nAnd here is the body of the paper.",
-		"A Standard Plaintext Title",
-		"Standard plaintext first block",
-	),
-	# --- 2. Empty and Invalid Inputs ---
-	(None, "unknown", "None type input"),
-	("", "unknown", "Empty string"),
-	("    \n   \t  ", "unknown", "Whitespace-only string"),
-	(12345, "unknown", "Integer input (type safety)"),
-	# --- 3. Whitespace and Linebreak Chaos ---
-	(
-		"   #    Title   with   Crazy    Spaces    \n\nBody",
-		"Title with Crazy Spaces",
-		"Extreme internal and leading whitespace",
-	),
-	(
-		"# A Very Long\nTitle That Spans\nMultiple Lines\n\nFirst paragraph.",
-		"A Very Long Title That Spans Multiple Lines",
-		"Multiline markdown title with linebreaks inside the block",
-	),
-	(
-		"\n\n\n# Deeply Pushed Title\n\nBody text.",
-		"Deeply Pushed Title",
-		"Title preceded by multiple blank lines",
-	),
-	# --- 4. URL Stripping Triggers ---
-	(
-		"# Title With a Link http://arxiv.org/abs/123\n\nBody",
-		"Title With a Link",
-		"Standard HTTP link stripping",
-	),
-	(
-		"Another Title https://github.com/repo\n\nBody",
-		"Another Title",
-		"HTTPS link stripping (since 'http' is a substring)",
-	),
-	(
-		"http://example.com/no-title-just-link\n\nBody",
-		"unknown",
-		"First block is entirely a URL",
-	),
-	# --- Markdown Edge Cases ---
-	(
-		"## A Secondary Header\n\nBody",
-		"A Secondary Header",
-		"H2 header (strips both #s)",
-	),
-	(
-		"#Title Without Space\n\nBody",
-		"Title Without Space",
-		"Markdown H1 missing the space after the hash",
-	),
-	# --- 6. Current Heuristic Limitations ---
-	(
-		"Title Without Double Newlines\nThis is immediately followed by the abstract. No blank lines exist.\nWe just keep typing.",
-		"Title Without Double Newlines This is immediately followed by the abstract. No blank lines exist. We just keep typing.",
-		"No double newlines means the entire document is treated as the title block",
-	),
-	(
-		"# Understanding HTTP and FTP Protocols\n\nBody",
-		"Understanding HTTP and FTP Protocols",
-		"'HTTP' is uppercase, so .find('http') misses it (case-sensitivity)",
-	),
-]
-
-
 @pytest.fixture(autouse=True)
 def mock_token(monkeypatch):
 	"""Provide a mock Hugging Face token."""
@@ -297,26 +223,113 @@ def test_normalize_record_logic(case: NormalizeTestCase):
 
 	# Empty config is fine since we are just testing the isolated method
 	extractor = DatasetExtractor([])
+	prefix = "tp"
+	source_type = "test_type"
+	fallback_genres = ["Test Genre"]
 
 	result = extractor._normalize_record(
-		x=case.record, p="test_prefix", t="test_type", fg=["Test Genre"]
+		x=case.record, p=prefix, t=source_type, fg=fallback_genres
 	)
 
 	assert result["source_name"] == case.expected_source_name
-	assert result["id"] == case.expected_id
+	assert result["id"] == f"{prefix}:{case.expected_id}"
 	assert result["text"] == case.record["text"]
-	assert result["prefix"] == "test_prefix"
-	assert result["source_type"] == "test_type"
-	assert result["fallback_genres"] == ["Test Genre"]
+	assert result["source_type"] == source_type
+	assert result["fallback_genres"] == fallback_genres
+
+
+@dataclass
+class TitleTestCase:
+	"""Encapsulates parameters for testing title extraction."""
+
+	text: str
+	expected: str
+	desc: str
+
+
+TITLE_TEST_CASES = [
+	# --- 1. The "Happy Paths" (Standard Formatting) ---
+	TitleTestCase(
+		"# My Perfect Title\n\nThis is the first paragraph.",
+		"My Perfect Title",
+		"Standard Markdown H1",
+	),
+	TitleTestCase(
+		"A Standard Plaintext Title\n\nAnd here is the body of the paper.",
+		"A Standard Plaintext Title",
+		"Standard plaintext first block",
+	),
+	# --- 2. Empty and Invalid Inputs ---
+	TitleTestCase(None, "unknown", "None type input"),  # type: ignore
+	TitleTestCase("", "unknown", "Empty string"),
+	TitleTestCase("    \n   \t  ", "unknown", "Whitespace-only string"),
+	TitleTestCase(12345, "unknown", "Integer input (type safety)"),  # type: ignore
+	# --- 3. Whitespace and Linebreak Chaos ---
+	TitleTestCase(
+		"   #    Title   with   Crazy    Spaces    \n\nBody",
+		"Title with Crazy Spaces",
+		"Extreme internal and leading whitespace",
+	),
+	TitleTestCase(
+		"# A Very Long\nTitle That Spans\nMultiple Lines\n\nFirst paragraph.",
+		"A Very Long Title That Spans Multiple Lines",
+		"Multiline markdown title with linebreaks inside block",
+	),
+	TitleTestCase(
+		"\n\n\n# Deeply Pushed Title\n\nBody text.",
+		"Deeply Pushed Title",
+		"Title preceded by multiple blank lines",
+	),
+	# --- 4. URL Stripping Triggers ---
+	TitleTestCase(
+		"# Title With a Link http://arxiv.org/abs/123\n\nBody",
+		"Title With a Link",
+		"Standard HTTP link stripping",
+	),
+	TitleTestCase(
+		"Another Title https://github.com/repo\n\nBody",
+		"Another Title",
+		"HTTPS link stripping (since 'http' is a substring)",
+	),
+	TitleTestCase(
+		"http://example.com/no-title-just-link\n\nBody",
+		"unknown",
+		"First block is entirely a URL",
+	),
+	# --- Markdown Edge Cases ---
+	TitleTestCase(
+		"## A Secondary Header\n\nBody",
+		"A Secondary Header",
+		"H2 header (strips both #s)",
+	),
+	TitleTestCase(
+		"#Title Without Space\n\nBody",
+		"Title Without Space",
+		"Markdown H1 missing the space after the hash",
+	),
+	# --- 6. Current Heuristic Limitations ---
+	TitleTestCase(
+		"Title Without Double Newlines\nThis is immediately followed by the abstract. No blank lines exist.\nWe just keep typing.",
+		"Title Without Double Newlines This is immediately followed by the abstract. No blank lines exist. We just keep typing.",
+		"No double newlines -> entire document is treated as the title block",
+	),
+	TitleTestCase(
+		"# Understanding HTTP and FTP Protocols\n\nBody",
+		"Understanding HTTP and FTP Protocols",
+		"'HTTP' is uppercase, so .find('http') misses it (case-sensitivity)",
+	),
+]
 
 
 class TestDatasetExtractorTitleExtraction:
-	@pytest.mark.parametrize("text, expected, description", TITLE_TEST_CASES)
-	def test_extract_title_from_text(self, text, expected, description):
+	@pytest.mark.parametrize(
+		"case", TITLE_TEST_CASES, ids=lambda c: c.desc
+	)
+	def test_extract_title_from_text(self, case):
 		"""Test the extraction of a title from a raw text."""
 		extractor = DatasetExtractor([])
-		result = extractor._extract_title_from_text(text)
-		assert result == expected, f"Failed on: {description}"
+		result = extractor._extract_title_from_text(case.text)
+		assert result == case.expected, f"Failed on: {case.description}"
 
 
 @pytest.mark.integration
@@ -358,12 +371,11 @@ def test_real_huggingface_stream_interleaves_multiple_sources(monkeypatch):
 		"id",
 		"text",
 		"source_name",
-		"prefix",
 		"source_type",
 		"fallback_genres",
 	}
 
-	found_prefixes = set()
+	found_source_types = set()
 
 	for _ in range(4):
 		item = next(stream_iter)
@@ -372,7 +384,11 @@ def test_real_huggingface_stream_interleaves_multiple_sources(monkeypatch):
 		assert isinstance(item["text"], str)
 		assert isinstance(item["id"], str)
 
-		found_prefixes.add(item["prefix"])
+		found_source_types.add(item["source_type"])
 
-	assert "pg" in found_prefixes, "Stream did not yield any Gutenberg records."
-	assert "arxiv" in found_prefixes, "Stream did not yield any arXiv records."
+	assert "project_gutenberg" in found_source_types, (
+		"Stream did not yield any Gutenberg records."
+	)
+	assert "arxiv_papers" in found_source_types, (
+		"Stream did not yield any arXiv records."
+	)
