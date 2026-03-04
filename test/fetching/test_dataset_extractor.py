@@ -92,7 +92,7 @@ class TestDatasetExtractorGetFullStream:
 		mock_interleave = mocker.patch("fetching.dataset_extractor.interleave_datasets")
 		extractor = DatasetExtractor(valid_multi_config)
 
-		stream = extractor.get_full_stream()
+		extractor.get_full_stream()
 
 		mock_load.assert_any_call(
 			"common-pile/project_gutenberg_filtered",
@@ -173,7 +173,7 @@ def test_real_huggingface_stream_interleaves_multiple_sources(monkeypatch):
 	"""
 	monkeypatch.setenv("SSL_CERT_FILE", certifi.where())
 	monkeypatch.delenv("HF_TOKEN", raising=False)
- 
+
 	extractor = DatasetExtractor(
 		[
 			{

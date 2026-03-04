@@ -6,7 +6,6 @@ from datasets import IterableDataset
 from typing import Iterator, TypedDict
 import re
 
-from utils.text_splits import randomize_stream
 
 dotenv.load_dotenv()
 
@@ -71,7 +70,7 @@ class DatasetExtractor:
 			self.logger.setLevel(logging.CRITICAL)
 
 	def _extract_title_from_text(self, text: str) -> str:
-		"""Extracts a prospective title from the beginning of a raw document.
+		"""Extract a prospective title from the beginning of a raw document.
 
 		Targets Markdown headers or the first distinct text block, normalizing
 		newlines and stripping excess whitespace or appended URLs.
@@ -92,10 +91,7 @@ class DatasetExtractor:
 		first_block = paragraphs[0] if paragraphs else text
 
 		title_match = re.match(r"^#\s*(.*)", first_block, flags=re.DOTALL)
-		if title_match:
-			raw_title = title_match.group(1)
-		else:
-			raw_title = first_block
+		raw_title = title_match.group(1) if title_match else first_block
 
 		clean_title = re.sub(r"\s+", " ", raw_title).strip()
 
@@ -132,7 +128,12 @@ class DatasetExtractor:
 			source_type = config.get("type", "unknown")
 			fallback_genres = config.get("fallback_genres", ["Other / Uncategorized"])
 
-			def normalize_record(x, p=prefix, t=source_type, fg=fallback_genres):
+			def _normalize_record(
+				x: dict,
+				p: str = prefix,
+				t: str = source_type,
+				fg: list[str] = fallback_genres,
+			) -> dict:
 				"""Normalize individual records and safely map metadata."""
 				metadata = x.get("metadata", {})
 				source_name = "unknown"
@@ -151,7 +152,7 @@ class DatasetExtractor:
 					"fallback_genres": fg,
 				}
 
-			ds = ds.map(normalize_record)
+			ds = ds.map(_normalize_record)
 
 			columns = [
 				"id",
@@ -167,7 +168,9 @@ class DatasetExtractor:
 			streams.append(ds)
 
 		return interleave_datasets(
-			streams, seed=42, stopping_strategy="all_exhausted_without_replacement"
+			streams,
+			seed=42,
+			stopping_strategy="all_exhausted_without_replacement",
 		)
 
 	def get_pg_id_stream(self) -> Iterator[str]:
