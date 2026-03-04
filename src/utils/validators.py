@@ -2,7 +2,6 @@ from parameter_validator import validator
 from typing import Callable, Any, get_origin, get_args
 from types import UnionType
 from utils.constants import ALPHABET
-from utils.text_splits import TextStream
 
 
 def in_range(min_value: int, max_value: int) -> Callable:
@@ -97,17 +96,19 @@ def _deep_validate(value: Any, type_hint: Any) -> None:
 		raise ValueError(
 			f"All elements in '{value}' must be of type {element_type.__name__}.",
 		)
-  
-def _validate_field(key: str, type_hint: type, dict, name: str) -> None:
+
+def _validate_field(key: str, type_hint: type, dict: dict[str, Any], name: str) -> None:
 	"""Validate a field in a dictionary.
 
 	Args:
-		value (Any): The value to validate.
-		name (str): The name of the parameter.
-		type_hint (Type): The expected type hint.
+		key (str): The key to validate.
+		type_hint (type): The expected type hint.
+		dict (dict[str, Any]): The dictionary to validate.
+		name (str): The name of the dictionary parameter.
 
 	Raises:
 		ValueError: If the value is invalid.
+
 	"""
 	if key not in dict:
 			raise ValueError(f"Missing required key in {name}: '{key}'")
@@ -137,5 +138,5 @@ def validate_typed_dict(dict: dict[str, Any], name: str, type_hint: type) -> Non
 		ValueError: If the dictionary is invalid.
 
 	"""
-	for key, type_hint in type_hint.__annotations__.items():
-		_validate_field(key, type_hint, dict, name)
+	for key, type_hint_sub in type_hint.__annotations__.items():
+		_validate_field(key, type_hint_sub, dict, name)

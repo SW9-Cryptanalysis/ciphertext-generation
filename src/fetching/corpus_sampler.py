@@ -14,6 +14,8 @@ from utils.validators import validate_typed_dict
 from parameter_validator import parameter_validator
 
 class Targets(TypedDict):
+	"""A typed dictionary for target counts."""
+
 	train: int
 	val: int
 	test: int
