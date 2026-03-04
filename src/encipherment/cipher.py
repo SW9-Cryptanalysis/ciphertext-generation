@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from parameter_validator import parameter_validator, all_of
 import json
 from utils.text_splits import TextStream
-from utils.validators import validate_text_obj
+from utils.validators import validate_typed_dict
 
 from utils.validators import (
 	in_range,
@@ -201,7 +201,7 @@ class HomophonicCipher(SubstitutionCipher):
 	"""
 
 	@parameter_validator(
-		text_obj=validate_text_obj,
+		text_obj=validate_typed_dict,
 		difficulty=all_of(
 			in_range(MIN_DIFFICULTY, MAX_DIFFICULTY),
 			strongly_typed_optional,
@@ -329,7 +329,7 @@ class MonoalphabeticCipher(SubstitutionCipher):
 
 	"""
 
-	@parameter_validator(text_obj=validate_text_obj)
+	@parameter_validator(text_obj=validate_typed_dict)
 	def __init__(self, text_obj: TextStream) -> None:
 		"""Initialize the MonoalphabeticCipher with the given text object.
 

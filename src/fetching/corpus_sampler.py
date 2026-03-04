@@ -1,4 +1,4 @@
-from typing import Iterator, Iterable
+from typing import Iterator, Iterable, TypedDict
 from itertools import islice
 
 from utils.constants import BOOK_IDS_VALIDATION, TOTAL_BOOKS
@@ -10,18 +10,21 @@ from utils.text_splits import (
 	TextStream,
 )
 
-from utils.validators import validate_targets
+from utils.validators import validate_typed_dict
 from parameter_validator import parameter_validator
 
-
+class Targets(TypedDict):
+	train: int
+	val: int
+	test: int
 
 class CorpusSampler:
 	"""Manages the stateful extraction of texts across dataset splits."""
 
-	@parameter_validator(targets=validate_targets)
+	@parameter_validator(targets=validate_typed_dict)
 	def __init__(
 		self,
-		targets: dict[str, int],
+		targets: Targets,
 		len_bounds: tuple[int, int],
 		genre_map: dict[str, list[str]],
 	) -> None:
