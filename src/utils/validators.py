@@ -19,9 +19,7 @@ def in_range(min_value: int, max_value: int) -> Callable:
 
 	@validator
 	def validate(value: int, name: str) -> None:
-		if not isinstance(value, int):
-			return
-		if not (min_value <= value <= max_value):
+		if isinstance(value, int) and not (min_value <= value <= max_value):
 			raise ValueError(
 				f"Parameter `{name}` must be between {min_value} and {max_value}.",
 			)
@@ -29,6 +27,7 @@ def in_range(min_value: int, max_value: int) -> Callable:
 	return validate
 
 
+@validator
 def strongly_typed_optional(value: Any, name: str, type_hint: type) -> None:
 	"""Validate that a parameter is either None or of the expected type.
 
@@ -51,6 +50,7 @@ def strongly_typed_optional(value: Any, name: str, type_hint: type) -> None:
 		)
 
 
+@validator
 def lower_case_no_spaces_alpha_string(value: Any, name: str, type_hint: type) -> None:
 	"""Validate that a string is lowercase and contains no spaces.
 
@@ -90,42 +90,52 @@ def is_alpha_lowercase_no_spaces(value: str) -> bool:
 	return all(c in ALPHABET for c in value)
 
 
-@validator
-def validate_text_obj(value: Any, name: str) -> None:
-	"""Validate that a value is a valid TextStream object.
+def _deep_validate(value: Any, type_hint: Any) -> None:
+	"""Validate on list or dict elements recursively."""
+	element_type = get_args(type_hint)[0]
+	if not all(isinstance(item, element_type) for item in value):
+		raise ValueError(
+			f"All elements in '{value}' must be of type {element_type.__name__}.",
+		)
+  
+def _validate_field(key: str, type_hint: type, dict, name: str) -> None:
+	"""Validate a field in a dictionary.
 
 	Args:
 		value (Any): The value to validate.
 		name (str): The name of the parameter.
+		type_hint (Type): The expected type hint.
 
 	Raises:
-		TypeError: If the value is not a dict.
-		KeyError: If the dict does not contain the required keys.
-		ValueError: If the dict does not contain the required keys.
-
+		ValueError: If the value is invalid.
 	"""
-	if not isinstance(value, dict):
-		raise TypeError(f"Parameter `{name}` must be of type dict.")
+	if key not in dict:
+			raise ValueError(f"Missing required key in {name}: '{key}'")
 
-	required_keys = TextStream.__annotations__.keys()
-	if set(value.keys()) != set(required_keys):
-		raise KeyError(
-			f"Parameter `{name}` must contain the following keys: {str(required_keys)}."
-			f" Missing keys: {set(required_keys) - set(value.keys())}.",
-		)
+	origin_type = get_origin(type_hint) or type_hint
 
-	text_content = value["text"]
-	if not text_content or not is_alpha_lowercase_no_spaces(text_content):
+	if not isinstance(dict[key], origin_type):
 		raise ValueError(
-			f"Parameter `{name}` must include a non-empty, lowercase alphabetic string "
-			"with no spaces in the text field.",
+			f"Invalid type for key '{key}'. "
+			f"Expected {origin_type.__name__}, got {type(dict[key]).__name__}.",
 		)
+
+	if origin_type is list:
+		_deep_validate(dict[key], type_hint)
+
 
 @validator
-def validate_targets(targets: dict[str, int]) -> None:
-	"""Validate the targets dictionary."""
-	required_keys = {"train", "val", "test"}
-	if set(targets.keys()) != required_keys:
-		raise ValueError(
-			f"total_samples_map must contain exactly keys: {required_keys}",
-		)
+def validate_typed_dict(dict: dict[str, Any], name: str, type_hint: type) -> None:
+	"""Validate a dictionary with a specific type hint.
+
+	Args:
+		dict (dict[str, Any]): The dictionary to validate.
+		name (str): The name of the parameter.
+		type_hint (type): The expected type hint.
+
+	Raises:
+		ValueError: If the dictionary is invalid.
+
+	"""
+	for key, type_hint in type_hint.__annotations__.items():
+		_validate_field(key, type_hint, dict, name)
