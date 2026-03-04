@@ -98,13 +98,15 @@ def _deep_validate(value: Any, type_hint: Any) -> None:
 		)
 
 
-def _validate_field(key: str, type_hint: type, dict_obj: dict[str, Any], name: str) -> None:
+def _validate_field(
+	key: str, type_hint: type, dict_obj: dict[str, Any], name: str,
+) -> None:
 	"""Validate a field in a dictionary.
 
 	Args:
 		key (str): The key to validate.
 		type_hint (type): The expected type hint.
-		dict (dict[str, Any]): The dictionary to validate.
+		dict_obj (dict[str, Any]): The dictionary to validate.
 		name (str): The name of the dictionary parameter.
 
 	Raises:
