@@ -128,7 +128,7 @@ def validate_typed_dict(dict_obj: Any, name: str, type_hint: type) -> None:
 	"""Validate a dictionary with a specific type hint.
 
 	Args:
-		dict (dict[str, Any]): The dictionary to validate.
+		dict_obj (dict[str, Any]): The dictionary to validate.
 		name (str): The name of the parameter.
 		type_hint (type): The expected type hint.
 

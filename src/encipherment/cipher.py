@@ -221,7 +221,7 @@ class HomophonicCipher(SubstitutionCipher):
 			raise ValueError("Plaintext must be a non-empty string.")
 		if not is_alpha_lowercase_no_spaces(text_obj["text"]):
 			raise ValueError(
-				"Plaintext must be a lowercase alphabetic string with no spaces."
+				"Plaintext must be a lowercase alphabetic string with no spaces.",
 			)
 		self.plaintext = text_obj["text"]
 		self.plaintext_with_boundaries = text_obj["text_with_boundaries"]
@@ -346,7 +346,7 @@ class MonoalphabeticCipher(SubstitutionCipher):
 			raise ValueError("Plaintext must be a non-empty string.")
 		if not is_alpha_lowercase_no_spaces(text_obj["text"]):
 			raise ValueError(
-				"Plaintext must be a lowercase alphabetic string with no spaces."
+				"Plaintext must be a lowercase alphabetic string with no spaces.",
 			)
 		self.plaintext = text_obj["text"]
 		self.plaintext_with_boundaries = text_obj["text_with_boundaries"]
