@@ -54,7 +54,7 @@ class GenreMapper:
 
 		"""
 		final_genre_map = load_existing_genre_map(output_path, self.logger)
-		id_stream = self.extractor.get_id_stream()
+		id_stream = self.extractor.get_pg_id_stream()
 
 		batch_buffer = []
 		newly_mapped_count = 0

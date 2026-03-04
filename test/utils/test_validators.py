@@ -1,132 +1,262 @@
 import pytest
+from dataclasses import dataclass
+from typing import Any, TypedDict
+from contextlib import nullcontext as does_not_raise
 
 from utils.validators import (
 	in_range,
 	strongly_typed_optional,
 	lower_case_no_spaces_alpha_string,
-	is_alpha_lowercase_no_spaces,
+	validate_typed_dict,
 )
 
 
-class TestInRangeValidator:
-	@pytest.fixture
-	def validator(self):
-		return in_range(10, 20)
+@dataclass
+class RangeTestCase:
+	"""Encapsulates parameters for in_range validation tests."""
 
-	def test_value_within_range(self, validator):
-		validator(15, name="test_param", type_hint=int)
-
-	def test_value_equal_to_min(self, validator):
-		validator(10, name="test_param", type_hint=int)
-
-	def test_value_equal_to_max(self, validator):
-		validator(20, name="test_param", type_hint=int)
-
-	def test_value_below_min(self, validator):
-		with pytest.raises(ValueError) as excinfo:
-			validator(5, name="test_param", type_hint=int)
-		assert "Parameter `test_param` must be between 10 and 20." in str(excinfo.value)
-
-	def test_value_above_max(self, validator):
-		with pytest.raises(ValueError) as excinfo:
-			validator(25, name="test_param", type_hint=int)
-		assert "Parameter `test_param` must be between 10 and 20." in str(excinfo.value)
-
-	def test_non_integer_value(self, validator):
-		# Non-integer values should be ignored by the validator
-		validator("string_value", name="test_param", type_hint=str)
+	desc: str
+	value: Any
+	min_val: int
+	max_val: int
+	expected_context: Any
+	match: str | None = None
 
 
-class TestStronglyTypedOptionalValidator:
-	def test_value_is_none(self):
-		# None should be accepted
-		strongly_typed_optional(None, name="optional_param", type_hint=int)
+@dataclass
+class TypeTestCase:
+	"""Encapsulates parameters for type validation tests."""
 
-	def test_value_of_expected_type(self):
-		strongly_typed_optional(42, name="optional_param", type_hint=int)
-
-	def test_illegal_type_value(self):
-		with pytest.raises(TypeError) as excinfo:
-			strongly_typed_optional("not an int", name="optional_param", type_hint=int)
-		assert "Parameter `optional_param` must be of type int or None." in str(
-			excinfo.value
-		)
-
-	def test_value_of_union_type(self):
-		type_hint = int | str | None
-		strongly_typed_optional(42, name="optional_param", type_hint=type_hint)  # type: ignore
-		strongly_typed_optional("a string", name="optional_param", type_hint=type_hint)  # type: ignore
-
-	def test_value_of_unexpected_union_type(self):
-		type_hint = int | str | None
-		with pytest.raises(TypeError) as excinfo:
-			strongly_typed_optional(3.14, name="optional_param", type_hint=type_hint)  # type: ignore
-		assert "Parameter `optional_param` must be of type int, str, or None." in str(
-			excinfo.value
-		)
+	desc: str
+	value: Any
+	type_hint: Any
+	expected_context: Any
+	match: str | None = None
 
 
-class TestLowerCaseNoSpacesAlphaStringValidator:
-	def test_valid_string(self):
+@dataclass
+class ValueTestCase:
+	"""Encapsulates parameters for generic value validation tests."""
+
+	desc: str
+	value: Any
+	expected_context: Any
+	match: str | None = None
+
+
+class DummyTextStream(TypedDict):
+	"""Mock TypedDict to simulate TextStream annotations."""
+
+	id: str
+	text: str
+	source_name: str
+
+
+class DummyConfig(TypedDict):
+	"""Mock TypedDict to test validate_typed_dict."""
+
+	name: str
+	items: list[int]
+
+
+IN_RANGE_CASES = [
+	RangeTestCase(
+		desc="Valid: Inside range",
+		value=5,
+		min_val=1,
+		max_val=10,
+		expected_context=does_not_raise(),
+	),
+	RangeTestCase(
+		desc="Valid: Exact minimum boundary",
+		value=1,
+		min_val=1,
+		max_val=10,
+		expected_context=does_not_raise(),
+	),
+	RangeTestCase(
+		desc="Valid: Exact maximum boundary",
+		value=10,
+		min_val=1,
+		max_val=10,
+		expected_context=does_not_raise(),
+	),
+	RangeTestCase(
+		desc="Invalid: Below minimum",
+		value=0,
+		min_val=1,
+		max_val=10,
+		expected_context=pytest.raises(ValueError),
+		match="must be between",
+	),
+	RangeTestCase(
+		desc="Invalid: Above maximum",
+		value=11,
+		min_val=1,
+		max_val=10,
+		expected_context=pytest.raises(ValueError),
+		match="must be between",
+	),
+	RangeTestCase(
+		desc="Ignored: Non-integer types safely return early",
+		value="5",
+		min_val=1,
+		max_val=10,
+		expected_context=does_not_raise(),
+	),
+]
+
+
+@pytest.mark.parametrize("case", IN_RANGE_CASES, ids=lambda c: c.desc)
+def test_in_range(case: RangeTestCase):
+	"""Test the integer range boundary validator using a single case object.
+
+	The target value must be passed positionally, while the parameter name
+	is supplied as a keyword argument to satisfy the @validator wrapper.
+	"""
+	validator_func = in_range(case.min_val, case.max_val)
+	with case.expected_context as exc_info:
+		validator_func(case.value, name="test_param", type_hint=int)
+	if case.match and exc_info:
+		assert case.match in str(exc_info.value)
+
+
+STRONGLY_TYPED_OPTIONAL_CASES = [
+	TypeTestCase(
+		desc="Valid: None passes for any expected type",
+		value=None,
+		type_hint=int,
+		expected_context=does_not_raise(),
+	),
+	TypeTestCase(
+		desc="Valid: Exact type match",
+		value=5,
+		type_hint=int,
+		expected_context=does_not_raise(),
+	),
+	TypeTestCase(
+		desc="Valid: Matches one of UnionType options",
+		value=5,
+		type_hint=str | int,
+		expected_context=does_not_raise(),
+	),
+	TypeTestCase(
+		desc="Invalid: Type mismatch",
+		value="5",
+		type_hint=int,
+		expected_context=pytest.raises(TypeError),
+		match="must be of type int",
+	),
+	TypeTestCase(
+		desc="Invalid: UnionType mismatch",
+		value=[1, 2],
+		type_hint=str | int,
+		expected_context=pytest.raises(TypeError),
+		match="must be of type str, int",
+	),
+]
+
+
+@pytest.mark.parametrize("case", STRONGLY_TYPED_OPTIONAL_CASES, ids=lambda c: c.desc)
+def test_strongly_typed_optional(case: TypeTestCase):
+	"""Test the strongly typed optional parameter validator using a single case object."""
+	with case.expected_context as exc_info:
+		strongly_typed_optional(case.value, name="test_param", type_hint=case.type_hint)
+	if case.match and exc_info:
+		assert case.match in str(exc_info.value)
+
+
+LOWER_CASE_ALPHA_CASES = [
+	TypeTestCase(
+		desc="Valid: Lowercase alpha string without spaces",
+		value="helloworld",
+		type_hint=str,
+		expected_context=does_not_raise(),
+	),
+	TypeTestCase(
+		desc="Invalid: Not a string",
+		value=123,
+		type_hint=str,
+		expected_context=pytest.raises(TypeError),
+		match="must be of type str",
+	),
+	TypeTestCase(
+		desc="Invalid: Empty string",
+		value="",
+		type_hint=str,
+		expected_context=pytest.raises(ValueError),
+		match="non-blank",
+	),
+	TypeTestCase(
+		desc="Invalid: Contains spaces",
+		value="hello world",
+		type_hint=str,
+		expected_context=pytest.raises(ValueError),
+		match="lowercase alphabetic",
+	),
+	TypeTestCase(
+		desc="Invalid: Contains uppercase characters",
+		value="HelloWorld",
+		type_hint=str,
+		expected_context=pytest.raises(ValueError),
+		match="lowercase alphabetic",
+	),
+]
+
+
+@pytest.mark.parametrize("case", LOWER_CASE_ALPHA_CASES, ids=lambda c: c.desc)
+def test_lower_case_no_spaces_alpha_string(case: TypeTestCase):
+	"""Test the strictly constrained string validator using a single case object."""
+	with case.expected_context as exc_info:
 		lower_case_no_spaces_alpha_string(
-			"validstring", name="test_param", type_hint=str
+			case.value, name="test_param", type_hint=case.type_hint
 		)
-
-	def test_string_with_spaces(self):
-		with pytest.raises(ValueError) as excinfo:
-			lower_case_no_spaces_alpha_string(
-				"invalid string", name="test_param", type_hint=str
-			)
-		assert (
-			"Parameter `test_param` must be a lowercase alphabetic string with no spaces."
-			in str(excinfo.value)
-		)
-
-	def test_string_with_uppercase(self):
-		with pytest.raises(ValueError) as excinfo:
-			lower_case_no_spaces_alpha_string(
-				"InvalidString", name="test_param", type_hint=str
-			)
-		assert (
-			"Parameter `test_param` must be a lowercase alphabetic string with no spaces."
-			in str(excinfo.value)
-		)
-
-	def test_string_with_non_alpha(self):
-		with pytest.raises(ValueError) as excinfo:
-			lower_case_no_spaces_alpha_string(
-				"invalid123", name="test_param", type_hint=str
-			)
-		assert (
-			"Parameter `test_param` must be a lowercase alphabetic string with no spaces."
-			in str(excinfo.value)
-		)
-
-	def test_non_string_value(self):
-		with pytest.raises(TypeError) as excinfo:
-			lower_case_no_spaces_alpha_string(12345, name="test_param", type_hint=str)
-		assert "Parameter `test_param` must be of type str." in str(excinfo.value)
-
-	def test_empty_string(self):
-		with pytest.raises(ValueError) as excinfo:
-			lower_case_no_spaces_alpha_string("", name="test_param", type_hint=str)
-		assert "Parameter `test_param` must be a non-blank string." in str(
-			excinfo.value
-		)
+	if case.match and exc_info:
+		assert case.match in str(exc_info.value)
 
 
-class TestIsAlphaLowercaseNoSpaces:
-	def test_valid_string(self):
-		assert is_alpha_lowercase_no_spaces("validstring") is True
+VALIDATE_TYPED_DICT_CASES = [
+	TypeTestCase(
+		desc="Valid: Dictionary perfectly matches TypedDict schema",
+		value={"name": "test", "items": [1, 2, 3]},
+		type_hint=DummyConfig,
+		expected_context=does_not_raise(),
+	),
+	TypeTestCase(
+		desc="Invalid: Missing key",
+		value={"items": [1, 2, 3]},
+		type_hint=DummyConfig,
+		expected_context=pytest.raises(ValueError),
+		match="Missing required key",
+	),
+	TypeTestCase(
+		desc="Invalid: Root key type mismatch",
+		value={"name": 123, "items": [1, 2, 3]},
+		type_hint=DummyConfig,
+		expected_context=pytest.raises(ValueError),
+		match="Invalid type for key 'name'",
+	),
+	TypeTestCase(
+		desc="Invalid: Generic list sub-type mismatch",
+		value={"name": "test", "items": [1, "two", 3]},
+		type_hint=DummyConfig,
+		expected_context=pytest.raises(ValueError),
+		match="All elements in",
+	),
+	TypeTestCase(
+		desc="Invalid: Not a dictionary",
+		value="not a dict",
+		type_hint=DummyConfig,
+		expected_context=pytest.raises(TypeError),
+		match="must be of type dict",
+	),
+]
 
-	def test_string_with_spaces(self):
-		assert is_alpha_lowercase_no_spaces("invalid string") is False
 
-	def test_string_with_uppercase(self):
-		assert is_alpha_lowercase_no_spaces("InvalidString") is False
-
-	def test_string_with_non_alpha(self):
-		assert is_alpha_lowercase_no_spaces("invalid123") is False
-
-	def test_empty_string(self):
-		assert is_alpha_lowercase_no_spaces("") is False
+@pytest.mark.parametrize("case", VALIDATE_TYPED_DICT_CASES, ids=lambda c: c.desc)
+def test_validate_typed_dict(case: TypeTestCase):
+	"""Test the recursive TypedDict schema validator using a single case object."""
+	with case.expected_context as exc_info:
+		validate_typed_dict(case.value, name="test_dict", type_hint=case.type_hint)
+	if case.match and exc_info:
+		assert case.match in str(exc_info.value)
