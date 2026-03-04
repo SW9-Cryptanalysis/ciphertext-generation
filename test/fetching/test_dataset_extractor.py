@@ -30,13 +30,13 @@ def valid_multi_config():
 TITLE_TEST_CASES = [
 	# --- 1. The "Happy Paths" (Standard Formatting) ---
 	(
-		"# My Perfect Title\n\nThis is the first paragraph.", 
-		"My Perfect Title", 
+		"# My Perfect Title\n\nThis is the first paragraph.",
+		"My Perfect Title",
 		"Standard Markdown H1"
 	),
 	(
-		"A Standard Plaintext Title\n\nAnd here is the body of the paper.", 
-		"A Standard Plaintext Title", 
+		"A Standard Plaintext Title\n\nAnd here is the body of the paper.",
+		"A Standard Plaintext Title",
 		"Standard plaintext first block"
 	),
 
@@ -48,59 +48,59 @@ TITLE_TEST_CASES = [
 
 	# --- 3. Whitespace and Linebreak Chaos ---
 	(
-		"   #    Title   with   Crazy    Spaces    \n\nBody", 
-		"Title with Crazy Spaces", 
+		"   #    Title   with   Crazy    Spaces    \n\nBody",
+		"Title with Crazy Spaces",
 		"Extreme internal and leading whitespace"
 	),
 	(
-		"# A Very Long\nTitle That Spans\nMultiple Lines\n\nFirst paragraph.", 
-		"A Very Long Title That Spans Multiple Lines", 
+		"# A Very Long\nTitle That Spans\nMultiple Lines\n\nFirst paragraph.",
+		"A Very Long Title That Spans Multiple Lines",
 		"Multiline markdown title with linebreaks inside the block"
 	),
 	(
-		"\n\n\n# Deeply Pushed Title\n\nBody text.", 
-		"Deeply Pushed Title", 
+		"\n\n\n# Deeply Pushed Title\n\nBody text.",
+		"Deeply Pushed Title",
 		"Title preceded by multiple blank lines"
 	),
 
 	# --- 4. URL Stripping Triggers ---
 	(
-		"# Title With a Link http://arxiv.org/abs/123\n\nBody", 
-		"Title With a Link", 
+		"# Title With a Link http://arxiv.org/abs/123\n\nBody",
+		"Title With a Link",
 		"Standard HTTP link stripping"
 	),
 	(
-		"Another Title https://github.com/repo\n\nBody", 
-		"Another Title", 
+		"Another Title https://github.com/repo\n\nBody",
+		"Another Title",
 		"HTTPS link stripping (since 'http' is a substring)"
 	),
 	(
-		"http://example.com/no-title-just-link\n\nBody", 
-		"unknown", 
+		"http://example.com/no-title-just-link\n\nBody",
+		"unknown",
 		"First block is entirely a URL"
 	),
 
 	# --- Markdown Edge Cases ---
 	(
-		"## A Secondary Header\n\nBody", 
-		"A Secondary Header", 
+		"## A Secondary Header\n\nBody",
+		"A Secondary Header",
 		"H2 header (strips both #s)"
 	),
 	(
-		"#Title Without Space\n\nBody", 
-		"Title Without Space", 
+		"#Title Without Space\n\nBody",
+		"Title Without Space",
 		"Markdown H1 missing the space after the hash"
 	),
 
 	# --- 6. Current Heuristic Limitations ---
 	(
-		"Title Without Double Newlines\nThis is immediately followed by the abstract. No blank lines exist.\nWe just keep typing.", 
-		"Title Without Double Newlines This is immediately followed by the abstract. No blank lines exist. We just keep typing.", 
+		"Title Without Double Newlines\nThis is immediately followed by the abstract. No blank lines exist.\nWe just keep typing.",
+		"Title Without Double Newlines This is immediately followed by the abstract. No blank lines exist. We just keep typing.",
 		"No double newlines means the entire document is treated as the title block"
 	),
 	(
-		"# Understanding HTTP and FTP Protocols\n\nBody", 
-		"Understanding HTTP and FTP Protocols", 
+		"# Understanding HTTP and FTP Protocols\n\nBody",
+		"Understanding HTTP and FTP Protocols",
 		"'HTTP' is uppercase, so .find('http') misses it (case-sensitivity)"
 	),
 ]
@@ -241,7 +241,7 @@ class TestDatasetExtractorGetIdStream:
 			ValueError, match="No Project Gutenberg dataset found in config."
 		):
 			next(stream)
-   
+
 class TestDatasetExtractorTitelExtraction:
 	@pytest.mark.parametrize("text, expected, description", TITLE_TEST_CASES)
 	def test_extract_title_from_text(self, text, expected, description):
