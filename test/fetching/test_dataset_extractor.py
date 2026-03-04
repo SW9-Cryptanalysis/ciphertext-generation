@@ -3,6 +3,8 @@ import logging
 import certifi
 from fetching.dataset_extractor import DatasetExtractor
 from datasets import IterableDataset
+from typing import Any
+from dataclasses import dataclass
 
 
 @pytest.fixture
@@ -27,81 +29,77 @@ def valid_multi_config():
 		},
 	]
 
+
 TITLE_TEST_CASES = [
 	# --- 1. The "Happy Paths" (Standard Formatting) ---
 	(
 		"# My Perfect Title\n\nThis is the first paragraph.",
 		"My Perfect Title",
-		"Standard Markdown H1"
+		"Standard Markdown H1",
 	),
 	(
 		"A Standard Plaintext Title\n\nAnd here is the body of the paper.",
 		"A Standard Plaintext Title",
-		"Standard plaintext first block"
+		"Standard plaintext first block",
 	),
-
 	# --- 2. Empty and Invalid Inputs ---
 	(None, "unknown", "None type input"),
 	("", "unknown", "Empty string"),
 	("    \n   \t  ", "unknown", "Whitespace-only string"),
 	(12345, "unknown", "Integer input (type safety)"),
-
 	# --- 3. Whitespace and Linebreak Chaos ---
 	(
 		"   #    Title   with   Crazy    Spaces    \n\nBody",
 		"Title with Crazy Spaces",
-		"Extreme internal and leading whitespace"
+		"Extreme internal and leading whitespace",
 	),
 	(
 		"# A Very Long\nTitle That Spans\nMultiple Lines\n\nFirst paragraph.",
 		"A Very Long Title That Spans Multiple Lines",
-		"Multiline markdown title with linebreaks inside the block"
+		"Multiline markdown title with linebreaks inside the block",
 	),
 	(
 		"\n\n\n# Deeply Pushed Title\n\nBody text.",
 		"Deeply Pushed Title",
-		"Title preceded by multiple blank lines"
+		"Title preceded by multiple blank lines",
 	),
-
 	# --- 4. URL Stripping Triggers ---
 	(
 		"# Title With a Link http://arxiv.org/abs/123\n\nBody",
 		"Title With a Link",
-		"Standard HTTP link stripping"
+		"Standard HTTP link stripping",
 	),
 	(
 		"Another Title https://github.com/repo\n\nBody",
 		"Another Title",
-		"HTTPS link stripping (since 'http' is a substring)"
+		"HTTPS link stripping (since 'http' is a substring)",
 	),
 	(
 		"http://example.com/no-title-just-link\n\nBody",
 		"unknown",
-		"First block is entirely a URL"
+		"First block is entirely a URL",
 	),
-
 	# --- Markdown Edge Cases ---
 	(
 		"## A Secondary Header\n\nBody",
 		"A Secondary Header",
-		"H2 header (strips both #s)"
+		"H2 header (strips both #s)",
 	),
 	(
 		"#Title Without Space\n\nBody",
 		"Title Without Space",
-		"Markdown H1 missing the space after the hash"
+		"Markdown H1 missing the space after the hash",
 	),
-
 	# --- 6. Current Heuristic Limitations ---
 	(
 		"Title Without Double Newlines\nThis is immediately followed by the abstract. No blank lines exist.\nWe just keep typing.",
 		"Title Without Double Newlines This is immediately followed by the abstract. No blank lines exist. We just keep typing.",
-		"No double newlines means the entire document is treated as the title block"
+		"No double newlines means the entire document is treated as the title block",
 	),
 	(
 		"# Understanding HTTP and FTP Protocols\n\nBody",
 		"Understanding HTTP and FTP Protocols",
-		"'HTTP' is uppercase, so .find('http') misses it (case-sensitivity)"
+		"'HTTP' is uppercase, so .find('http') misses it (case-sensitivity)",
 	),
 ]
 
@@ -242,6 +240,76 @@ class TestDatasetExtractorGetIdStream:
 		):
 			next(stream)
 
+
+@dataclass
+class NormalizeTestCase:
+	"""Encapsulates parameters for testing record normalization."""
+
+	desc: str
+	record: dict[str, Any]
+	expected_source_name: str
+	expected_id: str
+
+
+NORMALIZE_CASES = [
+	NormalizeTestCase(
+		desc="Valid: Extracts title from standard metadata dict",
+		record={
+			"id": 123,  # Integer ID should be cast to string
+			"text": "Some document text.",
+			"metadata": {"title": "The Great Paper"},
+		},
+		expected_source_name="The Great Paper",
+		expected_id="123",
+	),
+	NormalizeTestCase(
+		desc="Fallback: Extracts title from text if metadata title is missing",
+		record={
+			"id": "abc-456",
+			"text": "# Header Title\n\nSome document text.",
+			"metadata": {},
+		},
+		expected_source_name="Header Title",
+		expected_id="abc-456",
+	),
+	NormalizeTestCase(
+		desc="Fallback: Extracts title from text if metadata is not a dict",
+		record={
+			"id": "def-789",
+			"text": "Plaintext Title\n\nSome document text.",
+			"metadata": "corrupted_string_metadata",
+		},
+		expected_source_name="Plaintext Title",
+		expected_id="def-789",
+	),
+	NormalizeTestCase(
+		desc="Edge Case: Missing ID and missing metadata entirely",
+		record={"text": "Emergency Title\n\nSome document text."},
+		expected_source_name="Emergency Title",
+		expected_id="unknown",
+	),
+]
+
+
+@pytest.mark.parametrize("case", NORMALIZE_CASES, ids=lambda c: c.desc)
+def test_normalize_record_logic(case: NormalizeTestCase):
+	"""Test the normalization mapping logic across various metadata states."""
+
+	# Empty config is fine since we are just testing the isolated method
+	extractor = DatasetExtractor([])
+
+	result = extractor._normalize_record(
+		x=case.record, p="test_prefix", t="test_type", fg=["Test Genre"]
+	)
+
+	assert result["source_name"] == case.expected_source_name
+	assert result["id"] == case.expected_id
+	assert result["text"] == case.record["text"]
+	assert result["prefix"] == "test_prefix"
+	assert result["source_type"] == "test_type"
+	assert result["fallback_genres"] == ["Test Genre"]
+
+
 class TestDatasetExtractorTitleExtraction:
 	@pytest.mark.parametrize("text, expected, description", TITLE_TEST_CASES)
 	def test_extract_title_from_text(self, text, expected, description):
@@ -249,7 +317,6 @@ class TestDatasetExtractorTitleExtraction:
 		extractor = DatasetExtractor([])
 		result = extractor._extract_title_from_text(text)
 		assert result == expected, f"Failed on: {description}"
-
 
 
 @pytest.mark.integration
