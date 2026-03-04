@@ -242,7 +242,7 @@ class TestDatasetExtractorGetIdStream:
 		):
 			next(stream)
 
-class TestDatasetExtractorTitelExtraction:
+class TestDatasetExtractorTitleExtraction:
 	@pytest.mark.parametrize("text, expected, description", TITLE_TEST_CASES)
 	def test_extract_title_from_text(self, text, expected, description):
 		"""Test the extraction of a title from a raw text."""
