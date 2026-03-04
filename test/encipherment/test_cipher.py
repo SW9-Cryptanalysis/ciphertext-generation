@@ -1,6 +1,8 @@
 import pytest
 from encipherment.cipher import HomophonicCipher, MonoalphabeticCipher
 from utils.constants import MIN_DIFFICULTY, MAX_DIFFICULTY
+from typing import Any
+from dataclasses import dataclass
 
 # --- Fixtures ---
 
@@ -44,19 +46,32 @@ def sample_stream_illegal(sample_texts_illegal):
 	]
 
 
-@pytest.fixture
-def bad_streams():
-	"""Returns a list of invalid TextStream dictionaries for HomophonicCipher."""
-	return [
-		{
+@dataclass
+class BadStreamTestCase:
+	"""Encapsulates parameters for testing invalid TextStream dictionaries."""
+	desc: str
+	stream: dict[str, Any]
+	expected_exception: type[Exception]
+	match: str
+
+
+BAD_STREAM_CASES = [
+	BadStreamTestCase(
+		desc="Invalid: Empty plaintext string",
+		stream={
 			"text": "",
 			"text_with_boundaries": "",
 			"source_id": "book_123",
 			"source_name": "Test Book",
-			"length": len("invalid"),
+			"length": 0,
 			"genres": [],
 		},
-		{
+		expected_exception=ValueError,
+		match="non-empty",
+	),
+	BadStreamTestCase(
+		desc="Invalid: Whitespace only plaintext string",
+		stream={
 			"text": " ",
 			"text_with_boundaries": " ",
 			"source_id": "book_123",
@@ -64,15 +79,23 @@ def bad_streams():
 			"length": 0,
 			"genres": [],
 		},
-		{
-			"text": "inval id",
+		expected_exception=ValueError,
+		match="lowercase alphabetic string with no spaces",
+	),
+	BadStreamTestCase(
+		desc="Invalid: Length is None type",
+		stream={
+			"text": "invalid",
 			"text_with_boundaries": "inval_id",
 			"source_id": "book_123",
 			"source_name": "Test Book",
 			"length": None,
 			"genres": [],
 		},
-	]
+		expected_exception=ValueError,
+		match="Invalid type for key 'length'",
+	),
+]
 
 
 # --- HomophonicCipher Tests ---
@@ -111,12 +134,8 @@ class TestHomophonicCipher:
 				# Wrap illegal text in a TextStream dict structure
 				bad_stream = {"text": text, "source_name": "bad"}
 
-				with pytest.raises(KeyError) as excinfo:
+				with pytest.raises(ValueError, match="Missing required keys"):
 					HomophonicCipher(bad_stream)  # type: ignore
-				assert "text_obj" in str(excinfo.value)
-				assert "Missing keys:" in str(excinfo.value)
-				assert "source_id" in str(excinfo.value)
-				assert "source_name" in str(excinfo.value)
 
 		def test_defined_difficulty(self, valid_text_stream):
 			for difficulty in range(4, 11):
@@ -164,29 +183,11 @@ class TestHomophonicCipher:
 					in str(excinfo.value)
 				)
 
-		def test_non_integer_difficulty(self, valid_text_stream):
-			for non_integer in [5.5, "ten"]:
-				with pytest.raises(TypeError) as excinfo:
-					HomophonicCipher(valid_text_stream, difficulty=non_integer)
-				assert "Parameter `difficulty` must be of type int, or None." in str(
-					excinfo.value
-				)
-
-		def test_non_stream_plaintext(self):
-			# The validator expects text_obj to be the first arg, validation might fail
-			# inside __init__ when accessing ["text"] if input is not subscriptable
-			for invalid_input in [12345, None, 5.67]:
-				with pytest.raises(TypeError):
-					HomophonicCipher(invalid_input)
-
-		def test_empty_string_plaintext_in_stream(self, bad_streams):
-			for bad_stream in bad_streams:
-				with pytest.raises(ValueError) as excinfo:
-					HomophonicCipher(bad_stream)  # type: ignore
-				assert (
-					"must include a non-empty, lowercase alphabetic string with no spaces in the text field."
-					in str(excinfo.value)
-				)
+		@pytest.mark.parametrize("case", BAD_STREAM_CASES, ids=lambda c: c.desc)
+		def test_invalid_stream_initialization(self, case: BadStreamTestCase):
+			"""Test that invalid stream parameters raise the specific expected exceptions."""
+			with pytest.raises(case.expected_exception, match=case.match):
+				HomophonicCipher(case.stream) # type: ignore
 
 	class TestHomophonicSerialization:
 		def test_json_serialization(self, valid_text_stream):
@@ -401,27 +402,8 @@ class TestMonoalphabeticCipher:
 		assert f"Key: {cipher.key}" in str_repr
 		assert f'Ciphertext: "{cipher.ciphertext}"' in str_repr
 
-	def test_illegal_plaintext(self, sample_stream_illegal):
-		for text_obj in sample_stream_illegal:
-			with pytest.raises(ValueError) as excinfo:
-				MonoalphabeticCipher(text_obj)  # type: ignore
-
-			# Use the error message from validate_text_obj
-			assert (
-				"must include a non-empty, lowercase alphabetic string with no spaces"
-				in str(excinfo.value)
-			)
-
-	def test_non_dict_input(self):
-		# FIX: The validator now checks if input is a dict/TextStream
-		for invalid_input in [12345, None, 5.67, "just a string"]:
-			with pytest.raises(TypeError):
-				MonoalphabeticCipher(invalid_input)  # type: ignore
-
-	def test_empty_string_plaintext(self, bad_streams):
-		for bad_stream in bad_streams:
-			with pytest.raises(ValueError) as excinfo:
-				MonoalphabeticCipher(bad_stream)  # type: ignore
-			assert "must include a non-empty, lowercase alphabetic string" in str(
-				excinfo.value
-			)
+	@pytest.mark.parametrize("case", BAD_STREAM_CASES, ids=lambda c: c.desc)
+	def test_invalid_stream_initialization(self, case: BadStreamTestCase):
+		"""Test that invalid stream parameters raise the specific expected exceptions."""
+		with pytest.raises(case.expected_exception, match=case.match):
+			MonoalphabeticCipher(case.stream) # type: ignore

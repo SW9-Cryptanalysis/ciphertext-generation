@@ -7,11 +7,12 @@ from abc import ABC, abstractmethod
 from parameter_validator import parameter_validator, all_of
 import json
 from utils.text_splits import TextStream
-from utils.validators import validate_typed_dict
 
 from utils.validators import (
 	in_range,
 	strongly_typed_optional,
+	validate_typed_dict,
+	is_alpha_lowercase_no_spaces,
 )
 
 
@@ -79,9 +80,7 @@ class SubstitutionCipher(ABC):
 		new_key = {}
 		for char, homophones in self.key.items():
 			remapped_homophones = [
-				int(symbol_map[str(h)])
-				for h in homophones
-				if str(h) in symbol_map
+				int(symbol_map[str(h)]) for h in homophones if str(h) in symbol_map
 			]
 
 			new_key[char] = remapped_homophones
@@ -218,6 +217,12 @@ class HomophonicCipher(SubstitutionCipher):
 				("homophonic" or "monoalphabetic").
 
 		"""
+		if not text_obj["text"]:
+			raise ValueError("Plaintext must be a non-empty string.")
+		if not is_alpha_lowercase_no_spaces(text_obj["text"]):
+			raise ValueError(
+				"Plaintext must be a lowercase alphabetic string with no spaces."
+			)
 		self.plaintext = text_obj["text"]
 		self.plaintext_with_boundaries = text_obj["text_with_boundaries"]
 		if not difficulty:
@@ -337,6 +342,12 @@ class MonoalphabeticCipher(SubstitutionCipher):
 			text_obj (TextStream): Text object containing the plaintext and metadata.
 
 		"""
+		if not text_obj["text"]:
+			raise ValueError("Plaintext must be a non-empty string.")
+		if not is_alpha_lowercase_no_spaces(text_obj["text"]):
+			raise ValueError(
+				"Plaintext must be a lowercase alphabetic string with no spaces."
+			)
 		self.plaintext = text_obj["text"]
 		self.plaintext_with_boundaries = text_obj["text_with_boundaries"]
 		self.num_symbols = 0
