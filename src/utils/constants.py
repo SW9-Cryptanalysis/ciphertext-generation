@@ -50,7 +50,24 @@ BOOK_IDS_VALIDATION = [
 ]
 
 TOTAL_BOOKS = 55_454
-DATASET_NAME = "common-pile/project_gutenberg_filtered"
+DATASETS = [
+	{
+		"path": "common-pile/project_gutenberg_filtered",
+		"type": "project_gutenberg",
+		"split_name": "train",
+		"column": "text",
+		"prefix": "pg",
+		"fallback_genres": ["Other / Uncategorized"],
+	},
+	{
+		"path": "common-pile/arxiv_papers_filtered",
+		"type": "technical",
+		"split_name": "train",
+		"column": "content",
+		"prefix": "arxiv",
+		"fallback_genres": ["Academic Papers"],
+	}
+]
 
 DEFAULT_TAXONOMY = {
 		"Sci-Fi & Fantasy": ["science fiction", "fantasy", "science-fiction"],
