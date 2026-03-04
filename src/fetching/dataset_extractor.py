@@ -69,7 +69,8 @@ class DatasetExtractor:
 			self.logger.addHandler(logging.NullHandler())
 			self.logger.setLevel(logging.CRITICAL)
 
-	def _extract_title_from_text(self, text: str) -> str:
+	@staticmethod
+	def _extract_title_from_text(text: str) -> str:
 		"""Extract a prospective title from the beginning of a raw document.
 
 		Targets Markdown headers or the first distinct text block, normalizing
@@ -101,7 +102,8 @@ class DatasetExtractor:
 
 		return clean_title or "unknown"
 
-	def _normalize_record(self, x: dict, p: str, t: str, fg: list[str]) -> dict:
+	@staticmethod
+	def _normalize_record(x: dict, p: str, t: str, fg: list[str]) -> dict:
 		"""Normalize individual records and safely map metadata."""
 		metadata = x.get("metadata", {})
 		source_name = "unknown"
@@ -109,16 +111,15 @@ class DatasetExtractor:
 			source_name = metadata.get("title", "unknown")
 
 		if source_name == "unknown":
-			source_name = self._extract_title_from_text(x["text"])
+			source_name = DatasetExtractor._extract_title_from_text(x["text"])
 
 		return {
-			"id": str(x.get("id", "unknown")),
-			"text": x["text"],
-			"source_name": source_name,
-			"prefix": p,
-			"source_type": t,
-			"fallback_genres": fg,
-		}
+            "id": f"{p}:{str(x.get('id', 'unknown'))}",
+            "text": x["text"],
+            "source_name": source_name,
+            "source_type": t,
+            "fallback_genres": fg,
+        }
 
 	def get_full_stream(self) -> IterableDataset:
 		"""Get the full Hugging Face stream.
@@ -148,7 +149,7 @@ class DatasetExtractor:
 			fallback_genres = config.get("fallback_genres", ["Other / Uncategorized"])
 
 			ds = ds.map(
-				self._normalize_record,
+				DatasetExtractor._normalize_record,
 				fn_kwargs={"p": prefix, "t": source_type, "fg": fallback_genres},
 			)
 
@@ -156,7 +157,6 @@ class DatasetExtractor:
 				"id",
 				"text",
 				"source_name",
-				"prefix",
 				"source_type",
 				"fallback_genres",
 			]

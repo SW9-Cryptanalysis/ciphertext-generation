@@ -4,7 +4,7 @@ from cipher_generation.cipher_manager import CipherManager
 from typing import Iterator
 
 from fetching.dataset_extractor import DatasetExtractor
-from fetching.corpus_sampler import CorpusSampler
+from fetching.corpus_sampler import CorpusSampler, Targets
 from utils.genres import load_existing_genre_map
 from utils.text_splits import randomize_stream, TextStream
 from utils.constants import (
@@ -12,12 +12,12 @@ from utils.constants import (
 	NUM_VALIDATION_CIPHERS,
 	NUM_TEST_CIPHERS,
 	GENRE_MAP_PATH,
-	DATASET_NAME,
+	DATASETS,
 )
 
 
 def get_text_stream(
-	targets: dict[str, int],
+	targets: Targets,
 	len_bounds: tuple[int, int] = (4000, 10000),
 	extractor: DatasetExtractor | None = None,
 ) -> Iterator[tuple[str, TextStream]]:
@@ -33,7 +33,7 @@ def get_text_stream(
 
 	"""
 	if extractor is None:
-		extractor = DatasetExtractor(DATASET_NAME)
+		extractor = DatasetExtractor(DATASETS)
 
 	genre_map = load_existing_genre_map(GENRE_MAP_PATH, None)
 	full_stream = randomize_stream(extractor.get_full_stream())
@@ -72,11 +72,13 @@ if __name__ == "__main__":
 		load_folder_ids()
 	)
 
-	targets = {
-		"train": NUM_TRAINING_CIPHERS,
-		"val": NUM_VALIDATION_CIPHERS,
-		"test": NUM_TEST_CIPHERS,
-	}
+	targets = Targets(
+		{
+			"train": NUM_TRAINING_CIPHERS,
+			"val": NUM_VALIDATION_CIPHERS,
+			"test": NUM_TEST_CIPHERS,
+		},
+	)
 
 	text_stream = get_text_stream(targets=targets)
 
