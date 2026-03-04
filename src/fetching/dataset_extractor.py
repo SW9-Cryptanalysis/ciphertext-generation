@@ -90,7 +90,7 @@ class DatasetExtractor:
 		paragraphs = re.split(r"\n\s*\n", text)
 		first_block = paragraphs[0] if paragraphs else text
 
-		title_match = re.match(r"^#\s*(.*)", first_block, flags=re.DOTALL)
+		title_match = re.match(r"^#+\s*(.*)", first_block, flags=re.DOTALL)
 		raw_title = title_match.group(1) if title_match else first_block
 
 		clean_title = re.sub(r"\s+", " ", raw_title).strip()
@@ -99,7 +99,7 @@ class DatasetExtractor:
 		if url_index != -1:
 			clean_title = clean_title[:url_index].strip()
 
-		return clean_title
+		return clean_title or "unknown"
 
 	def get_full_stream(self) -> IterableDataset:
 		"""Get the full Hugging Face stream.
