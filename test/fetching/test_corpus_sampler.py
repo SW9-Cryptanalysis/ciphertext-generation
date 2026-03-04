@@ -40,7 +40,7 @@ class TestCorpusSamplerInit:
         """Test that the parameter validator intercepts incorrect dictionary keys."""
         invalid_targets = {"train": 100, "validation": 10}
 
-        with pytest.raises(ValueError, match="Missing required key in targets: 'val'"):
+        with pytest.raises(ValueError, match="Missing required keys in targets: 'test', 'val'"):
             CorpusSampler(invalid_targets, (500, 1000), default_genre_map) # type: ignore
 
 
