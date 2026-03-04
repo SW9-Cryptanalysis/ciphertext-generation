@@ -97,6 +97,7 @@ def _deep_validate(value: Any, type_hint: Any) -> None:
 			f"All elements in '{value}' must be of type {element_type.__name__}.",
 		)
 
+
 def _validate_field(key: str, type_hint: type, dict: dict[str, Any], name: str) -> None:
 	"""Validate a field in a dictionary.
 
@@ -110,9 +111,6 @@ def _validate_field(key: str, type_hint: type, dict: dict[str, Any], name: str) 
 		ValueError: If the value is invalid.
 
 	"""
-	if key not in dict:
-			raise ValueError(f"Missing required key in {name}: '{key}'")
-
 	origin_type = get_origin(type_hint) or type_hint
 
 	if not isinstance(dict[key], origin_type):
@@ -126,7 +124,7 @@ def _validate_field(key: str, type_hint: type, dict: dict[str, Any], name: str) 
 
 
 @validator
-def validate_typed_dict(dict: dict[str, Any], name: str, type_hint: type) -> None:
+def validate_typed_dict(dict_obj: Any, name: str, type_hint: type) -> None:
 	"""Validate a dictionary with a specific type hint.
 
 	Args:
@@ -135,8 +133,19 @@ def validate_typed_dict(dict: dict[str, Any], name: str, type_hint: type) -> Non
 		type_hint (type): The expected type hint.
 
 	Raises:
-		ValueError: If the dictionary is invalid.
+		ValueError: If the dictionary is missing keys or has invalid types.
 
 	"""
+	if not isinstance(dict_obj, dict):
+		raise TypeError(f"Parameter `{name}` must be of type dict.")
+
+	required_keys = set(type_hint.__annotations__.keys())
+	provided_keys = set(dict_obj.keys())
+
+	missing_keys = required_keys - provided_keys
+	if missing_keys:
+		missing_str = ", ".join(f"'{k}'" for k in sorted(missing_keys))
+		raise ValueError(f"Missing required keys in {name}: {missing_str}")
+
 	for key, type_hint_sub in type_hint.__annotations__.items():
-		_validate_field(key, type_hint_sub, dict, name)
+		_validate_field(key, type_hint_sub, dict_obj, name)

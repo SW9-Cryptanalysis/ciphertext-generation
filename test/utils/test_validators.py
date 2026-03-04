@@ -243,6 +243,13 @@ VALIDATE_TYPED_DICT_CASES = [
 		expected_context=pytest.raises(ValueError),
 		match="All elements in",
 	),
+	TypeTestCase(
+		desc="Invalid: Not a dictionary",
+		value="not a dict",
+		type_hint=DummyConfig,
+		expected_context=pytest.raises(TypeError),
+		match="must be of type dict",
+	),
 ]
 
 
