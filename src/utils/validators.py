@@ -98,7 +98,7 @@ def _deep_validate(value: Any, type_hint: Any) -> None:
 		)
 
 
-def _validate_field(key: str, type_hint: type, dict: dict[str, Any], name: str) -> None:
+def _validate_field(key: str, type_hint: type, dict_obj: dict[str, Any], name: str) -> None:
 	"""Validate a field in a dictionary.
 
 	Args:
@@ -113,14 +113,14 @@ def _validate_field(key: str, type_hint: type, dict: dict[str, Any], name: str) 
 	"""
 	origin_type = get_origin(type_hint) or type_hint
 
-	if not isinstance(dict[key], origin_type):
+	if not isinstance(dict_obj[key], origin_type):
 		raise ValueError(
 			f"Invalid type for key '{key}'. "
-			f"Expected {origin_type.__name__}, got {type(dict[key]).__name__}.",
+			f"Expected {origin_type.__name__}, got {type(dict_obj[key]).__name__}.",
 		)
 
 	if origin_type is list:
-		_deep_validate(dict[key], type_hint)
+		_deep_validate(dict_obj[key], type_hint)
 
 
 @validator
