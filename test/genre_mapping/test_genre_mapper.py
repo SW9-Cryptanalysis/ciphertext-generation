@@ -51,7 +51,7 @@ class TestGenreMapperInit:
 class TestGenreMapperRun:
     def test_run_orchestrates_streaming_pipeline(self, mocker, mock_dependencies):
         """Test the streaming batch logic and intermediate checkpoint saving."""
-        mock_dependencies["extractor"].get_id_stream.return_value = iter(
+        mock_dependencies["extractor"].get_pg_id_stream.return_value = iter(
             ["1001", "1002", "1003"]
         )
 
@@ -89,7 +89,7 @@ class TestGenreMapperRun:
 
     def test_run_skips_existing_cached_ids(self, mocker, mock_dependencies):
         """Test that the cache prevents duplicate API calls for known books."""
-        mock_dependencies["extractor"].get_id_stream.return_value = iter(
+        mock_dependencies["extractor"].get_pg_id_stream.return_value = iter(
             ["1001", "1002"]
         )
 
