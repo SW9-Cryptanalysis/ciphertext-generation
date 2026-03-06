@@ -384,6 +384,11 @@ def test_real_huggingface_stream_interleaves_multiple_sources(monkeypatch):
 		assert isinstance(item["text"], str)
 		assert isinstance(item["id"], str)
 
+		if item["source_type"] == "project_gutenberg":
+			assert item["id"].startswith("pg:")
+		elif item["source_type"] == "arxiv_papers":
+			assert item["id"].startswith("arxiv:")
+
 		found_source_types.add(item["source_type"])
 
 	assert "project_gutenberg" in found_source_types, (

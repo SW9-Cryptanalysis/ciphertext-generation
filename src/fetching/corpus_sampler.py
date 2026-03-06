@@ -7,11 +7,14 @@ from utils.text_splits import (
 	get_book_chunks,
 	get_actual_take,
 	get_usable_text,
+	get_source_genres,
 	TextStream,
+	Book,
 )
 
 from utils.validators import validate_typed_dict
 from parameter_validator import parameter_validator
+
 
 class Targets(TypedDict):
 	"""A typed dictionary for target counts."""
@@ -19,6 +22,7 @@ class Targets(TypedDict):
 	train: int
 	val: int
 	test: int
+
 
 class CorpusSampler:
 	"""Manages the stateful extraction of texts across dataset splits."""
@@ -71,7 +75,7 @@ class CorpusSampler:
 
 			yield from self._process_book(book, split)
 
-	def _process_book(self, book: dict, split: str) -> Iterator[tuple[str, TextStream]]:
+	def _process_book(self, book: Book, split: str) -> Iterator[tuple[str, TextStream]]:
 		"""Handle the extraction and debt calculation for a single book."""
 		raw_text = book["text"]
 		usable_text = get_usable_text(raw_text, self.len_bounds)
@@ -99,7 +103,7 @@ class CorpusSampler:
 					"source_id": book.get("id", "unknown"),
 					"source_name": book.get("metadata", {}).get("title", "unknown"),
 					"length": len(chunk),
-					"genres": self.genre_map.get(str(book.get("id")), []),
+					"genres": get_source_genres(book, self.genre_map),
 				},
 			)
 			self.counts[split] += 1
