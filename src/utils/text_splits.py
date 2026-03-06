@@ -224,7 +224,16 @@ def get_usable_text(raw_text: str, len_bounds: tuple[int, int]) -> str:
 
 
 def get_source_genres(book: Book, genre_map: dict[str, list[str]]) -> list[str]:
-	"""Get the source genres for a book."""
+	"""Get the source genres for a book.
+
+	Args:
+		book (Book): The book to get the genres for.
+		genre_map (dict[str, list[str]]): The genre map to use for filtering.
+
+	Returns:
+		list[str]: The source genres for the book.
+
+	"""
 	if book.get("source_type") == "project_gutenberg":
 		id = book.get("id").removeprefix("pg:")
 		return genre_map.get(id, book.get("fallback_genres", []))
