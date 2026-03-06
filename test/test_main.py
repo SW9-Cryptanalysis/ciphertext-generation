@@ -7,8 +7,8 @@ from utils.formatting import format_text
 @pytest.fixture
 def book_text():
 	"""
-	Return a string of roughly 5,500 characters to simulate a book text.
-	Multiplying the base text by 7 easily clears the 5000 character minimum
+	Return a string of more than 5,000 characters to simulate a book text.
+	Multiplying the base text by 10 easily clears the 5000 character minimum
 	without needlessly processing an 80,000 character string.
 	"""
 	return (
