@@ -59,6 +59,7 @@ class CipherManager:
 		self.stats_queue = self.manager.Queue()
 
 		self.master_stats = DatasetStatsAggregator()
+		self._logging_interval = 1000
 
 	def execute(self) -> None:
 		"""Execute the cipher generation process."""
@@ -153,7 +154,7 @@ class CipherManager:
 		for count_fed, (split, text_data) in enumerate(self.stream, start=1):
 			self.job_queue.put((split, text_data))
 
-			if count_fed % 1000 == 0:
+			if count_fed % self._logging_interval == 0:
 				log.info(f"Fed {count_fed} texts to workers...")
 
 			if count_fed >= self.total_count:

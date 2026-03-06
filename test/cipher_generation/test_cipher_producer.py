@@ -1,29 +1,23 @@
 import pytest
 import os
 import queue
-import multiprocessing as mp
 from dataclasses import dataclass
 
+from encipherment.cipher import HomophonicCipher
 from cipher_generation.cipher_producer import CipherProducer
-from encipherment.cipher import SubstitutionCipher, HomophonicCipher
 from dataset_stats import DatasetStatsAggregator
 
 
-class MockCipher(SubstitutionCipher):
-	def __init__(self, *args, **kwargs):
-		self.plaintext = "a" * 500
-		self.difficulty = 10
-		self.num_symbols = 3
-		self.genres = ["Sci-Fi & Fantasy"]
+@pytest.fixture
+def mock_cipher(mocker):
+	from encipherment.cipher import SubstitutionCipher
 
-	def generate_key(self):
-		self.key = {"a": ["1"], "b": ["2"], "c": ["3"]}
-		return self.key
-
-	def encipher(self):
-		self.ciphertext = "1 2 3"
-		self.num_symbols = 3
-		return self.ciphertext
+	mock = mocker.Mock(spec=SubstitutionCipher)
+	mock.plaintext = "a" * 500
+	mock.difficulty = 10
+	mock.num_symbols = 3
+	mock.genres = ["Sci-Fi & Fantasy"]
+	return mock
 
 
 @pytest.fixture
@@ -35,9 +29,9 @@ def mock_cipher_data():
 
 @dataclass
 class ProducerContext:
-	input_q: mp.Queue
-	output_q: mp.Queue
-	stats_q: mp.Queue
+	input_q: queue.Queue
+	output_q: queue.Queue
+	stats_q: queue.Queue
 	cipher_data: tuple
 
 
@@ -56,7 +50,7 @@ def mock_producer(queue_factory):
 
 
 class TestCipherProducerRun:
-	def test_successful_run(self, mocker, producer_ctx, valid_text_stream):
+	def test_successful_run(self, mocker, producer_ctx, valid_text_stream, mock_cipher):
 		input_q = producer_ctx.input_q
 		output_q = producer_ctx.output_q
 		stats_q = producer_ctx.stats_q
@@ -64,10 +58,8 @@ class TestCipherProducerRun:
 		input_q.put(("train", valid_text_stream))
 		input_q.put("STOP")
 
-		mock_cipher_return = MockCipher()
-
 		mock_generate_cipher = mocker.patch.object(
-			CipherProducer, "generate_cipher", return_value=mock_cipher_return
+			CipherProducer, "generate_cipher", return_value=mock_cipher
 		)
 
 		mock_create_json = mocker.patch(
@@ -83,7 +75,7 @@ class TestCipherProducerRun:
 		producer.run()
 
 		mock_generate_cipher.assert_called_once_with(valid_text_stream)
-		mock_create_json.assert_called_once_with(mock_cipher_return)
+		mock_create_json.assert_called_once_with(mock_cipher)
 
 		items_in_queue = []
 		try:

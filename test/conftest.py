@@ -1,5 +1,5 @@
 import pytest
-import multiprocessing as mp
+import queue
 from test_data import dataset_bookstream
 
 
@@ -48,16 +48,18 @@ def valid_text_stream(sample_text, sample_text_with_boundaries):
 
 @pytest.fixture
 def queue_factory():
-	"""Returns a factory function that creates fresh queues."""
-	manager = mp.Manager()
-	queues = []
+    """
+    Returns a factory function that creates standard in-memory queues.
+    This avoids the overhead of spawning a Manager process per test.
+    """
+    queues = []
 
-	def _create_queue():
-		q = manager.Queue()
-		queues.append(q)
-		return q
+    def _create_queue():
+        q = queue.Queue()
+        queues.append(q)
+        return q
 
-	return _create_queue
+    return _create_queue
 
 
 @pytest.fixture
