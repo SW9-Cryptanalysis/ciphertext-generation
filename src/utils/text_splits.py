@@ -6,6 +6,16 @@ from datasets.iterable_dataset import IterableDataset
 from utils.formatting import format_text, clean_spaces
 
 
+class Book(TypedDict):
+	"""A typed dictionary for book metadata."""
+
+	id: str
+	text: str
+	source_name: str
+	source_type: str
+	fallback_genres: list[str]
+
+
 class TextStream(TypedDict):
 	"""A text stream object.
 
@@ -211,3 +221,12 @@ def get_usable_text(raw_text: str, len_bounds: tuple[int, int]) -> str:
 	else:
 		usable_text = raw_text[start_trim : total_len - end_trim]
 	return usable_text
+
+
+def get_source_genres(book: Book, genre_map: dict[str, list[str]]) -> list[str]:
+	"""Get the source genres for a book."""
+	if book.get("source_type") == "project_gutenberg":
+		id = book.get("id").removeprefix("pg:")
+		return genre_map.get(id, book.get("fallback_genres", []))
+	else:
+		return book.get("fallback_genres", [])
