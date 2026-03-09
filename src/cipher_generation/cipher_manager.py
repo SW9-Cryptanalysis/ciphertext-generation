@@ -35,14 +35,7 @@ class CipherManager:
 		text_stream_source: Iterable,
 		num_workers: int | None = None,
 	) -> None:
-		"""Initialize the CipherManager.
-
-		Args:
-			config: Configuration dictionary with count and folder_id per split.
-			text_stream_source: Iterator yielding (split, text_data) from the generator.
-			num_workers: Number of workers to use. Defaults to None.
-
-		"""
+		"""Initialize the CipherManager."""
 		self.config = config
 		self.stream = text_stream_source
 
@@ -69,7 +62,7 @@ class CipherManager:
 		)
 
 		uploader = DriveUploader(
-			queue=self.result_queue,  # type: ignore
+			upload_queue=self.result_queue,  # type: ignore
 			config=DriveUploaderConfig(
 				split_folders=self.split_folders,
 				total_ciphers=self.total_count,
@@ -135,16 +128,14 @@ class CipherManager:
 				"statistics": self.master_stats.__json__(),
 			},
 		).encode("utf-8")
-		self.result_queue.put(("metadata", metadata_filename, metadata_bytes))
+
+		self.result_queue.put(("metadata", metadata_filename, metadata_bytes, 0))
 
 	def _feeder_stream(self) -> int:
 		"""Feed the ciphers to the workers using the job queue.
 
-		This method feeds the ciphers to the workers using the job queue. It
-		handles routing by split and error handling.
-
-		Raises:
-			Exception: If any error occurs during the execution.
+		Returns:
+			int: The number of ciphers fed to the workers.
 
 		"""
 		log.info("Feeding ciphers to workers...")
