@@ -1,179 +1,167 @@
 import pytest
-import os
 import queue
 from dataclasses import dataclass
 
 from encipherment.cipher import HomophonicCipher
 from cipher_generation.cipher_producer import CipherProducer
-from dataset_stats import DatasetStatsAggregator
+
+
+@pytest.fixture
+def valid_text_stream():
+	"""Provide a standardized mock text stream dictionary."""
+	return {"text": "mock_text", "source_id": "1"}
 
 
 @pytest.fixture
 def mock_cipher(mocker):
-	from encipherment.cipher import SubstitutionCipher
-
-	mock = mocker.Mock(spec=SubstitutionCipher)
-	mock.plaintext = "a" * 500
-	mock.difficulty = 10
+	"""Mock a SubstitutionCipher with a valid __json__ return value."""
+	mock = mocker.Mock()
+	mock.plaintext = "a" * 10
+	mock.difficulty = 5
 	mock.num_symbols = 3
-	mock.genres = ["Sci-Fi & Fantasy"]
+	mock.genres = ["Sci-Fi"]
+	mock.__json__ = mocker.Mock(return_value={"mock_key": "mock_value"})
 	return mock
 
 
 @pytest.fixture
-def mock_cipher_data():
-	mock_json = '{"key": "value"}'
-	mock_bytes = mock_json.encode("utf-8")
-	return mock_json, mock_bytes
+def producer(mocker):
+	"""Provide a standard CipherProducer configured with a small batch size of 2."""
+	mock_input_queue = mocker.Mock()
+	mock_output_queue = mocker.Mock()
+	mock_stats_queue = mocker.Mock()
+	return CipherProducer(
+		queues=(mock_input_queue, mock_output_queue, mock_stats_queue),
+		batch_size=2,
+		name="TestProducer",
+	)
 
 
 @dataclass
-class ProducerContext:
-	input_q: queue.Queue
-	output_q: queue.Queue
-	stats_q: queue.Queue
-	cipher_data: tuple
+class CipherErrorCase:
+	"""Defines the parameters for testing various cipher generation failures.
+
+	Attributes:
+		id (str): The test case identifier.
+		exception (Exception): The exception raised during generation.
+		expected_log (str): The expected error log message.
+	"""
+
+	id: str
+	exception: Exception
+	expected_log: str
 
 
-@pytest.fixture
-def producer_ctx(queue_factory, mock_cipher_data):
-	return ProducerContext(
-		queue_factory(), queue_factory(), queue_factory(), mock_cipher_data
-	)
+cipher_error_cases = [
+	CipherErrorCase(
+		id="value_error",
+		exception=ValueError("Invalid cipher setup"),
+		expected_log="Error generating cipher: Invalid cipher setup",
+	),
+	CipherErrorCase(
+		id="unexpected_exception",
+		exception=Exception("Critical system failure"),
+		expected_log="Unexpected cipher generation error: Critical system failure",
+	),
+]
 
 
-@pytest.fixture
-def mock_producer(queue_factory):
-	return CipherProducer(
-		queues=(queue_factory(), queue_factory(), queue_factory()), name="TestProducer"
-	)
+class TestCipherProducerRunLoop:
+	"""Tests covering the batching loop, queue pulling, and cleanup logic."""
 
+	def test_successful_batch_flush(
+		self,
+		mocker,
+		producer,
+		valid_text_stream,
+		mock_cipher,
+	):
+		"""Verify the producer accumulates ciphers and flushes exactly at the batch size.
 
-class TestCipherProducerRun:
-	def test_successful_run(self, mocker, producer_ctx, valid_text_stream, mock_cipher):
-		input_q = producer_ctx.input_q
-		output_q = producer_ctx.output_q
-		stats_q = producer_ctx.stats_q
+		Provides two valid items to trigger exactly one full batch, then sends the STOP signal.
+		Because the batch size is 2, the output_queue.put method should be called exactly once.
+		"""
+		producer.input_queue.get.side_effect = [
+			("train", valid_text_stream),
+			("train", valid_text_stream),
+			"STOP",
+		]
 
-		input_q.put(("train", valid_text_stream))
-		input_q.put("STOP")
-
-		mock_generate_cipher = mocker.patch.object(
-			CipherProducer, "generate_cipher", return_value=mock_cipher
-		)
-
-		mock_create_json = mocker.patch(
-			"cipher_generation.cipher_producer.create_cipher_json",
-			return_value=producer_ctx.cipher_data,
-		)
-
-		producer = CipherProducer(
-			queues=(input_q, output_q, stats_q),
-			name="TestProducer",
-		)
-
-		producer.run()
-
-		mock_generate_cipher.assert_called_once_with(valid_text_stream)
-		mock_create_json.assert_called_once_with(mock_cipher)
-
-		items_in_queue = []
-		try:
-			items_in_queue.append(output_q.get(timeout=0.1))
-		except queue.Empty:
-			pytest.fail("Queue was empty before receiving expected cipher.")
-
-		assert len(items_in_queue) == 1
-
-		last_split, last_filename, last_bytes = items_in_queue[-1]
-		expected_pid = os.getpid()
-
-		assert last_split == "train"
-		assert f"_{expected_pid}.json" in last_filename
-		assert "123" in last_filename
-		assert last_bytes == producer_ctx.cipher_data[1]
-
-		try:
-			stats_obj = stats_q.get(timeout=0.1)
-			assert isinstance(stats_obj, DatasetStatsAggregator)
-			assert stats_obj.splits["train"].total_count == 1
-		except queue.Empty:
-			pytest.fail("Stats queue was empty before receiving aggregator.")
-
-	def test_stop_signal(self, queue_factory, caplog):
-		input_q, output_q, stats_q = queue_factory(), queue_factory(), queue_factory()
-		input_q.put("STOP")
-
-		producer = CipherProducer(
-			queues=(input_q, output_q, stats_q), name="TestProducer"
-		)
+		mocker.patch.object(producer, "generate_cipher", return_value=mock_cipher)
 
 		producer.run()
 
-		assert output_q.empty()
-		assert not stats_q.empty()
+		assert producer.output_queue.put.call_count == 1
 
-	def test_generation_runtime_failure(self, mocker, queue_factory):
-		input_q, output_q, stats_q = queue_factory(), queue_factory(), queue_factory()
+		call_args = producer.output_queue.put.call_args[0][0]
+		split, archive_name, compressed_bytes, cipher_count = call_args
 
-		input_q.put(("val", {"text": "fail", "source_id": "1"}))
-		input_q.put("STOP")
+		assert split == "train"
+		assert archive_name.startswith("batch_train_")
+		assert archive_name.endswith(".jsonl.zip")
+		assert isinstance(compressed_bytes, bytes)
+		assert cipher_count == 2
 
+	def test_orphan_batch_cleanup_on_stop(
+		self,
+		mocker,
+		producer,
+		valid_text_stream,
+		mock_cipher,
+	):
+		"""Verify that sending STOP forces a flush of any remaining items in the buffer.
+
+		Provides only one valid item so it does not hit the batch limit naturally.
+		The cleanup method must catch the orphan cipher and flush it under the 'final' split label.
+		"""
+		producer.input_queue.get.side_effect = [("val", valid_text_stream), "STOP"]
+
+		mocker.patch.object(producer, "generate_cipher", return_value=mock_cipher)
+
+		producer.run()
+
+		assert producer.output_queue.put.call_count == 1
+		call_args = producer.output_queue.put.call_args[0][0]
+		split, _, _, cipher_count = call_args
+
+		assert split == "final"
+		assert cipher_count == 1
+
+	def test_empty_queue_timeout(self, producer):
+		"""Verify the producer survives queue timeouts and continues listening."""
+		producer.input_queue.get.side_effect = [queue.Empty, queue.Empty, "STOP"]
+
+		producer.run()
+
+		assert producer.input_queue.get.call_count == 3
+
+	def test_unexpected_queue_exception(self, mocker, producer):
+		"""Verify the producer logs unexpected queue failures and continues listening."""
 		mock_log = mocker.patch("cipher_generation.cipher_producer.log")
-
-		mocker.patch.object(CipherProducer, "generate_cipher", return_value=None)
-
-		producer = CipherProducer(
-			queues=(input_q, output_q, stats_q), name="TestProducer"
-		)
+		producer.input_queue.get.side_effect = [Exception("Queue disconnect"), "STOP"]
 
 		producer.run()
 
-		assert output_q.empty()
-		mock_log.info.assert_any_call("TestProducer finished generation.")
+		mock_log.error.assert_called_once()
+		assert "Queue disconnect" in mock_log.error.call_args[0][0]
+		assert producer.input_queue.get.call_count == 2
 
-	def test_run_handles_queue_empty_and_retries(self, mocker):
-		mock_input_q = mocker.Mock()
-		mock_output_q = mocker.Mock()
-		mock_stats_q = mocker.Mock()
-
-		mock_input_q.get.side_effect = [queue.Empty, "STOP"]
-
-		producer = CipherProducer(
-			queues=(mock_input_q, mock_output_q, mock_stats_q),
-			name="TestProducer",
-		)
+	def test_run_skips_invalid_cipher(self, mocker, producer, valid_text_stream):
+		"""Verify the loop skips to the next item if cipher generation returns None."""
+		producer.input_queue.get.side_effect = [("train", valid_text_stream), "STOP"]
+		mocker.patch.object(producer, "generate_cipher", return_value=None)
 
 		producer.run()
 
-		assert mock_input_q.get.call_count == 2
-		mock_stats_q.put.assert_called_once()
-
-	def test_run_handles_unexpected_loop_exception(self, mocker):
-		mock_input_q = mocker.Mock()
-		mock_output_q = mocker.Mock()
-		mock_stats_q = mocker.Mock()
-		mock_log = mocker.patch("cipher_generation.cipher_producer.log")
-
-		mock_input_q.get.side_effect = [Exception("Queue connection lost"), "STOP"]
-
-		producer = CipherProducer(
-			queues=(mock_input_q, mock_output_q, mock_stats_q),
-			name="TestProducer",
-		)
-
-		producer.run()
-
-		mock_log.error.assert_called()
-		assert "Queue connection lost" in mock_log.error.call_args[0][0]
-		assert mock_input_q.get.call_count == 2
-		mock_stats_q.put.assert_called_once()
+		assert producer.input_queue.get.call_count == 2
+		producer.output_queue.put.assert_not_called()
 
 
 class TestGenerateCipherLogic:
-	def test_generate_cipher_success(self, mocker, mock_producer, valid_text_stream):
-		producer = mock_producer
+	"""Tests covering the internal instantiation and error handling of HomophonicCipher."""
 
+	def test_generate_cipher_success(self, mocker, producer, valid_text_stream):
+		"""Verify the cipher is instantiated, generated, and enciphered correctly."""
 		mock_cipher_instance = mocker.Mock(spec=HomophonicCipher)
 		mocked_homophonic_cipher = mocker.patch(
 			"cipher_generation.cipher_producer.HomophonicCipher",
@@ -183,44 +171,24 @@ class TestGenerateCipherLogic:
 		cipher = producer.generate_cipher(valid_text_stream)
 
 		mocked_homophonic_cipher.assert_called_once_with(valid_text_stream)
-
 		mock_cipher_instance.generate_key.assert_called_once()
 		mock_cipher_instance.encipher.assert_called_once()
-
 		assert cipher == mock_cipher_instance
 
-	def test_generate_cipher_errors(self, mocker, mock_producer, valid_text_stream):
-		producer = mock_producer
-
-		mock_log = mocker.patch("cipher_generation.cipher_producer.log")
-
-		mocker.patch(
-			"cipher_generation.cipher_producer.HomophonicCipher",
-			side_effect=ValueError("Invalid cipher setup"),
-		)
-
-		result = producer.generate_cipher(valid_text_stream)
-
-		assert result is None
-		mock_log.error.assert_called()
-		assert "Error generating cipher" in mock_log.error.call_args[0][0]
-
-	def test_generate_cipher_unexpected_exception(
-		self, mocker, mock_producer, valid_text_stream
+	@pytest.mark.parametrize("case", cipher_error_cases, ids=lambda c: c.id)
+	def test_generate_cipher_errors(
+		self, mocker, producer, valid_text_stream, case: CipherErrorCase
 	):
-		producer = mock_producer
-
+		"""Verify that cipher generation failures are caught and logged gracefully."""
 		mock_log = mocker.patch("cipher_generation.cipher_producer.log")
 
 		mocker.patch(
 			"cipher_generation.cipher_producer.HomophonicCipher",
-			side_effect=Exception("Critical system failure"),
+			side_effect=case.exception,
 		)
 
 		result = producer.generate_cipher(valid_text_stream)
 
 		assert result is None
-		mock_log.error.assert_called()
-		log_msg = mock_log.error.call_args[0][0]
-		assert "Unexpected cipher generation error" in log_msg
-		assert "Critical system failure" in log_msg
+		mock_log.error.assert_called_once()
+		assert case.expected_log in mock_log.error.call_args[0][0]
