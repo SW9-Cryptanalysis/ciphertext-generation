@@ -70,8 +70,14 @@ class CorpusSampler:
 				continue
 
 			split = get_split(idx)
+			
 			if self.counts[split] >= self.targets[split]:
-				continue
+				for backup_split in ["val", "test", "train"]:
+					if self.counts[backup_split] < self.targets[backup_split]:
+						split = backup_split
+						break
+				else:
+					continue
 
 			yield from self._process_book(book, split)
 
@@ -81,7 +87,7 @@ class CorpusSampler:
 		usable_text = get_usable_text(raw_text, self.len_bounds)
 
 		safe_capacity_req = int(self.len_bounds[1] * 1.5)
-		capacity = len(usable_text) // safe_capacity_req
+		capacity = len(usable_text) // safe_capacity_req if safe_capacity_req > 0 else 0
 
 		self.debts[split] += self.means[split]
 		actual_take = get_actual_take(split, self.debts, capacity)
@@ -90,7 +96,9 @@ class CorpusSampler:
 			return
 
 		take_limit = min(actual_take, self.targets[split] - self.counts[split])
-
+		
+		chunks_yielded = 0 
+		
 		for chunk, bounded_chunk in islice(
 			get_book_chunks(usable_text, actual_take, self.len_bounds),
 			take_limit,
@@ -107,5 +115,6 @@ class CorpusSampler:
 				},
 			)
 			self.counts[split] += 1
+			chunks_yielded += 1
 
-		self.debts[split] -= actual_take
+		self.debts[split] -= chunks_yielded
