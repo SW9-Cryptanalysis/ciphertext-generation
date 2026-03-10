@@ -43,8 +43,9 @@ class CipherProducer(mp.Process):
 		"""Execute the cipher generation process loop."""
 		stats = DatasetStatsAggregator()
 		process_name = self.name
-		batch_buffer: list[str] = []
-		batch_index = 0
+
+		batch_buffers: dict[str, list[str]] = {"train": [], "val": [], "test": []}
+		batch_indices: dict[str, int] = {"train": 0, "val": 0, "test": 0}
 
 		log.info(f"{process_name} started.")
 
@@ -53,11 +54,12 @@ class CipherProducer(mp.Process):
 				item = self.input_queue.get(timeout=5)
 
 				if item == "STOP":
-					self._cleanup(batch_buffer, batch_index, stats)
+					self._cleanup_all(batch_buffers, batch_indices, stats)
 					log.info(f"{process_name} received STOP signal.")
 					break
 
 				split, text_obj = item
+
 				cipher = self.generate_cipher(text_obj)
 
 				if cipher is None:
@@ -72,12 +74,12 @@ class CipherProducer(mp.Process):
 				)
 
 				cipher_str = json.dumps(cipher.__json__())
-				batch_buffer.append(cipher_str)
+				batch_buffers[split].append(cipher_str)
 
-				if len(batch_buffer) >= self.batch_size:
-					self._flush_batch(batch_buffer, split, batch_index)
-					batch_buffer.clear()
-					batch_index += 1
+				if len(batch_buffers[split]) >= self.batch_size:
+					self._flush_batch(batch_buffers[split], split, batch_indices[split])
+					batch_buffers[split].clear()
+					batch_indices[split] += 1
 
 			except queue.Empty:
 				continue
@@ -86,21 +88,16 @@ class CipherProducer(mp.Process):
 
 		log.info(f"{process_name} finished generation.")
 
-	def _cleanup(
+	def _cleanup_all(
 		self,
-		batch_buffer: list[str],
-		batch_index: int,
+		batch_buffers: dict[str, list[str]],
+		batch_indices: dict[str, int],
 		stats: DatasetStatsAggregator,
 	) -> None:
-		"""Flush any remaining ciphers and send the final stats.
-
-		Args:
-			batch_buffer (list[str]): The list of cipher JSON strings in the current batch.
-			batch_index (int): The current batch index.
-			stats (DatasetStatsAggregator): The current dataset statistics.
-		"""
-		if batch_buffer:
-			self._flush_batch(batch_buffer, "final", batch_index)
+		"""Flush any remaining ciphers across all splits and send final stats."""
+		for split, buffer in batch_buffers.items():
+			if buffer:
+				self._flush_batch(buffer, split, batch_indices[split])
 
 		self.stats_queue.put(stats)
 
