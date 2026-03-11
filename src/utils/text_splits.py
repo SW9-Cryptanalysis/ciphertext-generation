@@ -235,7 +235,8 @@ def get_source_genres(book: Book, genre_map: dict[str, list[str]]) -> list[str]:
 
 	"""
 	if book.get("source_type") == "project_gutenberg":
-		id = book.get("id").removeprefix("pg:")
-		return genre_map.get(id, book.get("fallback_genres", []))
+		book_id = str(book.get("id", ""))
+		id_val = book_id.removeprefix("pg:")
+		return genre_map.get(id_val, book.get("fallback_genres", []))
 	else:
 		return book.get("fallback_genres", [])
