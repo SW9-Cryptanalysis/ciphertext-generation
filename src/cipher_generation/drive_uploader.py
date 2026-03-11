@@ -120,16 +120,16 @@ class DriveUploader(mp.Process):
 
 	def _hoard_files(
 		self,
-		val_files: list[tuple],
-		test_files: list[tuple],
-		queue_payload: list[tuple[str, int]],
+		queue_payload: tuple[str, str, str, int],
+		val_files: list[tuple[str, int]],
+		test_files: list[tuple[str, int]],
 	) -> None:
-		"""Hoard the files from the queue payload.
+		"""Extract the filepath and count from a MERGE signal and store it.
 
 		Args:
-			val_files (list[tuple]): The list of val files to hoard.
-			test_files (list[tuple]): The list of test files to hoard.
-			queue_payload (list[tuple[str, int]]): The queue payload to hoard.
+			queue_payload (tuple[str, str, str, int]): The payload from the queue.
+			val_files (list[tuple[str, int]]): The list of val files to hoard.
+			test_files (list[tuple[str, int]]): The list of test files to hoard.
 
 		"""
 		split, filepath, cipher_count = (
