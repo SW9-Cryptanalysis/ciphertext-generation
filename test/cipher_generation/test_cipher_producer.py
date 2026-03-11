@@ -1,9 +1,11 @@
 import pytest
 import queue
+import os
 from dataclasses import dataclass
+from pathlib import Path
 
 from encipherment.cipher import HomophonicCipher
-from cipher_generation.cipher_producer import CipherProducer
+from cipher_generation.cipher_producer import CipherProducer, BatchInfo
 
 
 @pytest.fixture
@@ -25,16 +27,24 @@ def mock_cipher(mocker):
 
 
 @pytest.fixture
-def producer(mocker):
-	"""Provide a standard CipherProducer configured with a small batch size of 2."""
+def producer(mocker, tmp_path):
+	"""Provide a standard CipherProducer configured with a small batch size of 2.
+
+	Uses pytest's tmp_path to prevent writing actual files to the project
+	directory during testing.
+	"""
 	mock_input_queue = mocker.Mock()
 	mock_output_queue = mocker.Mock()
 	mock_stats_queue = mocker.Mock()
-	return CipherProducer(
+
+	p = CipherProducer(
 		queues=(mock_input_queue, mock_output_queue, mock_stats_queue),
 		batch_size=2,
 		name="TestProducer",
 	)
+	# Redirect file operations to the isolated test directory
+	p.temp_dir = tmp_path / "temp_ciphers"
+	return p
 
 
 @dataclass
@@ -42,9 +52,9 @@ class CipherErrorCase:
 	"""Defines the parameters for testing various cipher generation failures.
 
 	Attributes:
-		id (str): The test case identifier.
-		exception (Exception): The exception raised during generation.
-		expected_log (str): The expected error log message.
+	    id (str): The test case identifier.
+	    exception (Exception): The exception raised during generation.
+	    expected_log (str): The expected error log message.
 	"""
 
 	id: str
@@ -67,20 +77,16 @@ cipher_error_cases = [
 
 
 class TestCipherProducerRunLoop:
-	"""Tests covering the batching loop, queue pulling, and cleanup logic."""
+	"""Tests covering the batching loop, disk writing, and cleanup logic."""
 
-	def test_successful_batch_flush(
+	def test_successful_train_batch_zip(
 		self,
 		mocker,
 		producer,
 		valid_text_stream,
 		mock_cipher,
 	):
-		"""Verify the producer accumulates ciphers and flushes exactly at the batch size.
-
-		Provides two valid items to trigger exactly one full batch, then sends the STOP signal.
-		Because the batch size is 2, the output_queue.put method should be called exactly once.
-		"""
+		"""Verify the producer streams to disk and zips exactly at the batch size."""
 		producer.input_queue.get.side_effect = [
 			("train", valid_text_stream),
 			("train", valid_text_stream),
@@ -91,41 +97,73 @@ class TestCipherProducerRunLoop:
 
 		producer.run()
 
+		# Output queue should receive the zipped train file
 		assert producer.output_queue.put.call_count == 1
 
 		call_args = producer.output_queue.put.call_args[0][0]
-		split, archive_name, compressed_bytes, cipher_count = call_args
+		split, zip_filepath, archive_name, cipher_count = call_args
 
 		assert split == "train"
 		assert archive_name.startswith("batch_train_")
-		assert archive_name.endswith(".jsonl.zip")
-		assert isinstance(compressed_bytes, bytes)
+		assert archive_name.endswith(".zip")
 		assert cipher_count == 2
 
-	def test_orphan_batch_cleanup_on_stop(
+		# Verify the zip file exists on disk and the raw file was deleted
+		assert os.path.exists(zip_filepath)
+		assert not os.path.exists(zip_filepath.replace(".zip", ".jsonl"))
+
+	def test_cleanup_orphan_train_batch(
 		self,
 		mocker,
 		producer,
 		valid_text_stream,
 		mock_cipher,
 	):
-		"""Verify that sending STOP forces a flush of any remaining items in the buffer.
-
-		Provides only one valid item so it does not hit the batch limit naturally.
-		The cleanup method must catch the orphan cipher and flush it under the 'final' split label.
-		"""
-		producer.input_queue.get.side_effect = [("val", valid_text_stream), "STOP"]
-
+		"""Verify that STOP forces a zip of an incomplete train batch."""
+		producer.input_queue.get.side_effect = [("train", valid_text_stream), "STOP"]
 		mocker.patch.object(producer, "generate_cipher", return_value=mock_cipher)
 
 		producer.run()
 
 		assert producer.output_queue.put.call_count == 1
 		call_args = producer.output_queue.put.call_args[0][0]
-		split, _, _, cipher_count = call_args
+		split, zip_filepath, archive_name, cipher_count = call_args
 
-		assert split == "final"
+		assert split == "train"
+		assert archive_name.endswith(".zip")
 		assert cipher_count == 1
+		assert os.path.exists(zip_filepath)
+
+	def test_cleanup_val_test_merge_signal(
+		self,
+		mocker,
+		producer,
+		valid_text_stream,
+		mock_cipher,
+	):
+		"""Verify that val and test splits close cleanly and send the MERGE signal."""
+		producer.input_queue.get.side_effect = [
+			("val", valid_text_stream),
+			("test", valid_text_stream),
+			"STOP",
+		]
+		mocker.patch.object(producer, "generate_cipher", return_value=mock_cipher)
+
+		producer.run()
+
+		# Should put two MERGE signals into the output queue (one for val, one for test)
+		assert producer.output_queue.put.call_count == 2
+
+		val_call_args = producer.output_queue.put.call_args_list[0][0][0]
+		signal, split, filepath, count = val_call_args
+
+		assert signal == "MERGE"
+		assert split == "val"
+		assert filepath.endswith(".jsonl")
+		assert count == 1
+
+		# Ensure the raw JSONL file is left intact for the Uploader to merge
+		assert os.path.exists(filepath)
 
 	def test_empty_queue_timeout(self, producer):
 		"""Verify the producer survives queue timeouts and continues listening."""
