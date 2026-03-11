@@ -35,7 +35,16 @@ class CipherManager:
 		text_stream_source: Iterable,
 		num_workers: int | None = None,
 	) -> None:
-		"""Initialize the CipherManager."""
+		"""Initialize the CipherManager.
+
+		Args:
+			config (dict[str, dict[str, Any]]): Configuration dictionary mapping splits
+				to their folder IDs and target counts.
+			text_stream_source (Iterable): The iterable source of text chunks.
+			num_workers (int | None, optional): The number of workers to use.
+				Defaults to None (use all available CPUs).
+
+		"""
 		self.config = config
 		self.stream = text_stream_source
 
@@ -154,7 +163,7 @@ class CipherManager:
 		count_fed = 0
 
 		with tqdm(
-			total=self.total_count, desc="Texts Fed to Workers", position=0, leave=True
+			total=self.total_count, desc="Texts Fed to Workers", position=0, leave=True,
 		) as pbar:
 			for count_fed, (split, text_data) in enumerate(self.stream, start=1):
 				self.job_queue.put((split, text_data))

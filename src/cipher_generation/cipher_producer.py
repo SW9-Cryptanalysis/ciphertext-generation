@@ -4,6 +4,7 @@ import queue
 import json
 import zipfile
 from typing import Any, TypedDict
+from dataclasses import dataclass
 from multiprocessing.queues import Queue as MPQueue
 
 from utils.logging import get_logger_tqdm
@@ -23,6 +24,15 @@ class FileInfo(TypedDict):
 	filepath: str
 
 
+@dataclass
+class BatchInfo:
+	"""A dataclass to store the current batch information."""
+
+	batch_indices: dict[str, int]
+	files: dict[str, FileInfo]
+	current_counts: dict[str, int]
+
+
 class CipherProducer(mp.Process):
 	"""A multiprocessing process for generating and streaming ciphers to disk."""
 
@@ -33,7 +43,16 @@ class CipherProducer(mp.Process):
 		*args: Any,
 		**kwargs: Any,
 	) -> None:
-		"""Initialize the CipherProducer."""
+		"""Initialize the CipherProducer.
+
+		Args:
+			queues (tuple[MPQueue[Any], MPQueue[Any], MPQueue[Any]]): The queues
+				to use for communication.
+			batch_size (int, optional): The batch size to use. Defaults to 10000.
+			*args: Additional arguments to pass to the parent class.
+			**kwargs: Additional keyword arguments to pass to the parent class.
+
+		"""
 		super().__init__(*args, **kwargs)
 		self.input_queue, self.output_queue, self.stats_queue = queues
 		self.batch_size = batch_size
@@ -50,6 +69,8 @@ class CipherProducer(mp.Process):
 		current_counts: dict[str, int] = {"train": 0, "val": 0, "test": 0}
 		files = dict[str, FileInfo]()
 
+		batch_info = BatchInfo(batch_indices, files, current_counts)
+
 		log.info(f"{process_name} started.")
 
 		while True:
@@ -58,9 +79,7 @@ class CipherProducer(mp.Process):
 
 				if item == "STOP":
 					self._cleanup_all(
-						files,
-						current_counts,
-						batch_indices,
+						batch_info,
 						stats,
 					)
 					log.info(f"{process_name} received STOP signal.")
@@ -81,23 +100,7 @@ class CipherProducer(mp.Process):
 					genres=cipher.genres,
 				)
 
-				if split not in files:
-					self._open_new_batch_file(split, batch_indices, files)
-
-				cipher_str = json.dumps(cipher.__json__())
-				files[split]["handle"].write(cipher_str + "\n")
-				current_counts[split] += 1
-
-				if current_counts[split] >= self.batch_size and split == "train":
-					self._close_and_zip_batch(
-						split,
-						batch_indices,
-						files,
-						current_counts[split],
-					)
-					current_counts[split] = 0
-					batch_indices[split] += 1
-					del files[split]
+				self._write_and_batch_cipher(split, cipher, batch_info)
 
 			except queue.Empty:
 				continue
@@ -106,41 +109,59 @@ class CipherProducer(mp.Process):
 
 		log.info(f"{process_name} finished generation.")
 
-
-	def _hanle_cipher(
-		self, cipher: SubstitutionCipher, split: str, files: dict[str, FileInfo]
+	def _write_and_batch_cipher(
+		self,
+		split: str,
+		cipher: SubstitutionCipher,
+		batch_info: BatchInfo,
 	) -> None:
-		"""Handle the generation of a cipher and write it to the appropriate file."""
+		"""Write the cipher to disk and zip the batch if the limit is reached."""
+		if split not in batch_info.files:
+			self._open_new_batch_file(split, batch_info)
+
+		cipher_str = json.dumps(cipher.__json__())
+		batch_info.files[split]["handle"].write(cipher_str + "\n")
+		batch_info.current_counts[split] += 1
+
+		if batch_info.current_counts[split] >= self.batch_size and split == "train":
+			self._close_and_zip_batch(
+				split,
+				batch_info=batch_info,
+			)
+			batch_info.current_counts[split] = 0
+			batch_info.batch_indices[split] += 1
+			del batch_info.files[split]
 
 	def _open_new_batch_file(
 		self,
 		split: str,
-		batch_indices: dict[str, int],
-		files: dict[str, Any],
+		batch_info: BatchInfo,
 	) -> None:
 		"""Open a new raw JSONL file for streaming."""
-		filename = f"raw_batch_{split}_{os.getpid()}_{batch_indices[split]}.jsonl"
+		filename = (
+			f"raw_batch_{split}_{os.getpid()}_{batch_info.batch_indices[split]}.jsonl"
+		)
 		filepath = os.path.join(self.temp_dir, filename)
 
-		files[split] = {
-			"handle": open(filepath, "w", encoding="utf-8"),
+		batch_info.files[split] = {
+			"handle": open(filepath, "w", encoding="utf-8"),  # noqa: SIM115
 			"filepath": filepath,
 		}
 
 	def _close_and_zip_batch(
 		self,
 		split: str,
-		batch_indices: dict[str, int],
-		files: dict[str, Any],
-		cipher_count: int,
+		batch_info: BatchInfo,
 	) -> None:
 		"""Close the current JSONL file, zip it, queue it, and delete the raw file."""
-		files[split]["handle"].close()
+		batch_info.files[split]["handle"].close()
 
-		raw_filepath = files[split]["filepath"]
+		raw_filepath = batch_info.files[split]["filepath"]
 		internal_filename = os.path.basename(raw_filepath)
 
-		archive_name = f"batch_{split}_{os.getpid()}_{batch_indices[split]}.zip"
+		archive_name = (
+			f"batch_{split}_{os.getpid()}_{batch_info.batch_indices[split]}.zip"
+		)
 		zip_filepath = os.path.join(self.temp_dir, archive_name)
 
 		with zipfile.ZipFile(zip_filepath, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -148,39 +169,47 @@ class CipherProducer(mp.Process):
 
 		os.remove(raw_filepath)
 
-		self.output_queue.put((split, zip_filepath, archive_name, cipher_count))
+		self.output_queue.put(
+			(split, zip_filepath, archive_name, batch_info.current_counts[split]),
+		)
 
 	def _cleanup_all(
 		self,
-		files: dict[str, Any],
-		current_counts: dict[str, int],
-		batch_indices: dict[str, int],
+		batch_info: BatchInfo,
 		stats: DatasetStatsAggregator,
 	) -> None:
 		"""Flush any open files, zip them, and send final stats."""
-		for split in list(files.keys()):
-			if current_counts[split] > 0:
+		for split in list(batch_info.files.keys()):
+			if batch_info.current_counts[split] > 0:
 				if split in ["val", "test"]:
-					files[split]["handle"].close()
+					batch_info.files[split]["handle"].close()
 					self.output_queue.put(
 						(
 							"MERGE",
 							split,
-							files[split]["filepath"],
-							current_counts[split],
-						)
+							batch_info.files[split]["filepath"],
+							batch_info.current_counts[split],
+						),
 					)
-				self._close_and_zip_batch(
-					split,
-					batch_indices,
-					files,
-					current_counts[split],
-				)
+				else:  # <--- THIS IS THE CRITICAL FIX
+					self._close_and_zip_batch(
+						split,
+						batch_info,
+					)
 
 		self.stats_queue.put(stats)
 
 	def generate_cipher(self, text: TextStream) -> SubstitutionCipher | None:
-		"""Generate a cipher from the provided text string."""
+		"""Generate a cipher from the provided text string.
+
+		Args:
+			text (TextStream): The text stream to generate the cipher from.
+
+		Returns:
+			SubstitutionCipher | None: The generated cipher, or None if
+				an error occurred.
+
+		"""
 		try:
 			cipher = HomophonicCipher(text)
 			cipher.generate_key()

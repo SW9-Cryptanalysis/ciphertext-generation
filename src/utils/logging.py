@@ -33,6 +33,8 @@ def get_logger_tqdm(name: str, level: int = logging.DEBUG) -> logging.Logger:
 
 	Args:
 		name (str): The name of the logger.
+		level (int, optional): The logging level. Defaults to logging.DEBUG.
+
 
 	Returns:
 		logging.Logger: The fully configured logger.

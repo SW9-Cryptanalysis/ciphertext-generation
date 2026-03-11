@@ -53,7 +53,15 @@ class DriveUploader(mp.Process):
 		*args: Any,
 		**kwargs: Any,
 	) -> None:
-		"""Initialize the DriveUploader."""
+		"""Initialize the DriveUploader.
+
+		Args:
+			upload_queue (MPQueue[Any]): The queue to use for communication.
+			config (DriveUploaderConfig): The configuration for the uploader.
+			*args: Additional arguments to pass to the parent class.
+			**kwargs: Additional keyword arguments to pass to the parent class.
+
+		"""
 		super().__init__(*args, **kwargs)
 		self.queue = upload_queue
 		self.split_folders = config.split_folders
@@ -73,7 +81,12 @@ class DriveUploader(mp.Process):
 
 		tqdm.set_lock(self.tqdm_lock)
 
-		with tqdm(total=self.total_ciphers, desc="Total Ciphers Uploaded", position=1, leave=True) as pbar:
+		with tqdm(
+			total=self.total_ciphers,
+			desc="Total Ciphers Uploaded",
+			position=1,
+			leave=True,
+		) as pbar:
 			while True:
 				try:
 					queue_payload = self.queue.get(timeout=5)
@@ -102,10 +115,23 @@ class DriveUploader(mp.Process):
 				self._upload_file(upload_item, pbar)
 
 		log.info(
-			f"{process_name} finished. Total uploaded: {self.uploaded_count} ciphers."
+			f"{process_name} finished. Total uploaded: {self.uploaded_count} ciphers.",
 		)
 
-	def _hoard_files(self, val_files, test_files, queue_payload):
+	def _hoard_files(
+		self,
+		val_files: list[tuple],
+		test_files: list[tuple],
+		queue_payload: list[tuple[str, int]],
+	) -> None:
+		"""Hoard the files from the queue payload.
+
+		Args:
+			val_files (list[tuple]): The list of val files to hoard.
+			test_files (list[tuple]): The list of test files to hoard.
+			queue_payload (list[tuple[str, int]]): The queue payload to hoard.
+
+		"""
 		split, filepath, cipher_count = (
 			queue_payload[1],
 			queue_payload[2],
@@ -117,7 +143,10 @@ class DriveUploader(mp.Process):
 			test_files.append((filepath, cipher_count))
 
 	def _merge_and_upload(
-		self, split: str, files: list[tuple[str, int]], pbar: tqdm
+		self,
+		split: str,
+		files: list[tuple[str, int]],
+		pbar: tqdm,
 	) -> None:
 		"""Merge multiple raw JSONL files into a single ZIP archive and upload it."""
 		if not files:
@@ -129,19 +158,22 @@ class DriveUploader(mp.Process):
 		zip_filepath = os.path.join("temp_ciphers", archive_name)
 		internal_filename = f"{split}_merged.jsonl"
 
-		# Stream the raw files directly into the zip file to avoid memory spikes
-		with zipfile.ZipFile(zip_filepath, "w", zipfile.ZIP_DEFLATED) as zf:
-			with zf.open(internal_filename, "w") as dest:
-				for filepath, count in files:
-					with open(filepath, "rb") as src:
-						while True:
-							chunk = src.read(1024 * 1024 * 10)  # Read in 10MB chunks
-							if not chunk:
-								break
-							dest.write(chunk)
-					os.remove(filepath)  # Delete the raw worker file after merging
+		with (
+			zipfile.ZipFile(zip_filepath, "w", zipfile.ZIP_DEFLATED) as zf,
+			zf.open(
+				internal_filename,
+				"w",
+			) as dest,
+		):
+			for filepath, _ in files:
+				with open(filepath, "rb") as src:
+					while True:
+						chunk = src.read(1024 * 1024 * 10)
+						if not chunk:
+							break
+						dest.write(chunk)
+				os.remove(filepath)
 
-		# Upload the beautiful, single merged file!
 		upload_item = Item(
 			split=split,
 			filepath=zip_filepath,
