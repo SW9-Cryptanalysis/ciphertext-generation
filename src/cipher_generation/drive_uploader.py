@@ -1,8 +1,10 @@
 import multiprocessing as mp
 import queue
+import os
+import zipfile
 from typing import Any
 from multiprocessing.queues import Queue as MPQueue
-from utils.logging import get_logger
+from utils.logging import get_logger_tqdm
 from dataclasses import dataclass
 from utils.drive import (
 	authenticate_drive_terminal,
@@ -10,7 +12,7 @@ from utils.drive import (
 )
 from tqdm import tqdm
 
-log = get_logger("DriveUploader")
+log = get_logger_tqdm("DriveUploader", 20)
 SENTINEL = "STOP"
 
 
@@ -20,43 +22,29 @@ class Item:
 
 	Attributes:
 		split (str): The dataset split identifier.
-		filename (str): The destination filename.
-		file_bytes (bytes): The raw, compressed file data.
+		filepath (str): The local path to the generated file.
+		filename (str): The destination filename on Google Drive.
 		cipher_count (int): The number of ciphers contained in the file.
 
 	"""
 
 	split: str
+	filepath: str
 	filename: str
-	file_bytes: bytes
 	cipher_count: int
 
 
 @dataclass
 class DriveUploaderConfig:
-	"""A dataclass to store the configuration for the DriveUploader.
-
-	Attributes:
-		split_folders (dict[str, str]): A dictionary mapping split names to folder IDs.
-		total_ciphers (int): The total number of ciphers to upload across all splits.
-
-	"""
+	"""A dataclass to store the configuration for the DriveUploader."""
 
 	split_folders: dict[str, str]
 	total_ciphers: int
+	tqdm_lock: Any
 
 
 class DriveUploader(mp.Process):
-	"""A multiprocessing process for uploading ready-made batch files to Google Drive.
-
-	Attributes:
-		queue (MPQueue[Any]): The queue to read finished batch files from.
-		split_folders (dict[str, str]): Mappings of splits to Google Drive folder IDs.
-		total_ciphers (int): The total number of ciphers to upload.
-		drive_service (Any): The authenticated Google Drive service object.
-		uploaded_count (int): Tracking the total uploaded items.
-
-	"""
+	"""A multiprocessing process for uploading files from disk to Google Drive."""
 
 	def __init__(
 		self,
@@ -65,11 +53,12 @@ class DriveUploader(mp.Process):
 		*args: Any,
 		**kwargs: Any,
 	) -> None:
-		"""Initialize the DriveUploader with a queue and configuration."""
+		"""Initialize the DriveUploader."""
 		super().__init__(*args, **kwargs)
 		self.queue = upload_queue
 		self.split_folders = config.split_folders
 		self.total_ciphers = config.total_ciphers
+		self.tqdm_lock = config.tqdm_lock
 		self.drive_service = None
 		self.uploaded_count = 0
 
@@ -79,30 +68,87 @@ class DriveUploader(mp.Process):
 		if not self._authenticate_service():
 			return
 
-		with tqdm(total=self.total_ciphers, desc="Total Ciphers Uploaded") as pbar:
+		val_files: list[tuple[str, int]] = []
+		test_files: list[tuple[str, int]] = []
+
+		tqdm.set_lock(self.tqdm_lock)
+
+		with tqdm(total=self.total_ciphers, desc="Total Ciphers Uploaded", position=1, leave=True) as pbar:
 			while True:
 				try:
 					queue_payload = self.queue.get(timeout=5)
 				except queue.Empty:
+					pbar.refresh()
 					continue
 
 				if queue_payload == SENTINEL:
+					# The pipeline is done! Merge and upload the hoarded val/test files
+					self._merge_and_upload("val", val_files, pbar)
+					self._merge_and_upload("test", test_files, pbar)
 					break
 
-				split, filename, file_bytes, cipher_count = queue_payload
+				# Catch the MERGE signal from workers
+				if queue_payload[0] == "MERGE":
+					self._hoard_files(queue_payload, val_files, test_files)
+					continue
 
+				split, filepath, filename, cipher_count = queue_payload
 				upload_item = Item(
 					split=split,
+					filepath=filepath,
 					filename=filename,
-					file_bytes=file_bytes,
 					cipher_count=cipher_count,
 				)
-
 				self._upload_file(upload_item, pbar)
 
 		log.info(
-			f"{process_name} finished. Total uploaded: {self.uploaded_count} ciphers.",
+			f"{process_name} finished. Total uploaded: {self.uploaded_count} ciphers."
 		)
+
+	def _hoard_files(self, val_files, test_files, queue_payload):
+		split, filepath, cipher_count = (
+			queue_payload[1],
+			queue_payload[2],
+			queue_payload[3],
+		)
+		if split == "val":
+			val_files.append((filepath, cipher_count))
+		elif split == "test":
+			test_files.append((filepath, cipher_count))
+
+	def _merge_and_upload(
+		self, split: str, files: list[tuple[str, int]], pbar: tqdm
+	) -> None:
+		"""Merge multiple raw JSONL files into a single ZIP archive and upload it."""
+		if not files:
+			return
+
+		log.info(f"Merging {len(files)} raw files for {split} split...")
+		total_count = sum(c for _, c in files)
+		archive_name = f"{split}_final.zip"
+		zip_filepath = os.path.join("temp_ciphers", archive_name)
+		internal_filename = f"{split}_merged.jsonl"
+
+		# Stream the raw files directly into the zip file to avoid memory spikes
+		with zipfile.ZipFile(zip_filepath, "w", zipfile.ZIP_DEFLATED) as zf:
+			with zf.open(internal_filename, "w") as dest:
+				for filepath, count in files:
+					with open(filepath, "rb") as src:
+						while True:
+							chunk = src.read(1024 * 1024 * 10)  # Read in 10MB chunks
+							if not chunk:
+								break
+							dest.write(chunk)
+					os.remove(filepath)  # Delete the raw worker file after merging
+
+		# Upload the beautiful, single merged file!
+		upload_item = Item(
+			split=split,
+			filepath=zip_filepath,
+			filename=archive_name,
+			cipher_count=total_count,
+		)
+		self._upload_file(upload_item, pbar)
 
 	def _authenticate_service(self) -> bool:
 		"""Authenticate with the Google Drive service."""
@@ -117,13 +163,7 @@ class DriveUploader(mp.Process):
 			return False
 
 	def _upload_file(self, item: Item, pbar: tqdm) -> None:
-		"""Upload a completed file directly to Google Drive.
-
-		Args:
-			item (Item): The packaged upload details including bytes and metadata.
-			pbar (tqdm): The progress bar to update.
-
-		"""
+		"""Upload a completed file from disk to Google Drive and delete it locally."""
 		folder_id = self.split_folders.get(item.split)
 
 		if not folder_id:
@@ -133,9 +173,12 @@ class DriveUploader(mp.Process):
 			return
 
 		try:
+			with open(item.filepath, "rb") as f:
+				file_bytes = f.read()
+
 			file_id = upload_to_drive(
 				self.drive_service,
-				item.file_bytes,
+				file_bytes,
 				item.filename,
 				folder_id,
 			)
@@ -144,6 +187,8 @@ class DriveUploader(mp.Process):
 				self.uploaded_count += item.cipher_count
 				pbar.update(item.cipher_count)
 				log.info(f"Uploaded {item.filename} to {item.split} folder: {file_id}")
+
+				os.remove(item.filepath)
 			else:
 				log.error(f"FATAL: Failed to upload {item.filename} to {item.split}.")
 
