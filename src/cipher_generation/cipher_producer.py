@@ -2,30 +2,29 @@ import multiprocessing as mp
 import os
 import queue
 import json
-import io
 import zipfile
-from typing import Any
+from typing import Any, TypedDict
 from multiprocessing.queues import Queue as MPQueue
 
-from utils.logging import get_logger
+from utils.logging import get_logger_tqdm
 from encipherment.cipher import SubstitutionCipher, HomophonicCipher
 from utils.text_splits import TextStream
 from dataset_stats import DatasetStatsAggregator
+from utils.constants import PROJECT_ROOT
+from pathlib import Path
 
-log = get_logger("CipherProducer")
+log = get_logger_tqdm("CipherProducer", 20)
+
+
+class FileInfo(TypedDict):
+	"""A typed dictionary for tracking open file handles and paths."""
+
+	handle: Any
+	filepath: str
 
 
 class CipherProducer(mp.Process):
-	"""A multiprocessing process for generating ciphers in batched, zipped JSONL format.
-
-	Attributes:
-		input_queue (MPQueue[Any]): Queue containing tuples of (split, text_data).
-		output_queue (MPQueue[Any]): Queue to send tuples of
-			(split, archive_name, compressed_bytes, cipher_count).
-		stats_queue (MPQueue[Any]): Queue to send aggregate dataset statistics.
-		batch_size (int): The number of ciphers to accumulate before emitting a file.
-
-	"""
+	"""A multiprocessing process for generating and streaming ciphers to disk."""
 
 	def __init__(
 		self,
@@ -38,14 +37,18 @@ class CipherProducer(mp.Process):
 		super().__init__(*args, **kwargs)
 		self.input_queue, self.output_queue, self.stats_queue = queues
 		self.batch_size = batch_size
+		self.temp_dir = Path(PROJECT_ROOT) / "temp_ciphers"
 
 	def run(self) -> None:
 		"""Execute the cipher generation process loop."""
 		stats = DatasetStatsAggregator()
 		process_name = self.name
 
-		batch_buffers: dict[str, list[str]] = {"train": [], "val": [], "test": []}
+		os.makedirs(self.temp_dir, exist_ok=True)
+
 		batch_indices: dict[str, int] = {"train": 0, "val": 0, "test": 0}
+		current_counts: dict[str, int] = {"train": 0, "val": 0, "test": 0}
+		files = dict[str, FileInfo]()
 
 		log.info(f"{process_name} started.")
 
@@ -54,7 +57,12 @@ class CipherProducer(mp.Process):
 				item = self.input_queue.get(timeout=5)
 
 				if item == "STOP":
-					self._cleanup_all(batch_buffers, batch_indices, stats)
+					self._cleanup_all(
+						files,
+						current_counts,
+						batch_indices,
+						stats,
+					)
 					log.info(f"{process_name} received STOP signal.")
 					break
 
@@ -73,13 +81,23 @@ class CipherProducer(mp.Process):
 					genres=cipher.genres,
 				)
 
-				cipher_str = json.dumps(cipher.__json__())
-				batch_buffers[split].append(cipher_str)
+				if split not in files:
+					self._open_new_batch_file(split, batch_indices, files)
 
-				if len(batch_buffers[split]) >= self.batch_size:
-					self._flush_batch(batch_buffers[split], split, batch_indices[split])
-					batch_buffers[split].clear()
+				cipher_str = json.dumps(cipher.__json__())
+				files[split]["handle"].write(cipher_str + "\n")
+				current_counts[split] += 1
+
+				if current_counts[split] >= self.batch_size and split == "train":
+					self._close_and_zip_batch(
+						split,
+						batch_indices,
+						files,
+						current_counts[split],
+					)
+					current_counts[split] = 0
 					batch_indices[split] += 1
+					del files[split]
 
 			except queue.Empty:
 				continue
@@ -88,57 +106,81 @@ class CipherProducer(mp.Process):
 
 		log.info(f"{process_name} finished generation.")
 
+
+	def _hanle_cipher(
+		self, cipher: SubstitutionCipher, split: str, files: dict[str, FileInfo]
+	) -> None:
+		"""Handle the generation of a cipher and write it to the appropriate file."""
+
+	def _open_new_batch_file(
+		self,
+		split: str,
+		batch_indices: dict[str, int],
+		files: dict[str, Any],
+	) -> None:
+		"""Open a new raw JSONL file for streaming."""
+		filename = f"raw_batch_{split}_{os.getpid()}_{batch_indices[split]}.jsonl"
+		filepath = os.path.join(self.temp_dir, filename)
+
+		files[split] = {
+			"handle": open(filepath, "w", encoding="utf-8"),
+			"filepath": filepath,
+		}
+
+	def _close_and_zip_batch(
+		self,
+		split: str,
+		batch_indices: dict[str, int],
+		files: dict[str, Any],
+		cipher_count: int,
+	) -> None:
+		"""Close the current JSONL file, zip it, queue it, and delete the raw file."""
+		files[split]["handle"].close()
+
+		raw_filepath = files[split]["filepath"]
+		internal_filename = os.path.basename(raw_filepath)
+
+		archive_name = f"batch_{split}_{os.getpid()}_{batch_indices[split]}.zip"
+		zip_filepath = os.path.join(self.temp_dir, archive_name)
+
+		with zipfile.ZipFile(zip_filepath, "w", zipfile.ZIP_DEFLATED) as zf:
+			zf.write(raw_filepath, arcname=internal_filename)
+
+		os.remove(raw_filepath)
+
+		self.output_queue.put((split, zip_filepath, archive_name, cipher_count))
+
 	def _cleanup_all(
 		self,
-		batch_buffers: dict[str, list[str]],
+		files: dict[str, Any],
+		current_counts: dict[str, int],
 		batch_indices: dict[str, int],
 		stats: DatasetStatsAggregator,
 	) -> None:
-		"""Flush any remaining ciphers across all splits and send final stats."""
-		for split, buffer in batch_buffers.items():
-			if buffer:
-				self._flush_batch(buffer, split, batch_indices[split])
+		"""Flush any open files, zip them, and send final stats."""
+		for split in list(files.keys()):
+			if current_counts[split] > 0:
+				if split in ["val", "test"]:
+					files[split]["handle"].close()
+					self.output_queue.put(
+						(
+							"MERGE",
+							split,
+							files[split]["filepath"],
+							current_counts[split],
+						)
+					)
+				self._close_and_zip_batch(
+					split,
+					batch_indices,
+					files,
+					current_counts[split],
+				)
 
 		self.stats_queue.put(stats)
 
-	def _flush_batch(
-		self,
-		batch_buffer: list[str],
-		split: str,
-		batch_index: int,
-	) -> None:
-		"""Convert accumulated JSON strings into zipped JSONL byte stream and queue it.
-
-		Args:
-			batch_buffer (list[str]): List of single-line JSON strings.
-			split (str): The dataset split identifier.
-			batch_index (int): An incrementing integer to ensure unique filenames.
-
-		"""
-		jsonl_content = "\n".join(batch_buffer) + "\n"
-		raw_bytes = jsonl_content.encode("utf-8")
-
-		zip_buffer = io.BytesIO()
-		internal_filename = f"batch_{split}_{os.getpid()}_{batch_index}.jsonl"
-
-		with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-			zf.writestr(internal_filename, raw_bytes)
-
-		compressed_bytes = zip_buffer.getvalue()
-		archive_name = f"{internal_filename}.zip"
-		cipher_count = len(batch_buffer)
-
-		self.output_queue.put((split, archive_name, compressed_bytes, cipher_count))
-
 	def generate_cipher(self, text: TextStream) -> SubstitutionCipher | None:
-		"""Generate a cipher from the provided text string.
-
-		Args:
-			text (TextStream): Source text to generate a cipher from.
-
-		Returns:
-			SubstitutionCipher | None: The generated cipher, or None if an error occurred.
-		"""
+		"""Generate a cipher from the provided text string."""
 		try:
 			cipher = HomophonicCipher(text)
 			cipher.generate_key()
