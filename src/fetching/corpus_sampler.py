@@ -69,17 +69,24 @@ class CorpusSampler:
 			if book_id in BOOK_IDS_VALIDATION:
 				continue
 
-			split = get_split(idx)
-			
-			if self.counts[split] >= self.targets[split]:
-				for backup_split in ["val", "test", "train"]:
-					if self.counts[backup_split] < self.targets[backup_split]:
-						split = backup_split
-						break
-				else:
-					continue
+			initial_split = get_split(idx)
+			split = self._get_available_split(initial_split)
+
+			if not split:
+				continue
 
 			yield from self._process_book(book, split)
+
+	def _get_available_split(self, initial_split: str) -> str | None:
+		"""Find an available split, falling back to others if the target is full."""
+		if self.counts[initial_split] < self.targets[initial_split]:
+			return initial_split
+
+		for backup_split in ["val", "test", "train"]:
+			if self.counts[backup_split] < self.targets[backup_split]:
+				return backup_split
+
+		return None
 
 	def _process_book(self, book: Book, split: str) -> Iterator[tuple[str, TextStream]]:
 		"""Handle the extraction and debt calculation for a single book."""
@@ -96,9 +103,9 @@ class CorpusSampler:
 			return
 
 		take_limit = min(actual_take, self.targets[split] - self.counts[split])
-		
-		chunks_yielded = 0 
-		
+
+		chunks_yielded = 0
+
 		for chunk, bounded_chunk in islice(
 			get_book_chunks(usable_text, actual_take, self.len_bounds),
 			take_limit,
