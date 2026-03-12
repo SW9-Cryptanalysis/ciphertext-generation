@@ -77,7 +77,7 @@ class CipherManager:
 		tqdm_lock = mp.RLock()
 
 		uploader = DriveUploader(
-			upload_queue=self.result_queue,  # type: ignore
+			upload_queue=self.result_queue,
 			config=DriveUploaderConfig(
 				split_folders=self.split_folders,
 				total_ciphers=self.total_count,
@@ -117,31 +117,32 @@ class CipherManager:
 				log.info(f"Stream finished. Fed {count_fed} items. Stopping workers...")
 				for _ in range(self.num_workers):
 					self.job_queue.put(self.SENTINEL)
+
+			for p in workers:
+				p.join()
+
+			log.info("Workers finished. Merging statistics from all workers...")
+			for _ in range(self.num_workers):
+				incoming_stats = self.stats_queue.get()
+				self.master_stats.merge(incoming_stats)
+
+			self._upload_metadata()
+			self.result_queue.put(self.SENTINEL)
+
+			uploader.join()
+
+			log.info("=" * 40)
+			log.info("JOB COMPLETE")
+			log.info(f"Total ciphers fed: {count_fed}")
+			log.info(
+				f"Peak homophone ID (Vocab Size): "
+				f"{self.master_stats.global_max_homophones}",
+			)
+			log.info("=" * 40)
+
 		finally:
 			if self.temp_dir.exists():
 				shutil.rmtree(self.temp_dir, ignore_errors=True)
-
-		for p in workers:
-			p.join()
-
-		log.info("Workers finished. Merging statistics from all workers...")
-		for _ in range(self.num_workers):
-			incoming_stats = self.stats_queue.get()
-			self.master_stats.merge(incoming_stats)
-
-		self._upload_metadata()
-		self.result_queue.put(self.SENTINEL)
-
-		uploader.join()
-
-		log.info("=" * 40)
-		log.info("JOB COMPLETE")
-		log.info(f"Total ciphers fed: {count_fed}")
-		log.info(
-			f"Peak homophone ID (Vocab Size): "
-			f"{self.master_stats.global_max_homophones}",
-		)
-		log.info("=" * 40)
 
 	def _upload_metadata(self) -> None:
 		"""Upload the metadata and statistics files to Google Drive."""
