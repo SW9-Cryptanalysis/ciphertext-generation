@@ -2,10 +2,9 @@ import pytest
 import queue
 import os
 from dataclasses import dataclass
-from pathlib import Path
 
 from encipherment.cipher import HomophonicCipher
-from cipher_generation.cipher_producer import CipherProducer, BatchInfo
+from cipher_generation.cipher_producer import CipherProducer, ProducerConfig
 
 
 @pytest.fixture
@@ -37,9 +36,16 @@ def producer(mocker, tmp_path):
 	mock_output_queue = mocker.Mock()
 	mock_stats_queue = mocker.Mock()
 
-	p = CipherProducer(
-		queues=(mock_input_queue, mock_output_queue, mock_stats_queue),
+	config = ProducerConfig(
+		input_queue=mock_input_queue,
+		output_queue=mock_output_queue,
+		stats_queue=mock_stats_queue,
 		batch_size=2,
+		temp_dir=tmp_path / "temp_ciphers",
+	)
+
+	p = CipherProducer(
+		config=config,
 		name="TestProducer",
 	)
 	# Redirect file operations to the isolated test directory
@@ -110,7 +116,7 @@ class TestCipherProducerRunLoop:
 
 		# Verify the zip file exists on disk and the raw file was deleted
 		assert os.path.exists(zip_filepath)
-		assert not os.path.exists(zip_filepath.replace(".zip", ".jsonl"))
+		assert not os.path.exists(zip_filepath.with_suffix(".jsonl"))
 
 	def test_cleanup_orphan_train_batch(
 		self,
@@ -159,7 +165,7 @@ class TestCipherProducerRunLoop:
 
 		assert signal == "MERGE"
 		assert split == "val"
-		assert filepath.endswith(".jsonl")
+		assert filepath.with_suffix(".jsonl")
 		assert count == 1
 
 		# Ensure the raw JSONL file is left intact for the Uploader to merge

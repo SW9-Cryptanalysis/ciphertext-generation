@@ -3,6 +3,7 @@ import json
 import os
 from dataclasses import dataclass
 from unittest.mock import MagicMock
+from pathlib import Path
 
 from cipher_generation.cipher_manager import CipherManager
 from dataset_stats import DatasetStatsAggregator
@@ -255,7 +256,7 @@ class TestCipherManagerPeakUpload:
         split_name, filepath, filename, cipher_count = metadata_payload
 
         assert split_name == "metadata"
-        assert filename == "metadata.json"
+        assert filename == Path("metadata.json")
         assert cipher_count == 0
 
         assert os.path.exists(filepath)
