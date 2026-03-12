@@ -11,7 +11,6 @@ from utils.logging import get_logger_tqdm
 from encipherment.cipher import SubstitutionCipher, HomophonicCipher
 from utils.text_splits import TextStream
 from dataset_stats import DatasetStatsAggregator
-from utils.constants import PROJECT_ROOT
 from pathlib import Path
 
 log = get_logger_tqdm("CipherProducer", 20)
@@ -21,7 +20,17 @@ class FileInfo(TypedDict):
 	"""A typed dictionary for tracking open file handles and paths."""
 
 	handle: Any
-	filepath: str
+	filepath: Path
+ 
+@dataclass
+class ProducerConfig:
+	"""A dataclass to store the configuration for the CipherProducer."""
+
+	batch_size: int
+	input_queue: MPQueue[Any]
+	output_queue: MPQueue[Any]
+	stats_queue: MPQueue[Any]
+	temp_dir: Path
 
 
 @dataclass
@@ -38,8 +47,7 @@ class CipherProducer(mp.Process):
 
 	def __init__(
 		self,
-		queues: tuple[MPQueue[Any], MPQueue[Any], MPQueue[Any]],
-		batch_size: int = 10000,
+		config: ProducerConfig,
 		*args: Any,
 		**kwargs: Any,
 	) -> None:
@@ -54,9 +62,12 @@ class CipherProducer(mp.Process):
 
 		"""
 		super().__init__(*args, **kwargs)
-		self.input_queue, self.output_queue, self.stats_queue = queues
-		self.batch_size = batch_size
-		self.temp_dir = Path(PROJECT_ROOT) / "temp_ciphers"
+		self.input_queue = config.input_queue
+		self.output_queue = config.output_queue
+		self.stats_queue = config.stats_queue
+
+		self.batch_size = config.batch_size
+		self.temp_dir = config.temp_dir
 
 	def run(self) -> None:
 		"""Execute the cipher generation process loop."""
@@ -141,7 +152,7 @@ class CipherProducer(mp.Process):
 		filename = (
 			f"raw_batch_{split}_{os.getpid()}_{batch_info.batch_indices[split]}.jsonl"
 		)
-		filepath = os.path.join(self.temp_dir, filename)
+		filepath = self.temp_dir / filename
 
 		batch_info.files[split] = {
 			"handle": open(filepath, "w", encoding="utf-8"),  # noqa: SIM115
@@ -156,18 +167,17 @@ class CipherProducer(mp.Process):
 		"""Close the current JSONL file, zip it, queue it, and delete the raw file."""
 		batch_info.files[split]["handle"].close()
 
-		raw_filepath = batch_info.files[split]["filepath"]
-		internal_filename = os.path.basename(raw_filepath)
+		filepath = batch_info.files[split]["filepath"]
 
 		archive_name = (
 			f"batch_{split}_{os.getpid()}_{batch_info.batch_indices[split]}.zip"
 		)
-		zip_filepath = os.path.join(self.temp_dir, archive_name)
+		zip_filepath = self.temp_dir / archive_name
 
 		with zipfile.ZipFile(zip_filepath, "w", zipfile.ZIP_DEFLATED) as zf:
-			zf.write(raw_filepath, arcname=internal_filename)
+			zf.write(filepath, arcname=filepath.name)
 
-		os.remove(raw_filepath)
+		os.remove(filepath)
 
 		self.output_queue.put(
 			(split, zip_filepath, archive_name, batch_info.current_counts[split]),
