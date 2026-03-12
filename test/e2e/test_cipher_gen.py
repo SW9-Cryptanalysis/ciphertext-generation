@@ -1,7 +1,6 @@
 import os
 import re
 import pytest
-import json
 import tqdm
 from cipher_generation.cipher_manager import CipherManager
 from encipherment.cipher import HomophonicCipher

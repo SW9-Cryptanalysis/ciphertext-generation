@@ -21,7 +21,7 @@ class FileInfo(TypedDict):
 
 	handle: Any
 	filepath: Path
- 
+
 @dataclass
 class ProducerConfig:
 	"""A dataclass to store the configuration for the CipherProducer."""
@@ -54,9 +54,8 @@ class CipherProducer(mp.Process):
 		"""Initialize the CipherProducer.
 
 		Args:
-			queues (tuple[MPQueue[Any], MPQueue[Any], MPQueue[Any]]): The queues
-				to use for communication.
-			batch_size (int, optional): The batch size to use. Defaults to 10000.
+			config (ProducerConfig): The configuration object.
+				Contains the queues and batch size to use.
 			*args: Additional arguments to pass to the parent class.
 			**kwargs: Additional keyword arguments to pass to the parent class.
 

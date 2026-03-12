@@ -58,9 +58,9 @@ class CipherErrorCase:
 	"""Defines the parameters for testing various cipher generation failures.
 
 	Attributes:
-	    id (str): The test case identifier.
-	    exception (Exception): The exception raised during generation.
-	    expected_log (str): The expected error log message.
+		id (str): The test case identifier.
+		exception (Exception): The exception raised during generation.
+		expected_log (str): The expected error log message.
 	"""
 
 	id: str

@@ -33,7 +33,7 @@ def mock_mp_manager(mocker):
         mock_result_queue,
         mock_stats_queue,
     ]
-    
+
     mocker.patch("multiprocessing.RLock", return_value=mocker.Mock())
 
     return mock_queue_cls, mock_job_queue, mock_result_queue, mock_stats_queue
@@ -126,7 +126,7 @@ class TestCipherManagerExecution:
 
         mock_uploader_cls = mocker.patch("cipher_generation.cipher_manager.DriveUploader")
         mock_producer_cls = mocker.patch("cipher_generation.cipher_manager.CipherProducer")
-        
+
         # FIX: Patch the global tqdm class
         mock_pbar = MagicMock()
         mock_pbar.__enter__.return_value = mock_pbar
@@ -160,7 +160,7 @@ class TestCipherManagerExecution:
 
     def test_execute_logging_progress(self, mocker, mock_mp_manager):
         mock_log = mocker.patch("cipher_generation.cipher_manager.log")
-        
+
         # FIX: Patch the global tqdm class
         mock_pbar = MagicMock()
         mock_pbar.__enter__.return_value = mock_pbar
@@ -193,7 +193,7 @@ class TestCipherManagerExecution:
 
         manager = CipherManager(test_config, large_stream)
         mock_log = mocker.patch("cipher_generation.cipher_manager.log")
-        
+
         # FIX: Patch the global tqdm class
         mock_pbar = MagicMock()
         mock_pbar.__enter__.return_value = mock_pbar
@@ -214,18 +214,18 @@ class TestCipherManagerPeakUpload:
 
         mocker.patch("cipher_generation.cipher_manager.DriveUploader")
         mocker.patch("cipher_generation.cipher_manager.CipherProducer")
-        
+
         # FIX: Patch the global tqdm class
         mock_pbar = MagicMock()
         mock_pbar.__enter__.return_value = mock_pbar
         mocker.patch("tqdm.tqdm", return_value=mock_pbar)
-        
+
         original_join = os.path.join
         def mock_join(*args):
             if args[0] == "temp_ciphers":
                 return str(tmp_path / args[1])
             return original_join(*args)
-            
+
         mocker.patch("os.path.join", side_effect=mock_join)
 
         dummy_config = {"train": {"folder_id": "dummy_folder_abc", "count": 1}}
@@ -260,8 +260,8 @@ class TestCipherManagerPeakUpload:
         assert cipher_count == 0
 
         assert os.path.exists(filepath)
-        
-        with open(filepath, "r", encoding="utf-8") as f:
+
+        with open(filepath, encoding="utf-8") as f:
             payload = json.load(f)
-            
+
         assert payload["max_symbol_id"] == expected_peak
