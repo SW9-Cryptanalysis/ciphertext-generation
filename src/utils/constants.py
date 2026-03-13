@@ -4,7 +4,7 @@ from pathlib import Path
 from fetching.dataset_extractor import DatasetConfig
 
 MIN_DIFFICULTY = 4
-MAX_DIFFICULTY = 30
+MAX_DIFFICULTY = 300
 MIN_PLAINTEXT_LENGTH = 4000
 MAX_PLAINTEXT_LENGTH = 6000
 NUM_CIPHERS = 100000
