@@ -67,6 +67,12 @@ class CipherManager:
             "metadata": config.metadata_folder,
         }
 
+        self.test_tracker: dict[int, dict[int, int]] = {
+            length: {difficulty: 0 for difficulty in diffs}
+            for length, diffs in config.dataset_config.test_matrix.items()
+        }
+        self.test_samples_per_bin = config.dataset_config.ciphers_per_bin
+
         self.num_workers = config.num_workers or max(1, (os.cpu_count() or 4) - 2)
 
         self.job_queue: Queue[CipherTask | Literal["STOP"]] = mp.Queue()  # type: ignore
@@ -209,10 +215,17 @@ class CipherManager:
             leave=True,
         ) as pbar:
             for count_fed, (split, text_data) in enumerate(self.stream, start=1):
+                target_difficulty = None
+                if split == "test":
+                    length = text_data.get("target_length", 0)
+                    target_difficulty = self._assign_test_difficulty(length)
+                    if target_difficulty is None:
+                        continue
+
                 task = CipherTask(
                     split=split,
                     text_data=text_data,
-                    target_difficulty=None,
+                    target_difficulty=target_difficulty,
                 )
                 self.job_queue.put(task)
                 pbar.update(1)
@@ -225,3 +238,34 @@ class CipherManager:
                     break
 
         return count_fed
+
+    def _assign_test_difficulty(self, length: int) -> int | None:
+        """Find an available difficulty bin for a given test length.
+
+        Args:
+            length (int): The sequence length of the test sample.
+
+        Returns:
+            int | None: The assigned difficulty, or None if all bins for
+                this length are full or the length is invalid.
+
+        """
+        import random
+
+        if length not in self.test_tracker:
+            log.warning(f"Length {length} not found in test matrix.")
+            return None
+
+        available_diffs = [
+            diff
+            for diff, count in self.test_tracker[length].items()
+            if count < self.test_samples_per_bin
+        ]
+
+        if not available_diffs:
+            return None
+
+        selected_diff = random.choice(available_diffs)
+        self.test_tracker[length][selected_diff] += 1
+
+        return selected_diff
