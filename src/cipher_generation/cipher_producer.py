@@ -8,7 +8,11 @@ from dataclasses import dataclass
 from multiprocessing.queues import Queue as MPQueue
 
 from utils.logging import get_logger_tqdm
-from encipherment.cipher import SubstitutionCipher, HomophonicCipher
+from encipherment.cipher import (
+    SubstitutionCipher,
+    HomophonicCipher,
+    MonoalphabeticCipher,
+)
 from utils.text_splits import TextStream
 from dataset_stats import DatasetStatsAggregator
 from pathlib import Path
@@ -98,7 +102,7 @@ class CipherProducer(mp.Process):
                     log.info(f"{process_name} received STOP signal.")
                     break
 
-                cipher = self.generate_cipher(item.text_data)
+                cipher = self.generate_cipher(item.text_data, item.target_difficulty)
 
                 if cipher is None:
                     continue
@@ -213,19 +217,34 @@ class CipherProducer(mp.Process):
 
         self.stats_queue.put(stats)
 
-    def generate_cipher(self, text: TextStream) -> SubstitutionCipher | None:
-        """Generate a cipher from the provided text string.
+    def generate_cipher(
+        self,
+        text: TextStream,
+        target_difficulty: int | None,
+    ) -> SubstitutionCipher | None:
+        """Generate a cipher from the provided text string, applying difficulty limits.
 
         Args:
             text (TextStream): The text stream to generate the cipher from.
+            target_difficulty (float | int | None): The specific difficulty to hit,
+                0 for monoalphabetic, or None to generate a random continuous
+                difficulty.
 
         Returns:
-            SubstitutionCipher | None: The generated cipher, or None if
-                an error occurred.
+            SubstitutionCipher | None: The generated cipher, or None if an error
+                occurred.
 
         """
         try:
-            cipher = HomophonicCipher(text)
+            if target_difficulty == 0:
+                cipher = MonoalphabeticCipher(text)
+
+            elif target_difficulty is None:
+                cipher = HomophonicCipher(text)
+
+            else:
+                cipher = HomophonicCipher(text, difficulty=target_difficulty)
+
             cipher.generate_key()
             cipher.encipher()
             return cipher
