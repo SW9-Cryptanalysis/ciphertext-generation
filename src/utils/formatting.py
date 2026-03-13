@@ -12,11 +12,12 @@ def numbers_to_words(text: str, source_id: str = "Unknown") -> str:
 	Massive number strings (e.g., from ArXiv data dumps) are logged and stripped.
 
 	Args:
-	    text (str): The input text containing numbers.
-	    source_id (str, optional): Identifier for logging. Defaults to "Unknown".
+		text (str): The input text containing numbers.
+		source_id (str, optional): Identifier for logging. Defaults to "Unknown".
 
 	Returns:
-	    str: The text with numbers converted to words, or stripped if too large.
+		str: The text with numbers converted to words, or stripped if too large.
+
 	"""
 
 	def replace_number(match: re.Match) -> str:
@@ -28,7 +29,7 @@ def numbers_to_words(text: str, source_id: str = "Unknown") -> str:
 		if len(number_str) > 50:
 			with open("arxiv_parsing_errors.log", "a", encoding="utf-8") as f:
 				f.write(
-					f"--- ERROR: Massive Number Detected (Source: {source_id}) ---\n"
+					f"--- ERROR: Massive Number Detected (Source: {source_id}) ---\n",
 				)
 				f.write(f"Number length: {len(number_str)}\n")
 				f.write(f"Snippet: {number_str[:100]}...\n")
