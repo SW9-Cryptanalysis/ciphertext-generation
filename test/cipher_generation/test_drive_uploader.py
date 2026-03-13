@@ -1,395 +1,328 @@
 import pytest
-import io
 import queue
-from typing import Final, Any
+import os
+import zipfile
 from dataclasses import dataclass
 from multiprocessing.queues import Queue as MPQueue
 
-from cipher_generation.drive_uploader import DriveUploader, DriveUploaderConfig, BatchState
+from cipher_generation.drive_uploader import DriveUploader, DriveUploaderConfig, Item
 
-# --- Constants & Test Data ---
-BATCH_SIZE: Final[int] = 2
-MOCK_SPLIT_FOLDERS: Final[dict[str, str]] = {
+MOCK_SPLIT_FOLDERS = {
 	"train": "mock_train_123",
 	"val": "mock_val_123",
+	"test": "mock_test_123",
 	"metadata": "mock_metadata_123",
 }
-SENTINEL: Final[str] = "STOP"
-
-
-# --- Shared Fixtures ---
-@pytest.fixture(autouse=True)
-def silent_zipfile(mocker):
-	"""Prevents any real ZipFile from being opened during tests."""
-	return mocker.patch("zipfile.ZipFile")
+SENTINEL = "STOP"
 
 
 @pytest.fixture
-def uploader_config():
-	return DriveUploaderConfig(split_folders=MOCK_SPLIT_FOLDERS, total_ciphers=10)
+def mock_queue(mocker):
+	"""Provide a mock multiprocessing queue."""
+	return mocker.Mock(spec=MPQueue)
 
 
 @pytest.fixture
-def mock_cipher_item():
-	return ("train", "cipher_123_10.json", b"mock_cipher_data_1")
+def mock_tqdm_lock(mocker):
+	"""Provide a mock multiprocessing lock."""
+	return mocker.Mock()
 
 
 @pytest.fixture
-def mock_cipher_item_2():
-	return ("train", "cipher_456_10.json", b"mock_cipher_data_2")
-
-
-@dataclass
-class UploaderTestContext:
-	queue: MPQueue[Any]
-	config: DriveUploaderConfig
-	item: tuple[str, str, bytes]
-	item2: tuple[str, str, bytes]
-
-
-@pytest.fixture
-def ctx(queue_factory, uploader_config, mock_cipher_item, mock_cipher_item_2):
-	"""Bundles common fixtures into a single context object."""
-	return UploaderTestContext(
-		queue=queue_factory(),
-		config=uploader_config,
-		item=mock_cipher_item,
-		item2=mock_cipher_item_2,
+def uploader_config(mock_tqdm_lock):
+	"""Provide a default uploader configuration."""
+	return DriveUploaderConfig(
+		split_folders=MOCK_SPLIT_FOLDERS,
+		total_ciphers=20000,
+		tqdm_lock=mock_tqdm_lock,
 	)
 
 
-# --- Test Classes ---
+@pytest.fixture
+def uploader(mock_queue, uploader_config):
+	"""Provide an initialized DriveUploader instance."""
+	return DriveUploader(mock_queue, uploader_config, name="TestUploader")
 
 
 class TestDriveUploaderInitialization:
-	"""Tests covering object initialization and dataclasses."""
+	"""Tests covering object initialization and state."""
 
-	def test_initialization(self, queue_factory, uploader_config):
-		uploader = DriveUploader(queue_factory(), uploader_config, name="Test")
+	def test_initialization(self, uploader, mock_tqdm_lock):
+		"""Verify the uploader initializes with the correct configuration."""
 		assert uploader.split_folders == MOCK_SPLIT_FOLDERS
-		assert uploader.total_ciphers == 10
+		assert uploader.total_ciphers == 20000
 		assert uploader.uploaded_count == 0
+		assert uploader.tqdm_lock == mock_tqdm_lock
 
-	def test_batch_state_init(self):
-		bs = BatchState(split="val", batch_num=5)
-		assert bs.split == "val"
-		assert bs.current_batch_count == 0
-		assert bs.batch_num == 5
-		assert isinstance(bs.batch_buffer, io.BytesIO)
+	def test_authenticate_service_success(self, mocker, uploader):
+		"""Verify successful authentication returns True and sets the drive service."""
+		mock_service = mocker.Mock()
+		mocker.patch(
+			"cipher_generation.drive_uploader.authenticate_drive_terminal",
+			return_value=mock_service,
+		)
+
+		result = uploader._authenticate_service()
+
+		assert result is True
+		assert uploader.drive_service == mock_service
+
+	def test_authenticate_service_failure(self, mocker, uploader):
+		"""Verify authentication failure catches the exception, logs it, and returns False."""
+		mocker.patch(
+			"cipher_generation.drive_uploader.authenticate_drive_terminal",
+			side_effect=Exception("Network disconnected"),
+		)
+		mock_log = mocker.patch("cipher_generation.drive_uploader.log")
+
+		result = uploader._authenticate_service()
+
+		assert result is False
+		assert uploader.drive_service is None
+
+		mock_log.critical.assert_called_once()
+		assert (
+			"Error authenticating drive service: Network disconnected"
+			in mock_log.critical.call_args[0][0]
+		)
+		assert mock_log.critical.call_args[1].get("exc_info") is True
 
 
 class TestDriveUploaderRunLoop:
-	"""Tests covering the main execution loop, queue pulling, and routing."""
+	"""Tests covering the main execution loop, queue pulling, and lock setting."""
 
-	def test_successful_full_upload(
-		self, mocker, queue_factory, mock_cipher_item, mock_cipher_item_2
-	):
-		total_to_upload = 2
-		local_config = DriveUploaderConfig(
-			split_folders=MOCK_SPLIT_FOLDERS, total_ciphers=total_to_upload
+	def test_successful_run_loop_and_merge(self, mocker, uploader, mock_queue):
+		"""Verify normal files upload, val/test files hoard, and SENTINEL triggers merge."""
+		mocker.patch.object(uploader, "_authenticate_service", return_value=True)
+		mock_upload = mocker.patch.object(uploader, "_upload_file")
+		mock_merge = mocker.patch.object(uploader, "_merge_and_upload")
+
+		# FIX: Correctly mock a context manager for tqdm
+		mock_pbar = mocker.MagicMock()
+		mock_pbar.__enter__.return_value = mock_pbar
+		mocker.patch("cipher_generation.drive_uploader.tqdm", return_value=mock_pbar)
+
+		mock_tqdm_set_lock = mocker.patch(
+			"cipher_generation.drive_uploader.tqdm.set_lock"
 		)
 
-		mocker.patch(
-			"cipher_generation.drive_uploader.authenticate_drive_terminal",
-			return_value=mocker.Mock(),
-		)
-		mock_upload_drive = mocker.patch(
-			"cipher_generation.drive_uploader.upload_to_drive",
-			side_effect=["file_id_1", "file_id_2"],
-		)
-
-		mock_pbar = mocker.Mock(total=total_to_upload)
-		mocker.patch(
-			"cipher_generation.drive_uploader.tqdm",
-			return_value=mocker.MagicMock(
-				__enter__=lambda self: mock_pbar, __exit__=lambda *args: None
-			),
-		)
-
-		mock_queue = queue_factory()
-
-		mock_queue.put(mock_cipher_item)
-		mock_queue.put(mock_cipher_item_2)
-		mock_queue.put(SENTINEL)
-
-		uploader = DriveUploader(mock_queue, local_config, name="TestUploader")
-		uploader.run()
-
-		assert uploader.uploaded_count == total_to_upload
-		assert mock_upload_drive.call_count == 1
-		mock_pbar.update.assert_called_once_with(BATCH_SIZE)
-
-	def test_empty_queue(self, mocker, uploader_config):
-		"""Test that the uploader handles empty queues gracefully via timeouts."""
-		queue_mock = mocker.Mock()
-		queue_mock.get.side_effect = [queue.Empty, SENTINEL]
-
-		mocker.patch(
-			"cipher_generation.drive_uploader.authenticate_drive_terminal",
-			return_value=mocker.Mock(),
-		)
-
-		uploader = DriveUploader(queue_mock, uploader_config, name="Test")
-		uploader.run()
-
-		assert uploader.uploaded_count == 0
-		assert queue_mock.get.call_count == 2
-
-		# Second run
-		uploader.uploaded_count = 10
-		queue_mock.get.side_effect = [queue.Empty, SENTINEL]
-		uploader.run()
-
-		assert uploader.uploaded_count == 10
-		assert queue_mock.get.call_count == 4
-
-	def test_authentication_failure(
-		self, mocker, queue_factory, uploader_config, mock_cipher_item
-	):
-		mocker.patch(
-			"cipher_generation.drive_uploader.authenticate_drive_terminal",
-			side_effect=Exception("Auth failed"),
-		)
-		mock_log = mocker.patch("cipher_generation.drive_uploader.log")
-
-		mock_queue = queue_factory()
-
-		mock_queue.put(mock_cipher_item)
-		mock_queue.put(SENTINEL)
-
-		uploader = DriveUploader(mock_queue, uploader_config, name="TestUploader")
-		uploader.run()
-
-		mock_log.critical.assert_called_once_with(
-			"TestUploader: Error authenticating drive service: Auth failed",
-			exc_info=True,
-		)
-		assert uploader.uploaded_count == 0
-
-	def test_metadata_routing_in_run(self, mocker, queue_factory, uploader_config):
-		"""Test that the 'metadata' split is routed correctly and not batched."""
-		mocker.patch(
-			"cipher_generation.drive_uploader.authenticate_drive_terminal",
-			return_value=mocker.Mock(),
-		)
-		mock_upload_raw = mocker.patch.object(DriveUploader, "_upload_raw_file")
-
-		mock_queue = queue_factory()
-		mock_queue.put(
-			("metadata", "metadata_vocab_size.json", b'{"max_symbol_id": 100}')
-		)
-		mock_queue.put(SENTINEL)
-
-		uploader = DriveUploader(mock_queue, uploader_config, name="TestUploader")
-		mocker.patch("cipher_generation.drive_uploader.tqdm")
+		mock_queue.get.side_effect = [
+			("train", "path/batch_train_1.zip", "batch_train_1.zip", 10000),
+			("MERGE", "val", "path/val_raw.jsonl", 5000),
+			("MERGE", "test", "path/test_raw.jsonl", 5000),
+			SENTINEL,
+		]
 
 		uploader.run()
 
-		assert "metadata" not in uploader.batch_states
-		assert "train" in uploader.batch_states
-		mock_upload_raw.assert_called_once_with(
-			"metadata", "metadata_vocab_size.json", b'{"max_symbol_id": 100}'
-		)
+		# Check lock was set
+		mock_tqdm_set_lock.assert_called_once_with(uploader.tqdm_lock)
 
-
-class TestDriveUploaderBatchHelpers:
-	"""Tests covering the zipped batch logic and API interactions."""
-
-	def test_upload_failure(self, mocker, ctx: UploaderTestContext):
-		mocker.patch(
-			"cipher_generation.drive_uploader.authenticate_drive_terminal",
-			return_value=mocker.Mock(),
-		)
-		mock_log = mocker.patch("cipher_generation.drive_uploader.log")
-
-		ctx.queue.put(ctx.item)
-		ctx.queue.put(ctx.item2)
-		ctx.queue.put(SENTINEL)
-
-		uploader = DriveUploader(ctx.queue, ctx.config, name="TestUploader")
-		uploader.run()
-
-		assert uploader.uploaded_count == 0
-		mock_log.critical.assert_called_once_with(
-			"FATAL: train Batch 1 failed all retries."
-		)
-
-	def test_partial_final_batch(self, mocker, ctx: UploaderTestContext):
-		total_expected = 3
-		ctx.config.total_ciphers = total_expected
-		mocker.patch("cipher_generation.drive_uploader.BATCH_SIZE", 2)
-
-		mocker.patch(
-			"cipher_generation.drive_uploader.authenticate_drive_terminal",
-			return_value=mocker.Mock(),
-		)
-		mock_upload_drive = mocker.patch(
-			"cipher_generation.drive_uploader.upload_to_drive",
-			side_effect=["file_id_full", "file_id_final"],
-		)
-		mock_pbar = mocker.Mock(total=total_expected)
-		mocker.patch(
-			"cipher_generation.drive_uploader.tqdm",
-			return_value=mocker.MagicMock(
-				__enter__=lambda self: mock_pbar, __exit__=lambda *args: None
-			),
-		)
-
-		ctx.queue.put(ctx.item)
-		ctx.queue.put(ctx.item2)
-		ctx.queue.put(ctx.item)
-		ctx.queue.put(SENTINEL)
-
-		uploader = DriveUploader(ctx.queue, ctx.config, name="TestUploader")
-		uploader.run()
-
-		assert uploader.uploaded_count == total_expected
-		assert mock_upload_drive.call_count == 2
-		mock_upload_drive.assert_any_call(
-			mocker.ANY, mocker.ANY, "train_ciphers_batch_1.zip", mocker.ANY
-		)
-		mock_upload_drive.assert_any_call(
-			mocker.ANY, mocker.ANY, "train_ciphers_batch_final_2.zip", mocker.ANY
-		)
-		mock_pbar.update.assert_any_call(2)
-		mock_pbar.update.assert_any_call(1)
-
-	def test_upload_batch_helper_success(self, mocker, uploader_config):
-		uploader = DriveUploader(mocker.Mock(), uploader_config, name="TestUploader")
-		uploader.drive_service = mocker.Mock()
-
-		mock_upload = mocker.patch(
-			"cipher_generation.drive_uploader.upload_to_drive", return_value="file_id_successful"
-		)
-		mock_pbar = mocker.Mock()
-
-		bs_initial = BatchState(split="train", batch_num=3)
-		bs_initial.current_batch_count = 5
-		bs_initial.batch_buffer.write(b"some_zip_data")
-		bs_initial.batch_buffer.seek(0)
-
-		new_bs = uploader._upload_batch(bs_initial, mock_pbar, "test_batch.zip")
-
-		assert new_bs.split == "train"
-		assert new_bs.batch_num == 4
-		assert new_bs.current_batch_count == 0
+		# Train should upload normally right away
 		assert mock_upload.call_count == 1
-		mock_pbar.update.assert_called_once_with(5)
-		new_bs.zip_buffer.close()
+		uploaded_item = mock_upload.call_args_list[0][0][0]
+		assert uploaded_item.split == "train"
 
-	def test_upload_batch_helper_failure(self, mocker, uploader_config):
-		uploader = DriveUploader(mocker.Mock(), uploader_config, name="TestUploader")
-		uploader.drive_service = mocker.Mock()
-		mock_log = mocker.patch("cipher_generation.drive_uploader.log")
+		# Merge should be called exactly twice at the end (once for val, once for test)
+		assert mock_merge.call_count == 2
+		val_merge_args = mock_merge.call_args_list[0][0]
+		test_merge_args = mock_merge.call_args_list[1][0]
 
-		mock_upload = mocker.patch(
-			"cipher_generation.drive_uploader.upload_to_drive", return_value=""
-		)
-		mock_pbar = mocker.Mock()
+		assert val_merge_args[0] == "val"
+		assert val_merge_args[1] == [("path/val_raw.jsonl", 5000)]
+		assert test_merge_args[0] == "test"
+		assert test_merge_args[1] == [("path/test_raw.jsonl", 5000)]
 
-		bs_initial = BatchState(split="train", batch_num=5)
-		bs_initial.current_batch_count = 10
+	def test_empty_queue_timeout_refreshes_pbar(self, mocker, uploader, mock_queue):
+		"""Verify empty queues catch the timeout and force a pbar refresh."""
+		mocker.patch.object(uploader, "_authenticate_service", return_value=True)
+		mock_upload = mocker.patch.object(uploader, "_upload_file")
 
-		new_bs = uploader._upload_batch(bs_initial, mock_pbar, "test_fail.zip")
+		# FIX: Correctly mock the context manager
+		mock_pbar = mocker.MagicMock()
+		mock_pbar.__enter__.return_value = mock_pbar
+		mocker.patch("cipher_generation.drive_uploader.tqdm", return_value=mock_pbar)
 
-		assert new_bs.batch_num == 6
-		assert new_bs.current_batch_count == 0
-		mock_log.critical.assert_called_once_with(
-			"FATAL: train Batch 5 failed all retries."
-		)
-		assert mock_upload.call_count == 1
-		mock_pbar.update.assert_not_called()
-		new_bs.zip_buffer.close()
+		mock_queue.get.side_effect = [
+			queue.Empty,
+			queue.Empty,
+			SENTINEL,
+		]
 
-	def test_upload_batch_exception_handling(self, mocker, uploader_config):
-		mock_bs_class = mocker.patch("cipher_generation.drive_uploader.BatchState")
-		mock_new_bs = mocker.Mock()
-		mock_new_bs.batch_num = 8
-		mock_new_bs.current_batch_count = 0
-		mock_bs_class.return_value = mock_new_bs
+		uploader.run()
 
-		uploader = DriveUploader(mocker.Mock(), uploader_config, name="TestUploader")
-		uploader.drive_service = mocker.Mock()
-		mock_log = mocker.patch("cipher_generation.drive_uploader.log")
-
-		mocker.patch(
-			"cipher_generation.drive_uploader.upload_to_drive",
-			side_effect=Exception("Unexpected API Crash"),
-		)
-		mock_pbar = mocker.Mock()
-
-		bs_initial = BatchState(split="train", batch_num=7)
-		bs_initial.current_batch_count = 5
-
-		new_bs = uploader._upload_batch(bs_initial, mock_pbar, "crash_batch.zip")
-
-		assert new_bs.batch_num == 8
-		assert new_bs.current_batch_count == 0
-		mock_log.error.assert_called_once_with(
-			"FATAL: Unexpected error uploading train Batch 7: Unexpected API Crash",
-			exc_info=True,
-		)
-		mock_pbar.update.assert_not_called()
-
-
-class TestDriveUploaderRawFileHelpers:
-	"""Tests covering the raw file upload logic specifically for metadata."""
-
-	def test_upload_raw_file_success(self, mocker, uploader_config):
-		uploader = DriveUploader(mocker.Mock(), uploader_config, name="TestUploader")
-		uploader.drive_service = mocker.Mock()
-		mock_log = mocker.patch("cipher_generation.drive_uploader.log")
-
-		mock_upload = mocker.patch(
-			"cipher_generation.drive_uploader.upload_to_drive", return_value="raw_file_id_1"
-		)
-
-		uploader._upload_raw_file("metadata", "meta.json", b"raw_data")
-
-		mock_upload.assert_called_once_with(
-			uploader.drive_service, b"raw_data", "meta.json", "mock_metadata_123"
-		)
-		mock_log.info.assert_called_once_with(
-			"Uploaded raw file meta.json to metadata folder: raw_file_id_1"
-		)
-
-	def test_upload_raw_file_missing_folder(self, mocker, uploader_config):
-		uploader = DriveUploader(mocker.Mock(), uploader_config, name="TestUploader")
-		mock_log = mocker.patch("cipher_generation.drive_uploader.log")
-		mock_upload = mocker.patch("cipher_generation.drive_uploader.upload_to_drive")
-
-		uploader._upload_raw_file("unknown_split", "meta.json", b"raw_data")
-
+		assert mock_queue.get.call_count == 3
+		assert mock_pbar.refresh.call_count == 2  # Refreshed twice due to empty queue
 		mock_upload.assert_not_called()
-		mock_log.error.assert_called_once_with(
-			"Cannot upload meta.json: No folder ID found for split 'unknown_split'"
+
+	def test_run_aborts_on_auth_failure(self, mocker, uploader, mock_queue):
+		"""Verify the run loop immediately returns if authentication fails."""
+		mocker.patch.object(uploader, "_authenticate_service", return_value=False)
+		mock_tqdm_set_lock = mocker.patch(
+			"cipher_generation.drive_uploader.tqdm.set_lock"
 		)
 
-	def test_upload_raw_file_api_rejection(self, mocker, uploader_config):
-		uploader = DriveUploader(mocker.Mock(), uploader_config, name="TestUploader")
+		uploader.run()
+
+		mock_tqdm_set_lock.assert_not_called()
+		mock_queue.get.assert_not_called()
+
+
+@dataclass
+class UploadTestCase:
+	"""Defines the parameters for testing various upload outcomes."""
+
+	id: str
+	split: str
+	expected_folder_id: str | None
+	api_return: str | None
+	expected_count_increase: int
+	logs_error: bool
+	expect_file_deleted: bool
+
+
+upload_test_cases = [
+	UploadTestCase(
+		id="success",
+		split="train",
+		expected_folder_id="mock_train_123",
+		api_return="success_file_id",
+		expected_count_increase=10000,
+		logs_error=False,
+		expect_file_deleted=True,
+	),
+	UploadTestCase(
+		id="missing_folder",
+		split="unknown_split",
+		expected_folder_id=None,
+		api_return=None,
+		expected_count_increase=0,
+		logs_error=True,
+		expect_file_deleted=False,
+	),
+	UploadTestCase(
+		id="api_rejection",
+		split="val",
+		expected_folder_id="mock_val_123",
+		api_return=None,
+		expected_count_increase=0,
+		logs_error=True,
+		expect_file_deleted=False,
+	),
+]
+
+
+class TestDriveUploaderDiskHelpers:
+	"""Tests covering disk reading, merging, cleaning, and API uploading."""
+
+	@pytest.mark.parametrize("case", upload_test_cases, ids=lambda c: c.id)
+	def test_upload_file_outcomes_and_disk_cleanup(
+		self, mocker, uploader, tmp_path, case: UploadTestCase
+	):
+		"""Verify successful API uploads correctly delete the local file, and failures preserve it."""
 		uploader.drive_service = mocker.Mock()
 		mock_log = mocker.patch("cipher_generation.drive_uploader.log")
+		mock_upload_to_drive = mocker.patch(
+			"cipher_generation.drive_uploader.upload_to_drive",
+			return_value=case.api_return,
+		)
+		mock_pbar = mocker.Mock()
 
-		mocker.patch("cipher_generation.drive_uploader.upload_to_drive", return_value=None)
-		uploader._upload_raw_file("metadata", "meta.json", b"raw_data")
+		# Create a real temporary file on disk for the test
+		dummy_file = tmp_path / "test_file.zip"
+		dummy_file.write_bytes(b"dummy_zip_data")
 
-		mock_log.error.assert_called_once_with(
-			"FATAL: Failed to upload raw file meta.json to metadata."
+		test_item = Item(
+			split=case.split,
+			filepath=str(dummy_file),
+			filename="test_file.zip",
+			cipher_count=10000,
 		)
 
-	def test_upload_raw_file_exception_handling(self, mocker, uploader_config):
-		uploader = DriveUploader(mocker.Mock(), uploader_config, name="TestUploader")
-		uploader.drive_service = mocker.Mock()
-		mock_log = mocker.patch("cipher_generation.drive_uploader.log")
+		uploader._upload_file(test_item, mock_pbar)
 
+		assert uploader.uploaded_count == case.expected_count_increase
+		assert os.path.exists(str(dummy_file)) != case.expect_file_deleted
+
+		if case.expect_file_deleted:
+			mock_upload_to_drive.assert_called_once_with(
+				uploader.drive_service,
+				b"dummy_zip_data",
+				"test_file.zip",
+				case.expected_folder_id,
+			)
+
+		if case.logs_error:
+			mock_log.error.assert_called_once()
+
+	def test_upload_file_unexpected_exception(self, mocker, uploader, tmp_path):
+		"""Verify API crashes are caught, logged, and the file is NOT deleted."""
+		mock_log = mocker.patch("cipher_generation.drive_uploader.log")
 		mocker.patch(
 			"cipher_generation.drive_uploader.upload_to_drive",
 			side_effect=Exception("Network Timeout"),
 		)
 
-		uploader._upload_raw_file("metadata", "meta.json", b"raw_data")
+		dummy_file = tmp_path / "crash_test.zip"
+		dummy_file.write_bytes(b"data")
 
-		mock_log.error.assert_called_once_with(
-			"FATAL: Unexpected error uploading raw file meta.json: Network Timeout",
-			exc_info=True,
+		test_item = Item(
+			split="train",
+			filepath=str(dummy_file),
+			filename="crash_test.zip",
+			cipher_count=100,
 		)
+
+		uploader._upload_file(test_item, mocker.Mock())
+
+		# Assert caught gracefully
+		mock_log.error.assert_called_once()
+		assert "FATAL: Unexpected error" in mock_log.error.call_args[0][0]
+
+		# Assert file was preserved on disk so it isn't lost
+		assert dummy_file.exists()
+
+	def test_merge_and_upload_logic(self, mocker, uploader, tmp_path):
+		"""Verify multiple raw files are merged into one zip and then passed to _upload_file."""
+		mock_upload = mocker.patch.object(uploader, "_upload_file")
+
+		# FIX: Intercept os.path.join to force writing into the tmp_path sandbox instead of project root
+		original_join = os.path.join
+
+		def mock_join(*args):
+			if args[0] == "temp_ciphers":
+				return str(tmp_path / args[1])
+			return original_join(*args)
+
+		mocker.patch("os.path.join", side_effect=mock_join)
+
+		# Create two raw files to merge
+		file1 = tmp_path / "raw1.jsonl"
+		file1.write_text("cipher1")
+		file2 = tmp_path / "raw2.jsonl"
+		file2.write_text("cipher2")
+
+		files_to_merge = [(str(file1), 5), (str(file2), 10)]
+
+		# Run merge
+		uploader._merge_and_upload("val", files_to_merge, mocker.Mock())
+
+		# Check that the raw files were deleted after merging
+		assert not file1.exists()
+		assert not file2.exists()
+
+		# Check that _upload_file was called with a newly created ZIP item
+		mock_upload.assert_called_once()
+		upload_item = mock_upload.call_args[0][0]
+
+		assert upload_item.split == "val"
+		assert upload_item.cipher_count == 15
+		assert upload_item.filename == "val_final.zip"
+
+		# Verify the ZIP actually contains the combined data
+		with zipfile.ZipFile(upload_item.filepath, "r") as zf:
+			assert "val_merged.jsonl" in zf.namelist()
+			with zf.open("val_merged.jsonl") as f:
+				content = f.read().decode("utf-8")
+				assert "cipher1" in content
+				assert "cipher2" in content

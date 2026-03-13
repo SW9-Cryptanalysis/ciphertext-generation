@@ -60,14 +60,6 @@ DATASETS: list[DatasetConfig] = [
 		"prefix": "pg",
 		"fallback_genres": ["Other / Uncategorized"],
 	},
-	{
-		"path": "common-pile/arxiv_papers_filtered",
-		"type": "arxiv_papers",
-		"split_name": "train",
-		"column": "content",
-		"prefix": "arxiv",
-		"fallback_genres": ["Academic Papers"],
-	},
 ]
 
 DEFAULT_TAXONOMY = {

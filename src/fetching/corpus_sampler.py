@@ -69,11 +69,24 @@ class CorpusSampler:
 			if book_id in BOOK_IDS_VALIDATION:
 				continue
 
-			split = get_split(idx)
-			if self.counts[split] >= self.targets[split]:
+			initial_split = get_split(idx)
+			split = self._get_available_split(initial_split)
+
+			if not split:
 				continue
 
 			yield from self._process_book(book, split)
+
+	def _get_available_split(self, initial_split: str) -> str | None:
+		"""Find an available split, falling back to others if the target is full."""
+		if self.counts[initial_split] < self.targets[initial_split]:
+			return initial_split
+
+		for backup_split in ["val", "test", "train"]:
+			if self.counts[backup_split] < self.targets[backup_split]:
+				return backup_split
+
+		return None
 
 	def _process_book(self, book: Book, split: str) -> Iterator[tuple[str, TextStream]]:
 		"""Handle the extraction and debt calculation for a single book."""
@@ -81,7 +94,7 @@ class CorpusSampler:
 		usable_text = get_usable_text(raw_text, self.len_bounds)
 
 		safe_capacity_req = int(self.len_bounds[1] * 1.5)
-		capacity = len(usable_text) // safe_capacity_req
+		capacity = len(usable_text) // safe_capacity_req if safe_capacity_req > 0 else 0
 
 		self.debts[split] += self.means[split]
 		actual_take = get_actual_take(split, self.debts, capacity)
@@ -90,6 +103,8 @@ class CorpusSampler:
 			return
 
 		take_limit = min(actual_take, self.targets[split] - self.counts[split])
+
+		chunks_yielded = 0
 
 		for chunk, bounded_chunk in islice(
 			get_book_chunks(usable_text, actual_take, self.len_bounds),
@@ -107,5 +122,6 @@ class CorpusSampler:
 				},
 			)
 			self.counts[split] += 1
+			chunks_yielded += 1
 
-		self.debts[split] -= actual_take
+		self.debts[split] -= chunks_yielded

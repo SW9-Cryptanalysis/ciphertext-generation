@@ -56,20 +56,6 @@ def authenticate_drive_terminal() -> build:  # type: ignore
 		os.environ["GOOGLE_TOKEN_JSON"] = token_content
 		log.info("Updated GOOGLE_TOKEN_JSON in current environment.")
 
-		log.warning(
-			"\nACTION REQUIRED: For permanent storage, copy the token content below:",
-		)
-		log.warning(
-			"----------------------------------------------------------------------",
-		)
-		log.warning(token_content)
-		log.warning(
-			"----------------------------------------------------------------------",
-		)
-		log.warning(
-			"Paste this JSON string into GOOGLE_TOKEN_JSON in your actual .env file.",
-		)
-
 	# 4. Build the Drive service object
 	return build("drive", DRIVE_VERSION, credentials=creds)
 

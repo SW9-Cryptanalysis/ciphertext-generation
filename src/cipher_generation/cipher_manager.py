@@ -1,14 +1,18 @@
 import multiprocessing as mp
-from utils.logging import get_logger
+from utils.logging import get_logger_tqdm
 import os
 from typing import Iterable, Any
 import json
+from pathlib import Path
+import shutil
+from utils.constants import PROJECT_ROOT
 
 from cipher_generation.drive_uploader import DriveUploader, DriveUploaderConfig
-from cipher_generation.cipher_producer import CipherProducer
+from cipher_generation.cipher_producer import CipherProducer, ProducerConfig
+from utils.constants import BATCH_SIZE
 from dataset_stats import DatasetStatsAggregator
 
-log = get_logger("CipherManager")
+log = get_logger_tqdm("CipherManager", 20)
 
 
 class CipherManager:
@@ -38,9 +42,11 @@ class CipherManager:
 		"""Initialize the CipherManager.
 
 		Args:
-			config: Configuration dictionary with count and folder_id per split.
-			text_stream_source: Iterator yielding (split, text_data) from the generator.
-			num_workers: Number of workers to use. Defaults to None.
+			config (dict[str, dict[str, Any]]): Configuration dictionary mapping splits
+				to their folder IDs and target counts.
+			text_stream_source (Iterable): The iterable source of text chunks.
+			num_workers (int | None, optional): The number of workers to use.
+				Defaults to None (use all available CPUs).
 
 		"""
 		self.config = config
@@ -53,13 +59,13 @@ class CipherManager:
 
 		self.num_workers = num_workers or max(1, (os.cpu_count() or 4) - 2)
 
-		self.manager = mp.Manager()
-		self.job_queue = self.manager.Queue(maxsize=1000)
-		self.result_queue = self.manager.Queue()
-		self.stats_queue = self.manager.Queue()
+		self.job_queue = mp.Queue(maxsize=1000)
+		self.result_queue = mp.Queue()
+		self.stats_queue = mp.Queue()
 
 		self.master_stats = DatasetStatsAggregator()
-		self._logging_interval = 1000
+		self._logging_interval = 10000
+		self.temp_dir = Path(PROJECT_ROOT / "temp_ciphers")
 
 	def execute(self) -> None:
 		"""Execute the cipher generation process."""
@@ -68,11 +74,14 @@ class CipherManager:
 			f"using {self.num_workers} workers.",
 		)
 
+		tqdm_lock = mp.RLock()
+
 		uploader = DriveUploader(
-			queue=self.result_queue,  # type: ignore
+			upload_queue=self.result_queue,
 			config=DriveUploaderConfig(
 				split_folders=self.split_folders,
 				total_ciphers=self.total_count,
+				tqdm_lock=tqdm_lock,
 			),
 			name="Uploader-Consumer",
 		)
@@ -81,7 +90,13 @@ class CipherManager:
 		workers = []
 		for i in range(self.num_workers):
 			p = CipherProducer(
-				queues=(self.job_queue, self.result_queue, self.stats_queue),  # type: ignore
+				config=ProducerConfig(
+					input_queue=self.job_queue,
+					output_queue=self.result_queue,
+					stats_queue=self.stats_queue,
+					batch_size=BATCH_SIZE,
+					temp_dir=self.temp_dir,
+				),
 				name=f"Worker-{i + 1}",
 			)
 			workers.append(p)
@@ -89,76 +104,96 @@ class CipherManager:
 
 		log.info("Feeder started. Reading stream and filling queues...")
 
-		count_fed = 0
 		try:
-			count_fed = self._feeder_stream()
+			count_fed = 0
+			try:
+				count_fed = self._feeder_stream(tqdm_lock)
 
-		except KeyboardInterrupt:
-			log.warning("Job interrupted! Stopping...")
-		except Exception as e:
-			log.error(f"Stream error: {e}")
-		finally:
-			log.info(f"Stream finished. Fed {count_fed} items. Stopping workers...")
+			except KeyboardInterrupt:
+				log.warning("Job interrupted! Stopping...")
+			except Exception as e:
+				log.error(f"Stream error: {e}")
+			finally:
+				log.info(f"Stream finished. Fed {count_fed} items. Stopping workers...")
+				for _ in range(self.num_workers):
+					self.job_queue.put(self.SENTINEL)
+
+			for p in workers:
+				p.join()
+
+			log.info("Workers finished. Merging statistics from all workers...")
 			for _ in range(self.num_workers):
-				self.job_queue.put(self.SENTINEL)
+				incoming_stats = self.stats_queue.get()
+				self.master_stats.merge(incoming_stats)
 
-		for p in workers:
-			p.join()
+			self._upload_metadata()
+			self.result_queue.put(self.SENTINEL)
 
-		log.info("Workers finished. Merging statistics from all workers...")
-		for _ in range(self.num_workers):
-			incoming_stats = self.stats_queue.get()
-			self.master_stats.merge(incoming_stats)
+			uploader.join()
 
-		self._upload_metadata()
-		self.result_queue.put(self.SENTINEL)
+			log.info("=" * 40)
+			log.info("JOB COMPLETE")
+			log.info(f"Total ciphers fed: {count_fed}")
+			log.info(
+				f"Peak homophone ID (Vocab Size): "
+				f"{self.master_stats.global_max_homophones}",
+			)
+			log.info("=" * 40)
 
-		uploader.join()
-
-		log.info("=" * 40)
-		log.info("JOB COMPLETE")
-		log.info(f"Total ciphers fed: {count_fed}")
-		log.info(
-			f"Peak homophone ID (Vocab Size): "
-			f"{self.master_stats.global_max_homophones}",
-		)
-		log.info("=" * 40)
+		finally:
+			if self.temp_dir.exists():
+				shutil.rmtree(self.temp_dir, ignore_errors=True)
 
 	def _upload_metadata(self) -> None:
 		"""Upload the metadata and statistics files to Google Drive."""
 		log.info("Uploading metadata and dataset statistics...")
 
-		metadata_filename = "metadata.json"
-		metadata_bytes = json.dumps(
-			{
-				"max_symbol_id": self.master_stats.global_max_homophones,
-				"statistics": self.master_stats.__json__(),
-			},
-		).encode("utf-8")
-		self.result_queue.put(("metadata", metadata_filename, metadata_bytes))
+		metadata_filename = Path("metadata.json")
 
-	def _feeder_stream(self) -> int:
+		os.makedirs(self.temp_dir, exist_ok=True)
+		filepath = self.temp_dir / metadata_filename
+
+		metadata_content = {
+			"max_symbol_id": self.master_stats.global_max_homophones,
+			"statistics": self.master_stats.__json__(),
+		}
+
+		with open(filepath, "w", encoding="utf-8") as f:
+			json.dump(metadata_content, f, indent=4)
+
+		self.result_queue.put(("metadata", filepath, metadata_filename, 0))
+
+	def _feeder_stream(self, tqdm_lock: Any) -> int:
 		"""Feed the ciphers to the workers using the job queue.
 
-		This method feeds the ciphers to the workers using the job queue. It
-		handles routing by split and error handling.
+		Args:
+			tqdm_lock (Any): The multiprocessing lock to use for tqdm.
 
-		Raises:
-			Exception: If any error occurs during the execution.
+		Returns:
+			int: The number of ciphers fed to the workers.
 
 		"""
-		log.info("Feeding ciphers to workers...")
+		from tqdm import tqdm
+
+		tqdm.set_lock(tqdm_lock)
 
 		count_fed = 0
 
-		for count_fed, (split, text_data) in enumerate(self.stream, start=1):
-			self.job_queue.put((split, text_data))
+		with tqdm(
+			total=self.total_count,
+			desc="Texts Fed to Workers",
+			position=0,
+			leave=True,
+		) as pbar:
+			for count_fed, (split, text_data) in enumerate(self.stream, start=1):
+				self.job_queue.put((split, text_data))
+				pbar.update(1)
 
-			if count_fed % self._logging_interval == 0:
-				log.info(f"Fed {count_fed} texts to workers...")
+				if count_fed % self._logging_interval == 0:
+					log.debug(f"Crossed {count_fed} texts milestone...")
 
-			if count_fed >= self.total_count:
-				log.info(f"Target of {self.total_count} reached. Stopping feeder.")
-				break
+				if count_fed >= self.total_count:
+					log.info(f"Target of {self.total_count} reached. Stopping feeder.")
+					break
 
 		return count_fed

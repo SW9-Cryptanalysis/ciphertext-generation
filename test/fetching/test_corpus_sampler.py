@@ -99,21 +99,6 @@ class TestCorpusSamplerGenerateStream:
 
 		mock_process.assert_not_called()
 
-	def test_generate_stream_skips_fulfilled_splits(
-		self, mocker, mock_constants, default_targets, default_genre_map
-	):
-		"""Test that books assigned to an already-full split are discarded."""
-		sampler = CorpusSampler(default_targets, (500, 1000), default_genre_map)
-		sampler.counts["val"] = 10
-
-		mocker.patch("fetching.corpus_sampler.get_split", return_value="val")
-		mock_process = mocker.patch.object(sampler, "_process_book")
-
-		dummy_stream = [{"id": "1", "text": "dummy"}]
-		list(sampler.generate_stream(dummy_stream))
-
-		mock_process.assert_not_called()
-
 	def test_generate_stream_yields_from_process_book(
 		self, mocker, mock_constants, default_targets, default_genre_map
 	):
@@ -130,6 +115,73 @@ class TestCorpusSamplerGenerateStream:
 		results = list(sampler.generate_stream(dummy_stream))
 
 		assert results == [expected_yield]
+
+	def test_generate_stream_continues_on_none_split(
+		self, mocker, mock_constants, default_targets, default_genre_map
+	):
+		"""Test that the loop executes 'continue' and moves to the next book if split is None."""
+		sampler = CorpusSampler(default_targets, (500, 1000), default_genre_map)
+
+		# Force the loop to run twice before checking completion
+		mocker.patch.object(sampler, "is_complete", side_effect=[False, False, True])
+
+		# First book gets None (triggering continue), second book gets "train"
+		mocker.patch.object(
+			sampler, "_get_available_split", side_effect=[None, "train"]
+		)
+
+		expected_yield = ("train", {"text": "chunk"})
+		mock_process = mocker.patch.object(
+			sampler, "_process_book", return_value=iter([expected_yield])
+		)
+
+		dummy_stream = [
+			{"id": "1", "text": "skip_me"},
+			{"id": "2", "text": "process_me"},
+		]
+
+		results = list(sampler.generate_stream(dummy_stream))
+
+		# Assert process_book was only called once, specifically for the second book
+		assert mock_process.call_count == 1
+		assert mock_process.call_args[0][0]["id"] == "2"
+		assert results == [expected_yield]
+
+
+class TestCorpusSamplerGetAvailableSplit:
+	"""Tests covering the split fallback routing logic."""
+
+	def test_returns_initial_when_not_full(self, default_targets, default_genre_map):
+		"""Verify it returns the requested split if the quota is not met."""
+		sampler = CorpusSampler(default_targets, (500, 1000), default_genre_map)
+		sampler.counts["train"] = 50  # Target is 100
+
+		assert sampler._get_available_split("train") == "train"
+
+	def test_returns_backup_when_initial_full(self, default_targets, default_genre_map):
+		"""Verify it falls back to the defined backup order ('val', 'test', 'train')."""
+		sampler = CorpusSampler(default_targets, (500, 1000), default_genre_map)
+
+		# Max out the train split
+		sampler.counts["train"] = 100
+
+		# Should fall back to the first available backup in the list: 'val'
+		assert sampler._get_available_split("train") == "val"
+
+		# Max out 'val' too
+		sampler.counts["val"] = 10
+
+		# Now it should fall back to 'test'
+		assert sampler._get_available_split("train") == "test"
+
+	def test_returns_none_when_all_full(self, default_targets, default_genre_map):
+		"""Verify it returns None when absolutely all splits are at capacity."""
+		sampler = CorpusSampler(default_targets, (500, 1000), default_genre_map)
+
+		# Max out everything
+		sampler.counts = {"train": 100, "val": 10, "test": 10}
+
+		assert sampler._get_available_split("train") is None
 
 
 class TestCorpusSamplerProcessBook:

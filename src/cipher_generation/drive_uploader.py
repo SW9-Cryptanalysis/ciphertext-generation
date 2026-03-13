@@ -1,161 +1,189 @@
 import multiprocessing as mp
+import queue
+import os
+import zipfile
+from typing import Any
 from multiprocessing.queues import Queue as MPQueue
-from utils.logging import get_logger
+from utils.logging import get_logger_tqdm
 from dataclasses import dataclass
 from utils.drive import (
 	authenticate_drive_terminal,
 	upload_to_drive,
 )
 from tqdm import tqdm
-from typing import Any
-from utils.constants import BATCH_SIZE
-import queue
 
-import io
-import zipfile
-
-log = get_logger("DriveUploader")
+log = get_logger_tqdm("DriveUploader", 20)
 SENTINEL = "STOP"
 
 
 @dataclass
-class DriveUploaderConfig:
-	"""A dataclass to store the configuration for the DriveUploader.
+class Item:
+	"""A dataclass representing a packaged file ready for upload.
 
 	Attributes:
-		split_folders (dict[str, str]): A dictionary mapping split names to folder IDs.
-		total_ciphers (int): The total number of ciphers to upload across all splits.
-
-	"""
-
-	split_folders: dict[str, str]
-	total_ciphers: int
-
-
-@dataclass
-class BatchState:
-	"""A dataclass to store the state of a batch upload for a specific split.
-
-	Attributes:
-		split (str): The split identifier for this batch.
-		current_batch_count (int): The number of ciphers in the current batch.
-		batch_buffer (io.BytesIO): A buffer for the current batch ZIP file.
-		zip_buffer (zipfile.ZipFile): A ZIP file for the current batch.
-		batch_num (int): The current batch number.
+		split (str): The dataset split identifier.
+		filepath (str): The local path to the generated file.
+		filename (str): The destination filename on Google Drive.
+		cipher_count (int): The number of ciphers contained in the file.
 
 	"""
 
 	split: str
-	current_batch_count: int
-	batch_buffer: io.BytesIO
-	zip_buffer: zipfile.ZipFile
-	batch_num: int
+	filepath: str
+	filename: str
+	cipher_count: int
 
-	def __init__(self, split: str, batch_num: int = 1) -> None:
-		"""Initialize the BatchState with default values for a given split.
 
-		Args:
-			split (str): The split identifier (e.g., 'train', 'val').
-			batch_num (int, optional): The batch number. Defaults to 1.
+@dataclass
+class DriveUploaderConfig:
+	"""A dataclass to store the configuration for the DriveUploader."""
 
-		"""
-		self.split = split
-		self.current_batch_count = 0
-		self.batch_num = batch_num
-		self.batch_buffer = io.BytesIO()
-		self.zip_buffer = zipfile.ZipFile(
-			self.batch_buffer,
-			"w",
-			zipfile.ZIP_DEFLATED,
-			False,
-		)
+	split_folders: dict[str, str]
+	total_ciphers: int
+	tqdm_lock: Any
 
 
 class DriveUploader(mp.Process):
-	"""A multiprocessing process for uploading ciphers to Google Drive.
-
-	Attributes:
-		queue (MPQueue[Any]): The queue to read ciphers from.
-		split_folders (dict[str, str]): Mappings of splits to Google Drive folder IDs.
-		total_ciphers (int): The total number of ciphers to upload.
-		drive_service (build): The authenticated Google Drive service object.
-		batch_states (dict[str, BatchState]): The current batch state for each split.
-
-	Methods:
-		run(): Execute the cipher upload process.
-
-	"""
+	"""A multiprocessing process for uploading files from disk to Google Drive."""
 
 	def __init__(
 		self,
-		queue: MPQueue[Any],
+		upload_queue: MPQueue[Any],
 		config: DriveUploaderConfig,
 		*args: Any,
 		**kwargs: Any,
 	) -> None:
-		"""Initialize the DriveUploader with a queue and configuration.
+		"""Initialize the DriveUploader.
 
 		Args:
-			queue (MPQueue[Any]): The queue to read ciphers from.
+			upload_queue (MPQueue[Any]): The queue to use for communication.
 			config (DriveUploaderConfig): The configuration for the uploader.
-			*args: Additional positional arguments.
-			**kwargs: Additional keyword arguments.
+			*args: Additional arguments to pass to the parent class.
+			**kwargs: Additional keyword arguments to pass to the parent class.
 
 		"""
 		super().__init__(*args, **kwargs)
-		self.queue = queue
+		self.queue = upload_queue
 		self.split_folders = config.split_folders
 		self.total_ciphers = config.total_ciphers
+		self.tqdm_lock = config.tqdm_lock
 		self.drive_service = None
 		self.uploaded_count = 0
 
 	def run(self) -> None:
-		"""Execute the cipher upload process.
-
-		This method continuously reads ciphers from the queue and uploads them to
-		Google Drive in batches. It handles routing by split and error handling.
-
-		Raises:
-			Exception: If any error occurs during the execution.
-
-		"""
-		self.batch_states = {
-			split: BatchState(split)
-			for split in self.split_folders
-			if split != "metadata"
-		}
+		"""Execute the cipher upload process."""
 		process_name = self.name
 		if not self._authenticate_service():
 			return
 
-		with tqdm(total=self.total_ciphers, desc="Total Ciphers Uploaded") as pbar:
+		val_files: list[tuple[str, int]] = []
+		test_files: list[tuple[str, int]] = []
+
+		tqdm.set_lock(self.tqdm_lock)
+
+		with tqdm(
+			total=self.total_ciphers,
+			desc="Total Ciphers Uploaded",
+			position=1,
+			leave=True,
+		) as pbar:
 			while True:
 				try:
-					item = self.queue.get(timeout=5)
+					queue_payload = self.queue.get(timeout=5)
 				except queue.Empty:
+					pbar.refresh()
 					continue
 
-				if item == SENTINEL:
-					self._upload_all_final_batches(pbar)
+				if queue_payload == SENTINEL:
+					# The pipeline is done! Merge and upload the hoarded val/test files
+					self._merge_and_upload("val", val_files, pbar)
+					self._merge_and_upload("test", test_files, pbar)
 					break
 
-				split, filename, file_bytes = item
-				if split == "metadata":
-					self._upload_raw_file(split, filename, file_bytes)
-				elif split in self.batch_states:
-					self._process_cipher_item(split, filename, file_bytes, pbar)
+				# Catch the MERGE signal from workers
+				if queue_payload[0] == "MERGE":
+					self._hoard_files(queue_payload, val_files, test_files)
+					continue
+
+				split, filepath, filename, cipher_count = queue_payload
+				upload_item = Item(
+					split=split,
+					filepath=filepath,
+					filename=filename,
+					cipher_count=cipher_count,
+				)
+				self._upload_file(upload_item, pbar)
 
 		log.info(
-			f"{process_name} finished. Total uploaded: {self.uploaded_count} files.",
+			f"{process_name} finished. Total uploaded: {self.uploaded_count} ciphers.",
 		)
 
-	def _authenticate_service(self) -> bool:
-		"""Authenticate with the Google Drive service.
+	def _hoard_files(
+		self,
+		queue_payload: tuple[str, str, str, int],
+		val_files: list[tuple[str, int]],
+		test_files: list[tuple[str, int]],
+	) -> None:
+		"""Extract the filepath and count from a MERGE signal and store it.
 
-		Returns:
-			bool: True if authentication was successful, False otherwise.
+		Args:
+			queue_payload (tuple[str, str, str, int]): The payload from the queue.
+			val_files (list[tuple[str, int]]): The list of val files to hoard.
+			test_files (list[tuple[str, int]]): The list of test files to hoard.
 
 		"""
+		split, filepath, cipher_count = (
+			queue_payload[1],
+			queue_payload[2],
+			queue_payload[3],
+		)
+		if split == "val":
+			val_files.append((filepath, cipher_count))
+		elif split == "test":
+			test_files.append((filepath, cipher_count))
+
+	def _merge_and_upload(
+		self,
+		split: str,
+		files: list[tuple[str, int]],
+		pbar: tqdm,
+	) -> None:
+		"""Merge multiple raw JSONL files into a single ZIP archive and upload it."""
+		if not files:
+			return
+
+		log.info(f"Merging {len(files)} raw files for {split} split...")
+		total_count = sum(c for _, c in files)
+		archive_name = f"{split}_final.zip"
+		zip_filepath = os.path.join("temp_ciphers", archive_name)
+		internal_filename = f"{split}_merged.jsonl"
+
+		with (
+			zipfile.ZipFile(zip_filepath, "w", zipfile.ZIP_DEFLATED) as zf,
+			zf.open(
+				internal_filename,
+				"w",
+			) as dest,
+		):
+			for filepath, _ in files:
+				with open(filepath, "rb") as src:
+					while True:
+						chunk = src.read(1024 * 1024 * 10)
+						if not chunk:
+							break
+						dest.write(chunk)
+				os.remove(filepath)
+
+		upload_item = Item(
+			split=split,
+			filepath=zip_filepath,
+			filename=archive_name,
+			cipher_count=total_count,
+		)
+		self._upload_file(upload_item, pbar)
+
+	def _authenticate_service(self) -> bool:
+		"""Authenticate with the Google Drive service."""
 		try:
 			self.drive_service = authenticate_drive_terminal()
 			return True
@@ -166,129 +194,38 @@ class DriveUploader(mp.Process):
 			)
 			return False
 
-	def _process_cipher_item(
-		self,
-		split: str,
-		filename: str,
-		file_bytes: bytes,
-		pbar: tqdm,
-	) -> None:
-		"""Process a single cipher item, adding it to the corresponding split batch.
+	def _upload_file(self, item: Item, pbar: tqdm) -> None:
+		"""Upload a completed file from disk to Google Drive and delete it locally."""
+		folder_id = self.split_folders.get(item.split)
 
-		Args:
-			split (str): The split routing identifier.
-			filename (str): The name of the file to add to the archive.
-			file_bytes (bytes): The raw bytes of the file.
-			pbar (tqdm): The progress bar to update.
-
-		"""
-		bs = self.batch_states[split]
-
-		bs.zip_buffer.writestr(filename, file_bytes)
-		bs.current_batch_count += 1
-
-		if bs.current_batch_count >= BATCH_SIZE:
-			bs.zip_buffer.close()
-			batch_filename = f"{split}_ciphers_batch_{bs.batch_num}.zip"
-			self.batch_states[split] = self._upload_batch(bs, pbar, batch_filename)
-
-	def _upload_raw_file(self, split: str, filename: str, file_bytes: bytes) -> None:
-		"""Upload a raw file directly to Google Drive without zipping.
-
-		Args:
-			split (str): The split identifier (e.g., 'metadata').
-			filename (str): The desired filename on Drive.
-			file_bytes (bytes): The raw file contents.
-
-		"""
-		folder_id = self.split_folders.get(split)
 		if not folder_id:
 			log.error(
-				f"Cannot upload {filename}: No folder ID found for split '{split}'",
+				f"Cannot upload {item.filename}: No folder ID found for '{item.split}'",
 			)
 			return
 
 		try:
+			with open(item.filepath, "rb") as f:
+				file_bytes = f.read()
+
 			file_id = upload_to_drive(
 				self.drive_service,
 				file_bytes,
-				filename,
+				item.filename,
 				folder_id,
 			)
 
 			if file_id:
-				log.info(f"Uploaded raw file {filename} to {split} folder: {file_id}")
+				self.uploaded_count += item.cipher_count
+				pbar.update(item.cipher_count)
+				log.info(f"Uploaded {item.filename} to {item.split} folder: {file_id}")
+
+				os.remove(item.filepath)
 			else:
-				log.error(f"FATAL: Failed to upload raw file {filename} to {split}.")
+				log.error(f"FATAL: Failed to upload {item.filename} to {item.split}.")
 
 		except Exception as e:
 			log.error(
-				f"FATAL: Unexpected error uploading raw file {filename}: {e}",
+				f"FATAL: Unexpected error uploading {item.filename}: {e}",
 				exc_info=True,
 			)
-
-	def _upload_all_final_batches(self, pbar: tqdm) -> None:
-		"""Upload any remaining partial batches for all configured splits.
-
-		Args:
-			pbar (tqdm): The progress bar to update.
-
-		"""
-		for split, bs in self.batch_states.items():
-			if bs.current_batch_count > 0:
-				log.info(
-					f"Uploading final partial batch for {split}: "
-					f"{bs.current_batch_count} files.",
-				)
-				bs.zip_buffer.close()
-				batch_filename = f"{split}_ciphers_batch_final_{bs.batch_num}.zip"
-				self.batch_states[split] = self._upload_batch(bs, pbar, batch_filename)
-
-	def _upload_batch(
-		self,
-		bs: BatchState,
-		pbar: tqdm,
-		batch_filename: str,
-	) -> BatchState:
-		"""Upload a batch of ciphers to Google Drive.
-
-		Args:
-			bs (BatchState): The current BatchState object.
-			pbar (tqdm): The progress bar to update.
-			batch_filename (str): The filename of the batch ZIP file.
-
-		Returns:
-			BatchState: A fresh BatchState object for the next iterations.
-
-		"""
-		folder_id = self.split_folders[bs.split]
-
-		try:
-			file_id = upload_to_drive(
-				self.drive_service,
-				bs.batch_buffer.getvalue(),
-				batch_filename,
-				folder_id,
-			)
-
-			if file_id:
-				self.uploaded_count += bs.current_batch_count
-				pbar.update(bs.current_batch_count)
-				log.info(
-					f"Uploaded {bs.split} Batch {bs.batch_num} to Drive: {file_id}",
-				)
-
-				return BatchState(split=bs.split, batch_num=bs.batch_num + 1)
-			else:
-				log.critical(
-					f"FATAL: {bs.split} Batch {bs.batch_num} failed all retries.",
-				)
-				return BatchState(split=bs.split, batch_num=bs.batch_num + 1)
-
-		except Exception as e:
-			log.error(
-				f"FATAL: Unexpected error uploading {bs.split} "
-				f"Batch {bs.batch_num}: {e}",
-				exc_info=True,
-			)
-			return BatchState(split=bs.split, batch_num=bs.batch_num + 1)
