@@ -72,7 +72,8 @@ ignore = [
 	"S106",   # Possible hardcoded password
 ]
 [tool.ruff.format]
-indent-style = "tab"
+indent-style = "space"
+
 
 [tool.uv.sources]
 parameter-validator = { git = "https://github.com/jatewo/parameter-validator.git" }
