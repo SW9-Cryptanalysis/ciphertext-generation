@@ -16,7 +16,7 @@ class CipherTask:
 
     split: str
     text_data: TextStream
-    target_difficulty: float | int | None = None
+    target_difficulty: int | None = None
 
 
 @dataclass
