@@ -51,17 +51,18 @@ def sample_monoalphabetic_plaintext():
 def sample_monoalphabetic_ciphertext():
     return "1 2 1 3 4 3 1 2 2 1 5 6 7 4 8 7 2 4"
 
+
 @pytest.fixture
 def mono_data(
     sample_monoalphabetic_plaintext,
     sample_monoalphabetic_ciphertext,
-    sample_monoalphabetic_mappings
+    sample_monoalphabetic_mappings,
 ):
     """Bundles monoalphabetic test data to reduce argument count."""
     return {
         "pt": sample_monoalphabetic_plaintext,
         "ct": sample_monoalphabetic_ciphertext,
-        "map": sample_monoalphabetic_mappings
+        "map": sample_monoalphabetic_mappings,
     }
 
 
@@ -78,7 +79,9 @@ class TestCipherConverter:
         assert converter.ciphertext == sample_ciphertext
         assert converter.mappings == sample_mappings
 
-    def test_convert(self, mocker, sample_plaintext, sample_ciphertext, sample_mappings):
+    def test_convert(
+        self, mocker, sample_plaintext, sample_ciphertext, sample_mappings
+    ):
         # MOCK: Patch the cipher class used inside CipherConverter.
         # We assume CipherConverter imports it as: from encipherment.cipher import HomophonicCipher
         # So we patch it where it is USED: utils.cipher_conversion.HomophonicCipher
@@ -182,7 +185,9 @@ class TestCipherConverter:
                 mappings={"a": ["1"], "b": ["2"], "c": ["3"], "d": ["1"]},
             )
         assert "Invalid mappings provided" in str(excinfo.value)
-        assert "Ambiguous mapping: Symbol '1' maps to multiple characters" in str(excinfo.value)
+        assert "Ambiguous mapping: Symbol '1' maps to multiple characters" in str(
+            excinfo.value
+        )
 
     def test_from_ciphertext_and_mappings_z408_no_ambiguity(self):
         new_key = copy.deepcopy(key_formatted)
@@ -238,17 +243,9 @@ class TestCipherConverter:
 
     @pytest.mark.parametrize(
         "construction_method",
-        [
-            "from_init",
-            "from_factory"
-        ],
+        ["from_init", "from_factory"],
     )
-    def test_monoalphabetic_construction(
-        self,
-        mocker,
-        construction_method,
-        mono_data
-    ):
+    def test_monoalphabetic_construction(self, mocker, construction_method, mono_data):
         # Patch BOTH to be safe, though we expect Monoalphabetic to be used
         mock_mono = mocker.patch("utils.cipher_conversion.MonoalphabeticCipher")
         mocker.patch("utils.cipher_conversion.HomophonicCipher")
@@ -268,22 +265,15 @@ class TestCipherConverter:
             pytest.fail(f"Unknown construction_method: {construction_method}")
 
         expected = {
-			"plaintext": mono_data["pt"],
-			"ciphertext": mono_data["ct"],
-			"mappings": mono_data["map"],
-		}
+            "plaintext": mono_data["pt"],
+            "ciphertext": mono_data["ct"],
+            "mappings": mono_data["map"],
+        }
 
-        self._assert_monoalphabetic_converter_state(
-            converter,
-            expected,
-            mock_mono
-        )
+        self._assert_monoalphabetic_converter_state(converter, expected, mock_mono)
 
     def _assert_monoalphabetic_converter_state(
-        self,
-        converter: CipherConverter,
-        expected: dict,
-        mock_mono_cls
+        self, converter: CipherConverter, expected: dict, mock_mono_cls
     ):
         assert converter.plaintext == expected["plaintext"]
         assert converter.ciphertext == expected["ciphertext"]

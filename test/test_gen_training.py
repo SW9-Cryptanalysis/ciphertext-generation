@@ -1,6 +1,6 @@
 import pytest
 
-from gen_training import get_folder_id, load_folder_ids, get_text_stream
+from gen_training import get_folder_id, load_folder_ids, get_text_stream, Targets
 
 
 class TestEnvironmentVariables:
@@ -16,7 +16,9 @@ class TestEnvironmentVariables:
         """Test that get_folder_id raises an OSError when the variable is missing."""
         monkeypatch.delenv("MISSING_ENV_VAR", raising=False)
 
-        with pytest.raises(OSError, match="Environment variable MISSING_ENV_VAR not set"):
+        with pytest.raises(
+            OSError, match="Environment variable MISSING_ENV_VAR not set"
+        ):
             get_folder_id("MISSING_ENV_VAR")
 
     def test_load_folder_ids_success(self, monkeypatch):
@@ -51,6 +53,7 @@ class TestGetTextStream:
         mock_sampler_instance = mock_dependencies["sampler_cls"].return_value
 
         targets = {"train": 10, "val": 2, "test": 2}
+        targets = Targets(**targets)
         result = get_text_stream(targets=targets)
 
         mock_dependencies["extractor_cls"].assert_called_once()
@@ -75,7 +78,10 @@ class TestGetTextStream:
         custom_extractor = mocker.Mock()
 
         targets = {"train": 5, "val": 1, "test": 1}
-        get_text_stream(targets=targets, len_bounds=(100, 500), extractor=custom_extractor)
+        targets = Targets(**targets)
+        get_text_stream(
+            targets=targets, len_bounds=(100, 500), extractor=custom_extractor
+        )
 
         mock_dependencies["extractor_cls"].assert_not_called()
 
