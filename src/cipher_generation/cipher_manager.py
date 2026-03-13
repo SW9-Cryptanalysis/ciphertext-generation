@@ -3,9 +3,13 @@ from utils.logging import get_logger_tqdm
 import os
 from typing import Iterable, Any
 import json
+from pathlib import Path
+import shutil
+from utils.constants import PROJECT_ROOT
 
 from cipher_generation.drive_uploader import DriveUploader, DriveUploaderConfig
-from cipher_generation.cipher_producer import CipherProducer
+from cipher_generation.cipher_producer import CipherProducer, ProducerConfig
+from utils.constants import BATCH_SIZE
 from dataset_stats import DatasetStatsAggregator
 
 log = get_logger_tqdm("CipherManager", 20)
@@ -61,6 +65,7 @@ class CipherManager:
 
 		self.master_stats = DatasetStatsAggregator()
 		self._logging_interval = 10000
+		self.temp_dir = Path(PROJECT_ROOT / "temp_ciphers")
 
 	def execute(self) -> None:
 		"""Execute the cipher generation process."""
@@ -72,7 +77,7 @@ class CipherManager:
 		tqdm_lock = mp.RLock()
 
 		uploader = DriveUploader(
-			upload_queue=self.result_queue,  # type: ignore
+			upload_queue=self.result_queue,
 			config=DriveUploaderConfig(
 				split_folders=self.split_folders,
 				total_ciphers=self.total_count,
@@ -85,7 +90,13 @@ class CipherManager:
 		workers = []
 		for i in range(self.num_workers):
 			p = CipherProducer(
-				queues=(self.job_queue, self.result_queue, self.stats_queue),  # type: ignore
+				config=ProducerConfig(
+					input_queue=self.job_queue,
+					output_queue=self.result_queue,
+					stats_queue=self.stats_queue,
+					batch_size=BATCH_SIZE,
+					temp_dir=self.temp_dir,
+				),
 				name=f"Worker-{i + 1}",
 			)
 			workers.append(p)
@@ -93,49 +104,54 @@ class CipherManager:
 
 		log.info("Feeder started. Reading stream and filling queues...")
 
-		count_fed = 0
 		try:
-			count_fed = self._feeder_stream(tqdm_lock)
+			count_fed = 0
+			try:
+				count_fed = self._feeder_stream(tqdm_lock)
 
-		except KeyboardInterrupt:
-			log.warning("Job interrupted! Stopping...")
-		except Exception as e:
-			log.error(f"Stream error: {e}")
-		finally:
-			log.info(f"Stream finished. Fed {count_fed} items. Stopping workers...")
+			except KeyboardInterrupt:
+				log.warning("Job interrupted! Stopping...")
+			except Exception as e:
+				log.error(f"Stream error: {e}")
+			finally:
+				log.info(f"Stream finished. Fed {count_fed} items. Stopping workers...")
+				for _ in range(self.num_workers):
+					self.job_queue.put(self.SENTINEL)
+
+			for p in workers:
+				p.join()
+
+			log.info("Workers finished. Merging statistics from all workers...")
 			for _ in range(self.num_workers):
-				self.job_queue.put(self.SENTINEL)
+				incoming_stats = self.stats_queue.get()
+				self.master_stats.merge(incoming_stats)
 
-		for p in workers:
-			p.join()
+			self._upload_metadata()
+			self.result_queue.put(self.SENTINEL)
 
-		log.info("Workers finished. Merging statistics from all workers...")
-		for _ in range(self.num_workers):
-			incoming_stats = self.stats_queue.get()
-			self.master_stats.merge(incoming_stats)
+			uploader.join()
 
-		self._upload_metadata()
-		self.result_queue.put(self.SENTINEL)
+			log.info("=" * 40)
+			log.info("JOB COMPLETE")
+			log.info(f"Total ciphers fed: {count_fed}")
+			log.info(
+				f"Peak homophone ID (Vocab Size): "
+				f"{self.master_stats.global_max_homophones}",
+			)
+			log.info("=" * 40)
 
-		uploader.join()
-
-		log.info("=" * 40)
-		log.info("JOB COMPLETE")
-		log.info(f"Total ciphers fed: {count_fed}")
-		log.info(
-			f"Peak homophone ID (Vocab Size): "
-			f"{self.master_stats.global_max_homophones}",
-		)
-		log.info("=" * 40)
+		finally:
+			if self.temp_dir.exists():
+				shutil.rmtree(self.temp_dir, ignore_errors=True)
 
 	def _upload_metadata(self) -> None:
 		"""Upload the metadata and statistics files to Google Drive."""
 		log.info("Uploading metadata and dataset statistics...")
 
-		metadata_filename = "metadata.json"
-		temp_dir = "temp_ciphers"
-		os.makedirs(temp_dir, exist_ok=True)
-		filepath = os.path.join(temp_dir, metadata_filename)
+		metadata_filename = Path("metadata.json")
+
+		os.makedirs(self.temp_dir, exist_ok=True)
+		filepath = self.temp_dir / metadata_filename
 
 		metadata_content = {
 			"max_symbol_id": self.master_stats.global_max_homophones,
@@ -158,12 +174,16 @@ class CipherManager:
 
 		"""
 		from tqdm import tqdm
+
 		tqdm.set_lock(tqdm_lock)
 
 		count_fed = 0
 
 		with tqdm(
-			total=self.total_count, desc="Texts Fed to Workers", position=0, leave=True,
+			total=self.total_count,
+			desc="Texts Fed to Workers",
+			position=0,
+			leave=True,
 		) as pbar:
 			for count_fed, (split, text_data) in enumerate(self.stream, start=1):
 				self.job_queue.put((split, text_data))

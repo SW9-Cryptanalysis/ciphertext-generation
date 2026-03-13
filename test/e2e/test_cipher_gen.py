@@ -1,11 +1,10 @@
 import os
 import re
 import pytest
-import json
 import tqdm
 from cipher_generation.cipher_manager import CipherManager
 from encipherment.cipher import HomophonicCipher
-from cipher_generation.cipher_producer import CipherProducer
+from cipher_generation.cipher_producer import CipherProducer, ProducerConfig
 from cipher_generation.drive_uploader import DriveUploader, DriveUploaderConfig
 
 
@@ -90,10 +89,18 @@ def test_end_to_end_pipeline_sync(mocker, tmp_path, mock_pbar, mock_cipher):
 	manager._feeder_stream(mocker.Mock())
 	manager.job_queue.put("STOP")
 
-	worker = CipherProducer(
-		queues=(manager.job_queue, manager.result_queue, manager.stats_queue)
+	config = ProducerConfig(
+		input_queue=manager.job_queue,
+		output_queue=manager.result_queue,
+		stats_queue=manager.stats_queue,
+		batch_size=100,
+		temp_dir=tmp_path / "temp_ciphers",
 	)
-	worker.temp_dir = tmp_path / "temp_ciphers"
+
+	worker = CipherProducer(
+		config=config,
+		name="TestWorker",
+	)
 	worker.run()
 
 	manager._upload_metadata()
