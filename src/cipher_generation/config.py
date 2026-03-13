@@ -75,4 +75,4 @@ class CipherConfig:
     metadata_folder: str
     num_workers: int | None = None
     batch_size: int = 10_000
-    dataset_config: DatasetConfig = DatasetConfig()
+    dataset_config: DatasetConfig = field(default_factory=DatasetConfig)
