@@ -17,54 +17,76 @@ from utils.validators import (
 
 
 class SubstitutionCipher(ABC):
-    """A base class for ciphers.
+    """A base class for substitution ciphers.
 
     Attributes:
         plaintext (str): The lowercase plaintext to be encrypted with no punctuation
             or spaces.
-        difficulty (int): The difficulty level of the cipher (4-20).
-        key (dict): A dictionary mapping each letter to a list of its homophones.
-        ciphertext (str): The resulting ciphertext as a string of reccurence encoded
+        plaintext_with_boundaries (str): The plaintext preserving word boundary
+            underscores.
+        difficulty (int | None): The difficulty level of the cipher.
+        num_symbols (int): The total number of unique symbols in the generated key.
+        key (dict[str, list[int]]): A dictionary mapping each letter to its cipher
+            symbols.
+        ciphertext (str): The resulting ciphertext as a string of recurrence encoded
             numbers separated by spaces.
+        ciphertext_with_boundaries (str): The recurrence encoded ciphertext preserving
+            word boundary underscores.
+        genres (list[str]): A list of genres associated with the source text.
+        source_id (str): The unique identifier for the source text.
+        source_name (str): The title or name of the source text.
 
     Methods:
-        generate_key(): Generate a homophonic substitution cipher key based on a
-            difficulty level.
+        generate_key(): Generate a substitution cipher key.
         encipher(): Encipher the plaintext using the generated key.
-        generate_difficulty(): Generate a difficulty level for the cipher.
-        __json__(): Return a JSON-serializable representation of the SubstitutionCipher
-            object.
-        __str__(): Return a string representation of the SubstitutionCipher object.
-        _validate_plaintext(): Validate the plaintext to ensure it contains only
-            lowercase letters with no punctuation or spaces.
-        _validate_difficulty(): Validate the difficulty level to ensure it is
-            between 4 and 20.
+        __json__(): Return a JSON-serializable representation of the object.
+        __str__(): Return a string representation of the object.
+        _apply_recurrence_and_remap_key(): Apply recurrence encoding and remap the key.
+        _generate_bounded_ciphertext(): Generate ciphertext preserving word boundaries.
 
     """
 
-    @abstractmethod
     def __init__(
         self,
         text_obj: TextStream,
         *,
         difficulty: int | None = None,
-        cipher_type: str = "homophonic",
-    ) -> None:  # pragma: no cover
-        """Initialize the Cipher object with the given plaintext."""
+    ) -> None:
+        """Initialize the Cipher object with common plaintext and metadata.
+
+        Args:
+            text_obj (TextStream): Text object containing the plaintext and metadata.
+            difficulty (int | None, optional): The difficulty level to apply.
+                Defaults to None.
+
+        Raises:
+            ValueError: If the plaintext is empty or contains invalid characters.
+
+        """
+        if not text_obj.get("text"):
+            raise ValueError("Plaintext must be a non-empty string.")
+        if not is_alpha_lowercase_no_spaces(text_obj["text"]):
+            raise ValueError(
+                "Plaintext must be a lowercase alphabetic string with no spaces.",
+            )
+
         self.plaintext = text_obj["text"]
         self.plaintext_with_boundaries = text_obj["text_with_boundaries"]
         self.difficulty = difficulty
         self.num_symbols = 0
-        self.key = {}
+        self.key: dict[str, list[int]] = {}
         self.ciphertext = ""
         self.ciphertext_with_boundaries = ""
         self.genres = text_obj["genres"]
         self.source_id = text_obj["source_id"]
         self.source_name = text_obj["source_name"]
-        raise NotImplementedError("This is an abstract base class.")
 
     def _apply_recurrence_and_remap_key(self) -> None:
-        """Apply recurrence encoding and remap the key using character keys."""
+        """Apply recurrence encoding and remap the key using character keys.
+
+        Transforms the raw generated ciphertext numbers into a strict 1..N
+        sequential order based on their first appearance in the text.
+        """
         original_numbers = self.ciphertext.split()
         new_ciphertext = []
         symbol_map = {}
@@ -156,7 +178,15 @@ class SubstitutionCipher(ABC):
 
     @classmethod
     def from_json(cls, json_data: str) -> "SubstitutionCipher":  # pragma: no cover
-        """Create a cipher object from a JSON string."""
+        """Create a cipher object from a JSON string.
+
+        Args:
+            json_data (str): A JSON formatted string representing a cipher.
+
+        Returns:
+            SubstitutionCipher: An instantiated cipher object.
+
+        """
         data = json.loads(json_data)
         cipher = cls(data["plaintext"])
         cipher.plaintext_with_boundaries = data["plaintext_with_boundaries"]
@@ -175,27 +205,14 @@ class SubstitutionCipher(ABC):
 class HomophonicCipher(SubstitutionCipher):
     """A class representing a homophonic substitution cipher.
 
-    Attributes:
-        plaintext (str): The lowercase plaintext to be encrypted with no punctuation
-            or spaces.
-        difficulty (int): The difficulty level of the cipher (4-20).
-        key (dict): A dictionary mapping each letter to a list of its homophones.
-        ciphertext (str): The resulting ciphertext as a string of numbers separated
-            by spaces.
-        recurrence_encoding (str): A string representing the recurrence encoding of
-            the ciphertext.
+    Inherits attributes from SubstitutionCipher. Automatically calculates a continuous
+    uniform difficulty based on the text length if no specific difficulty is provided.
 
     Methods:
         generate_key(): Generate a homophonic substitution cipher key based on a
             difficulty level.
         encipher(): Encipher the plaintext using the generated key.
-        generate_difficulty(): Generate a difficulty level for the cipher.
-        __json__(): Return a JSON-serializable representation of the Cipher object.
-        __str__(): Return a string representation of the Cipher object.
-        _validate_plaintext(): Validate the plaintext to ensure it contains only
-            lowercase letters with no punctuation or spaces.
-        _validate_difficulty(): Validate the difficulty level to ensure it is
-            between 4 and 20.
+        generate_difficulty(): Generate a random difficulty level for the cipher.
 
     """
 
@@ -207,35 +224,21 @@ class HomophonicCipher(SubstitutionCipher):
         ),
     )
     def __init__(self, text_obj: TextStream, *, difficulty: int | None = None) -> None:
-        """Initialize the Cipher object with the given plaintext.
+        """Initialize the HomophonicCipher object.
 
         Args:
             text_obj (TextStream): Text object containing the plaintext and metadata.
-            difficulty (int | None): The difficulty level of the cipher (4-20). If None,
-                a random difficulty will be generated.
-            cipher_type (str): The type of cipher to generate
-                ("homophonic" or "monoalphabetic").
+            difficulty (int | None, optional): The difficulty level of the cipher.
+                If None, a random continuous difficulty will be calculated and assigned.
+
+        Raises:
+            ValueError: If the provided difficulty falls outside the allowed bounds.
 
         """
-        if not text_obj["text"]:
-            raise ValueError("Plaintext must be a non-empty string.")
-        if not is_alpha_lowercase_no_spaces(text_obj["text"]):
-            raise ValueError(
-                "Plaintext must be a lowercase alphabetic string with no spaces.",
-            )
-        self.plaintext = text_obj["text"]
-        self.plaintext_with_boundaries = text_obj["text_with_boundaries"]
-        if not difficulty:
+        super().__init__(text_obj, difficulty=difficulty)
+
+        if not self.difficulty:
             self.difficulty = self.generate_difficulty()
-        else:
-            self.difficulty = difficulty
-        self.num_symbols = 0
-        self.key: dict[str, list] = {}
-        self.ciphertext: str = ""
-        self.ciphertext_with_boundaries: str = ""
-        self.genres = text_obj["genres"]
-        self.source_id = text_obj["source_id"]
-        self.source_name = text_obj["source_name"]
 
     def generate_key(self) -> dict:
         """Generate a homophonic substitution cipher key based on a difficulty level.
@@ -262,7 +265,7 @@ class HomophonicCipher(SubstitutionCipher):
 
         self.num_symbols = sum(homophones_dict.values())
 
-        homophone_numbers: list[int] = list(range(1, sum(homophones_dict.values()) + 1))
+        homophone_numbers: list[int] = list(range(1, self.num_symbols + 1))
         random.shuffle(homophone_numbers)
         key: dict[str, list[int]] = {}
         for letter, count in homophones_dict.items():
@@ -296,13 +299,10 @@ class HomophonicCipher(SubstitutionCipher):
         return self.ciphertext
 
     def generate_difficulty(self) -> int:
-        """Generate a difficulty level for the cipher.
-
-        Difficulty is based on the average occurrences of each homophone,
-        and ranges from 4-10, with 4 being the most difficult.
+        """Generate a random difficulty level.
 
         Returns:
-                        int: Difficulty level (4-10)
+            int: Difficulty level bounded by MIN_DIFFICULTY and MAX_DIFFICULTY.
 
         """
         return random.randint(MIN_DIFFICULTY, MAX_DIFFICULTY)
@@ -311,52 +311,28 @@ class HomophonicCipher(SubstitutionCipher):
 class MonoalphabeticCipher(SubstitutionCipher):
     """A monoalphabetic substitution cipher.
 
-    Attributes:
-        plaintext (str): The lowercase plaintext to be encrypted with no punctuation
-            or spaces.
-        difficulty (int): The difficulty level of the cipher (4-20).
-        key (dict): A dictionary mapping each letter to a list of its homophones.
-        ciphertext (str): The resulting ciphertext as a string of numbers separated
-            by spaces.
-        recurrence_encoding (str): A string representing the recurrence encoding of
-            the ciphertext.
+    Inherits attributes from SubstitutionCipher. Hardcodes the difficulty to 1,
+    as every letter maps to exactly one unique symbol.
 
     Methods:
-        generate_key(): Generate a homophonic substitution cipher key based on a
-            difficulty level.
+        generate_key(): Generate a monoalphabetic substitution key.
         encipher(): Encipher the plaintext using the generated key.
-        __json__(): Return a JSON-serializable representation of the Cipher object.
-        __str__(): Return a string representation of the Cipher object.
-        _validate_plaintext(): Validate the plaintext to ensure it contains only
-            lowercase letters with no punctuation or spaces.
-        _validate_difficulty(): Validate the difficulty level to ensure it is
-            between 4 and 20.
 
     """
 
     @parameter_validator(text_obj=validate_typed_dict)
     def __init__(self, text_obj: TextStream) -> None:
-        """Initialize the MonoalphabeticCipher with the given text object.
+        """Initialize the MonoalphabeticCipher object.
+
+        Automatically generates the key and enciphers the text upon initialization.
 
         Args:
             text_obj (TextStream): Text object containing the plaintext and metadata.
 
         """
-        if not text_obj["text"]:
-            raise ValueError("Plaintext must be a non-empty string.")
-        if not is_alpha_lowercase_no_spaces(text_obj["text"]):
-            raise ValueError(
-                "Plaintext must be a lowercase alphabetic string with no spaces.",
-            )
-        self.plaintext = text_obj["text"]
-        self.plaintext_with_boundaries = text_obj["text_with_boundaries"]
-        self.num_symbols = 0
+        super().__init__(text_obj, difficulty=1)
         self.key = self.generate_key()
-        self.difficulty = 1
         self.encipher()
-        self.genres = text_obj["genres"]
-        self.source_id = text_obj["source_id"]
-        self.source_name = text_obj["source_name"]
 
     def generate_key(self) -> dict[str, list[int]]:
         """Generate a random monoalphabetic substitution key.
@@ -368,7 +344,6 @@ class MonoalphabeticCipher(SubstitutionCipher):
             number.
 
         """
-        # Create a list of numbers 1-26 and shuffle them randomly
         cipher_numbers = list(range(1, 27))
         random.shuffle(cipher_numbers)
 
