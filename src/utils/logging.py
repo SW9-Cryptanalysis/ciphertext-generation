@@ -1,6 +1,12 @@
 import logging
 from easy_logging import EasyFormatter
 import tqdm
+import os
+import dotenv
+
+
+dotenv.load_dotenv()
+LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
 
 class TqdmLoggingHandler(logging.Handler):
@@ -16,7 +22,7 @@ class TqdmLoggingHandler(logging.Handler):
             self.handleError(record)
 
 
-def get_logger(name: str, level: int = logging.DEBUG) -> logging.Logger:
+def get_logger(name: str, level: int | str = LEVEL) -> logging.Logger:
     """Create logger using the EasyFormatter and return it."""
     logger = logging.getLogger(name)
     logger.setLevel(level)
@@ -28,7 +34,7 @@ def get_logger(name: str, level: int = logging.DEBUG) -> logging.Logger:
     return logger
 
 
-def get_logger_tqdm(name: str, level: int = logging.DEBUG) -> logging.Logger:
+def get_logger_tqdm(name: str, level: int | str = LEVEL) -> logging.Logger:
     """Initialize and return a logger with a custom formatter and tqdm handler.
 
     Args:
