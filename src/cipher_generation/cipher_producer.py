@@ -3,7 +3,7 @@ import os
 import queue
 import json
 import zipfile
-from typing import Any, TypedDict
+from typing import Any, TypedDict, Literal
 from dataclasses import dataclass
 from multiprocessing.queues import Queue as MPQueue
 
@@ -12,6 +12,8 @@ from encipherment.cipher import SubstitutionCipher, HomophonicCipher
 from utils.text_splits import TextStream
 from dataset_stats import DatasetStatsAggregator
 from pathlib import Path
+from cipher_generation.task import CipherTask, UploadTask
+
 
 log = get_logger_tqdm("CipherProducer", 20)
 
@@ -22,14 +24,15 @@ class FileInfo(TypedDict):
     handle: Any
     filepath: Path
 
+
 @dataclass
 class ProducerConfig:
     """A dataclass to store the configuration for the CipherProducer."""
 
     batch_size: int
-    input_queue: MPQueue[Any]
-    output_queue: MPQueue[Any]
-    stats_queue: MPQueue[Any]
+    input_queue: MPQueue[CipherTask | Literal["STOP"]]
+    output_queue: MPQueue[UploadTask | Literal["STOP"]]
+    stats_queue: MPQueue[DatasetStatsAggregator | Literal["STOP"]]
     temp_dir: Path
 
 
@@ -95,22 +98,20 @@ class CipherProducer(mp.Process):
                     log.info(f"{process_name} received STOP signal.")
                     break
 
-                split, text_obj = item
-
-                cipher = self.generate_cipher(text_obj)
+                cipher = self.generate_cipher(item.text_data)
 
                 if cipher is None:
                     continue
 
                 stats.record(
-                    split=split,
+                    split=item.split,
                     length=len(cipher.plaintext),
                     homophones=cipher.num_symbols,
                     difficulty=cipher.difficulty or 0,
                     genres=cipher.genres,
                 )
 
-                self._write_and_batch_cipher(split, cipher, batch_info)
+                self._write_and_batch_cipher(item.split, cipher, batch_info)
 
             except queue.Empty:
                 continue
@@ -168,8 +169,8 @@ class CipherProducer(mp.Process):
 
         filepath = batch_info.files[split]["filepath"]
 
-        archive_name = (
-            f"batch_{split}_{os.getpid()}_{batch_info.batch_indices[split]}.zip"
+        archive_name = Path(
+            f"batch_{split}_{os.getpid()}_{batch_info.batch_indices[split]}.zip",
         )
         zip_filepath = self.temp_dir / archive_name
 
@@ -178,9 +179,13 @@ class CipherProducer(mp.Process):
 
         os.remove(filepath)
 
-        self.output_queue.put(
-            (split, zip_filepath, archive_name, batch_info.current_counts[split]),
+        task = UploadTask(
+            filepath=zip_filepath,
+            filename=archive_name,
+            cipher_count=batch_info.current_counts[split],
+            split=split,
         )
+        self.output_queue.put(task)
 
     def _cleanup_all(
         self,
@@ -192,15 +197,15 @@ class CipherProducer(mp.Process):
             if batch_info.current_counts[split] > 0:
                 if split in ["val", "test"]:
                     batch_info.files[split]["handle"].close()
-                    self.output_queue.put(
-                        (
-                            "MERGE",
-                            split,
-                            batch_info.files[split]["filepath"],
-                            batch_info.current_counts[split],
-                        ),
+                    filename = Path(batch_info.files[split]["filepath"].name)
+                    task = UploadTask(
+                        filepath=batch_info.files[split]["filepath"],
+                        filename=filename,
+                        cipher_count=batch_info.current_counts[split],
+                        split=split,
                     )
-                else:  # <--- THIS IS THE CRITICAL FIX
+                    self.output_queue.put(task)
+                else:
                     self._close_and_zip_batch(
                         split,
                         batch_info,
