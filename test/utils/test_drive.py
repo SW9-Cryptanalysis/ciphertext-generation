@@ -8,6 +8,7 @@ from utils.drive import (
     upload_to_drive,
 )
 
+
 @pytest.fixture
 def mock_credentials():
     creds = MagicMock(spec=Credentials)
@@ -16,18 +17,26 @@ def mock_credentials():
     creds.to_json.return_value = '{"token": "mock_token"}'
     return creds
 
+
 @pytest.fixture
 def mock_cipher():
     cipher = MagicMock()
     # Directly assign the mock method to bypass configure_mock's getattr check on dunders
-    cipher.__json__ = MagicMock(return_value={"plaintext": "test", "ciphertext": "1 2 3"})
+    cipher.__json__ = MagicMock(
+        return_value={"plaintext": "test", "ciphertext": "1 2 3"}
+    )
     return cipher
 
-class TestDriveUtils:
 
-    def test_authenticate_drive_terminal_existing_valid_token(self, mocker, mock_credentials):
+class TestDriveUtils:
+    def test_authenticate_drive_terminal_existing_valid_token(
+        self, mocker, mock_credentials
+    ):
         mocker.patch("utils.drive.TOKEN_JSON", '{"token": "valid"}')
-        mocker.patch("google.oauth2.credentials.Credentials.from_authorized_user_info", return_value=mock_credentials)
+        mocker.patch(
+            "google.oauth2.credentials.Credentials.from_authorized_user_info",
+            return_value=mock_credentials,
+        )
         mock_build = mocker.patch("utils.drive.build")
 
         service = authenticate_drive_terminal()
@@ -35,13 +44,18 @@ class TestDriveUtils:
         assert service == mock_build.return_value
         mock_build.assert_called_once_with("drive", "v3", credentials=mock_credentials)
 
-    def test_authenticate_drive_terminal_expired_token_refresh(self, mocker, mock_credentials):
+    def test_authenticate_drive_terminal_expired_token_refresh(
+        self, mocker, mock_credentials
+    ):
         mock_credentials.valid = False
         mock_credentials.expired = True
-        mock_credentials.refresh_token = "refresh_token" # noqa: S105
+        mock_credentials.refresh_token = "refresh_token"  # noqa: S105
 
         mocker.patch("utils.drive.TOKEN_JSON", '{"token": "expired"}')
-        mocker.patch("google.oauth2.credentials.Credentials.from_authorized_user_info", return_value=mock_credentials)
+        mocker.patch(
+            "google.oauth2.credentials.Credentials.from_authorized_user_info",
+            return_value=mock_credentials,
+        )
         mock_build = mocker.patch("utils.drive.build")
 
         service = authenticate_drive_terminal()
@@ -75,14 +89,13 @@ class TestDriveUtils:
     def test_upload_to_drive_success(self, mocker):
         mock_service = MagicMock()
         mock_execute = mock_service.files.return_value.create.return_value.execute
-        mock_execute.return_value = {"id": "file_123", "name": "cipher.json", "parents": ["root"]}
+        mock_execute.return_value = {
+            "id": "file_123",
+            "name": "cipher.json",
+            "parents": ["root"],
+        }
 
-        file_id = upload_to_drive(
-            mock_service,
-            b"data",
-            "cipher.json",
-            "folder_123"
-        )
+        file_id = upload_to_drive(mock_service, b"data", "cipher.json", "folder_123")
 
         assert file_id == "file_123"
         mock_service.files.return_value.create.assert_called_once()
@@ -93,14 +106,12 @@ class TestDriveUtils:
 
     def test_upload_to_drive_failure(self, mocker):
         mock_service = MagicMock()
-        mock_service.files.return_value.create.return_value.execute.side_effect = Exception("Upload failed")
+        mock_service.files.return_value.create.return_value.execute.side_effect = (
+            Exception("Upload failed")
+        )
         mock_log = mocker.patch("utils.drive.log")
 
-        file_id = upload_to_drive(
-            mock_service,
-            b"data",
-            "cipher.json"
-        )
+        file_id = upload_to_drive(mock_service, b"data", "cipher.json")
 
         assert file_id == ""
         mock_log.error.assert_called_once()

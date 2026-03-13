@@ -7,12 +7,12 @@ from genre_mapping.genre_mapper import GenreMapper
 
 
 if __name__ == "__main__":
-	logger = get_logger("GenreMapper")
+    logger = get_logger("GenreMapper")
 
-	extractor = DatasetExtractor(DATASETS, logger=logger)
-	api_client = GutendexClient(logger=logger)
-	mapper = TaxonomyMapper()
-	genre_mapper = GenreMapper(extractor, api_client, mapper, logger=logger)
+    extractor = DatasetExtractor(DATASETS, logger=logger)
+    api_client = GutendexClient(logger=logger)
+    mapper = TaxonomyMapper()
+    genre_mapper = GenreMapper(extractor, api_client, mapper, logger=logger)
 
-	genre_map = genre_mapper.run(output_path=GENRE_MAP_PATH)
-	mapper.dump_unmapped_to_file()
+    genre_map = genre_mapper.run(output_path=GENRE_MAP_PATH)
+    mapper.dump_unmapped_to_file()

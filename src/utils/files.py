@@ -7,77 +7,77 @@ from parameter_validator import parameter_validator, non_blank_string
 
 @parameter_validator(book_id=non_blank_string, book_text=non_blank_string)
 def save_book(book_id: str, book_text: str) -> None:
-	"""Save the fetched book text to a local file for caching.
+    """Save the fetched book text to a local file for caching.
 
-	Args:
-		book_id (str): The ID of the book.
-		book_text (str): The entire contents of a book in string format.
+    Args:
+            book_id (str): The ID of the book.
+            book_text (str): The entire contents of a book in string format.
 
-	"""
-	try:
-		os.makedirs("books", exist_ok=True)
-	except OSError as e:
-		raise RuntimeError(f"Error creating books directory: {e}") from e
+    """
+    try:
+        os.makedirs("books", exist_ok=True)
+    except OSError as e:
+        raise RuntimeError(f"Error creating books directory: {e}") from e
 
-	try:
-		with open(f"books/{book_id}.txt", "w", encoding="utf-8") as f:
-			f.write(book_text)
-	except (OSError, PermissionError) as e:
-		raise RuntimeError(f"Error saving book {book_id}: {e}") from e
+    try:
+        with open(f"books/{book_id}.txt", "w", encoding="utf-8") as f:
+            f.write(book_text)
+    except (OSError, PermissionError) as e:
+        raise RuntimeError(f"Error saving book {book_id}: {e}") from e
 
 
 def book_is_cached(book_id: str) -> bool:
-	"""Check if a book with the given ID exists in the local cache.
+    """Check if a book with the given ID exists in the local cache.
 
-	Args:
-		book_id (str): The ID of the book.
+    Args:
+        book_id (str): The ID of the book.
 
-	Returns:
-		bool: True if the book file exists, False otherwise.
+    Returns:
+        bool: True if the book file exists, False otherwise.
 
-	"""
-	return os.path.exists(f"books/{book_id}.txt")
+    """
+    return os.path.exists(f"books/{book_id}.txt")
 
 
 def get_cached_book(book_id: str) -> str:
-	"""Retrieve the cached book text from a local file.
+    """Retrieve the cached book text from a local file.
 
-	Args:
-		book_id (str): The ID of the book.
+    Args:
+        book_id (str): The ID of the book.
 
-	Returns:
-		str: The entire contents of the cached book in string format.
+    Returns:
+        str: The entire contents of the cached book in string format.
 
-	Raises:
-		FileNotFoundError: If the book file does not exist.
+    Raises:
+        FileNotFoundError: If the book file does not exist.
 
-	"""
-	if not os.path.exists(f"books/{book_id}.txt"):
-		raise FileNotFoundError(f"Book with ID {book_id} is not cached.")
-	with open(f"books/{book_id}.txt", encoding="utf-8") as f:
-		return f.read()
+    """
+    if not os.path.exists(f"books/{book_id}.txt"):
+        raise FileNotFoundError(f"Book with ID {book_id} is not cached.")
+    with open(f"books/{book_id}.txt", encoding="utf-8") as f:
+        return f.read()
 
 
 def save_cipher(cipher_data: SubstitutionCipher, filename: str) -> None:
-	"""Save the cipher data to a JSON file.
+    """Save the cipher data to a JSON file.
 
-	Args:
-		cipher_data (dict): The cipher data to save.
-		filename (str): The name of the file to save the cipher.
+    Args:
+        cipher_data (dict): The cipher data to save.
+        filename (str): The name of the file to save the cipher.
 
-	"""
-	if not os.path.exists("ciphers"):
-		os.makedirs("ciphers")
-	with open(f"ciphers/{filename}", "w", encoding="utf-8") as f:
-		cipher_json = cipher_data.__json__()
-		formatted_json = json.dumps(cipher_json, indent=2)  # Standard formatting
+    """
+    if not os.path.exists("ciphers"):
+        os.makedirs("ciphers")
+    with open(f"ciphers/{filename}", "w", encoding="utf-8") as f:
+        cipher_json = cipher_data.__json__()
+        formatted_json = json.dumps(cipher_json, indent=2)  # Standard formatting
 
-		# Matches arrays with numbers spanning multiple lines
-		pattern = r"\[\s*\n\s*(\d+(?:,\s*\n\s*\d+)*)\s*\n\s*\]"
+        # Matches arrays with numbers spanning multiple lines
+        pattern = r"\[\s*\n\s*(\d+(?:,\s*\n\s*\d+)*)\s*\n\s*\]"
 
-		def replace_multiline_numbers(match: re.Match) -> str:
-			return "[" + re.sub(r",\s*\n\s*", ", ", match.group(1)) + "]"
+        def replace_multiline_numbers(match: re.Match) -> str:
+            return "[" + re.sub(r",\s*\n\s*", ", ", match.group(1)) + "]"
 
-		formatted_json = re.sub(pattern, replace_multiline_numbers, formatted_json)
+        formatted_json = re.sub(pattern, replace_multiline_numbers, formatted_json)
 
-		f.write(formatted_json)
+        f.write(formatted_json)

@@ -61,13 +61,15 @@ class TestGenreMapperRun:
 
         mock_dependencies["api_client"].fetch_raw_bookshelves.side_effect = mock_fetch
 
-        mock_dependencies["mapper"].extract_mapped_genres.side_effect = (
-            lambda x: [f"Mapped {x[0]}"]
-        )
+        mock_dependencies["mapper"].extract_mapped_genres.side_effect = lambda x: [
+            f"Mapped {x[0]}"
+        ]
 
         genre_mapper = GenreMapper(**mock_dependencies)
 
-        mocker.patch("genre_mapping.genre_mapper.load_existing_genre_map", return_value={})
+        mocker.patch(
+            "genre_mapping.genre_mapper.load_existing_genre_map", return_value={}
+        )
         mock_save = mocker.patch.object(genre_mapper, "_append_to_jsonl")
 
         result = genre_mapper.run(output_path=Path("dummy.json"), flush_size=2)
@@ -137,8 +139,7 @@ class TestGenreMapperSaveToJson:
         with open(test_file_path, encoding="utf-8") as f:
             saved_data = json.load(f)
 
-        expected_data =  {"id": "1001", "genres": ["History", "Romance"]}
-
+        expected_data = {"id": "1001", "genres": ["History", "Romance"]}
 
         assert saved_data == expected_data, (
             "The saved JSON should perfectly match the input dictionary"

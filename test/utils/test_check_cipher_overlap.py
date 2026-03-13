@@ -10,13 +10,18 @@ import utils.check_cipher_overlap as target_module  # Imported to monkeypatch mo
 
 # --- Fixtures ---
 
+
 @pytest.fixture
 def sample_ciphers_list():
     return [
         {"name": "c_1.json", "plaintext": "hello world", "id": 1},
         {"name": "c_2.json", "plaintext": "hello earth", "id": 2},  # Overlaps "hello"
-        {"name": "c_3.json", "plaintext": "apple banana", "id": 3}, # No overlap
-        {"name": "c_4.json", "plaintext": "hello world", "id": 4},  # Identical (should be skipped)
+        {"name": "c_3.json", "plaintext": "apple banana", "id": 3},  # No overlap
+        {
+            "name": "c_4.json",
+            "plaintext": "hello world",
+            "id": 4,
+        },  # Identical (should be skipped)
     ]
 
 
@@ -35,14 +40,15 @@ def mock_logger(monkeypatch):
 
 # --- Tests ---
 
+
 class TestJaccardSimilarity:
     @pytest.mark.parametrize(
         "str1, str2, expected",
         [
-            ("a b c", "a b c", 1.0),       # Identical
-            ("a b c", "d e f", 0.0),       # No overlap
-            ("a b", "b c", 0.333),         # Intersection 1 / Union 3 = 0.33...
-            ("", "a", 0.0),                # Empty handling
+            ("a b c", "a b c", 1.0),  # Identical
+            ("a b c", "d e f", 0.0),  # No overlap
+            ("a b", "b c", 0.333),  # Intersection 1 / Union 3 = 0.33...
+            ("", "a", 0.0),  # Empty handling
         ],
     )
     def test_calculation(self, str1, str2, expected):
@@ -66,7 +72,7 @@ class TestGetCiphers:
 
         # Invalid files (should be ignored)
         (d / "readme.txt").write_text("ignore me", encoding="utf-8")
-        (d / "other.json").write_text("{}", encoding="utf-8") # Doesn't start with c_
+        (d / "other.json").write_text("{}", encoding="utf-8")  # Doesn't start with c_
 
         # 3. Monkeypatch os.listdir or change directory so the function finds the files
         # Since the function uses relative path "ciphers", we switch cwd to tmp_path
@@ -94,11 +100,7 @@ class TestGetCiphers:
 class TestCheckCipherOverlap:
     def test_detects_overlaps(self, monkeypatch, sample_ciphers_list, mock_logger):
         # Monkeypatch get_ciphers to avoid file I/O and return controlled data
-        monkeypatch.setattr(
-            target_module,
-            "get_ciphers",
-            lambda: sample_ciphers_list
-        )
+        monkeypatch.setattr(target_module, "get_ciphers", lambda: sample_ciphers_list)
 
         result = check_cipher_overlap()
 
