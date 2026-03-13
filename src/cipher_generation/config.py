@@ -40,6 +40,7 @@ class DatasetConfig:
             10000: [5, 10, 15, 20, 25, 30, 50, 100, 200, 300, 0],
         },
     )
+    ciphers_per_bin: int = 100
 
     def __post_init__(self) -> None:
         """Validate the distribution splits immediately after initialization.

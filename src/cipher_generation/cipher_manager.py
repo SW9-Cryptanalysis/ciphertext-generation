@@ -52,7 +52,7 @@ class CipherManager:
         test_bins = sum(
             len(diffs) for diffs in config.dataset_config.test_matrix.values()
         )
-        test_count = test_bins * 100
+        test_count = test_bins * config.dataset_config.ciphers_per_bin
 
         self.total_count = (
             config.dataset_config.training_num
@@ -210,7 +210,9 @@ class CipherManager:
         ) as pbar:
             for count_fed, (split, text_data) in enumerate(self.stream, start=1):
                 task = CipherTask(
-                    split=split, text_data=text_data, target_difficulty=None,
+                    split=split,
+                    text_data=text_data,
+                    target_difficulty=None,
                 )
                 self.job_queue.put(task)
                 pbar.update(1)
