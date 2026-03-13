@@ -45,6 +45,7 @@ def generate_cipher(
             "source_name": "Test",
             "length": len(cleaned_text),
             "genres": [],
+            "target_length": len(cleaned_text),
         }
         cipher = HomophonicCipher(text_obj, difficulty=difficulty)
         cipher.generate_difficulty()
@@ -77,6 +78,7 @@ def generate_monoalphabetic_cipher(min_len: int, max_len: int, filename: str) ->
         "source_name": "Test",
         "length": len(cleaned_text),
         "genres": [],
+        "target_length": len(cleaned_text),
     }
     try:
         cipher = MonoalphabeticCipher(text_obj)
@@ -110,6 +112,7 @@ if __name__ == "__main__":  # pragma: no cover
             "source_name": "Test",
             "length": len(z408_plaintext),
             "genres": [],
+            "target_length": len(z408_plaintext),
         }
         z408 = HomophonicCipher(z408_text_obj, difficulty=7)
         z408.key = z408_key
