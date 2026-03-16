@@ -13,7 +13,7 @@ from encipherment.cipher import (
     HomophonicCipher,
     MonoalphabeticCipher,
 )
-from utils.text_splits import TextStream
+from utils.text_sampling import TextStream
 from dataset_stats import DatasetStatsAggregator
 from pathlib import Path
 from cipher_generation.task import CipherTask, UploadTask

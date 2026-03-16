@@ -6,7 +6,7 @@ from utils.constants import MIN_DIFFICULTY, MAX_DIFFICULTY
 from abc import ABC, abstractmethod
 from parameter_validator import parameter_validator, all_of
 import json
-from utils.text_splits import TextStream
+from utils.text_sampling import TextStream
 
 from utils.validators import (
     in_range,

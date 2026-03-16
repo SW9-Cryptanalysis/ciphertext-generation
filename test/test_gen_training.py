@@ -1,6 +1,7 @@
 import pytest
 
-from gen_training import get_folder_id, load_folder_ids, get_text_stream, Targets
+from gen_training import get_folder_id, load_folder_ids, get_text_stream
+from cipher_generation.config import DatasetConfig
 
 
 class TestEnvironmentVariables:
@@ -47,14 +48,17 @@ class TestGetTextStream:
             "sampler_cls": mocker.patch("gen_training.CorpusSampler"),
         }
 
-    def test_get_text_stream_default_extractor(self, mock_dependencies):
+    @pytest.fixture
+    def dummy_config(self):
+        """Provides a minimal DatasetConfig for routing tests."""
+        return DatasetConfig(training_num=10, validation_num=2, test_matrix={350: [0]})
+
+    def test_get_text_stream_default_extractor(self, mock_dependencies, dummy_config):
         """Test that get_text_stream initializes default dependencies and routes data correctly."""
         mock_extractor_instance = mock_dependencies["extractor_cls"].return_value
         mock_sampler_instance = mock_dependencies["sampler_cls"].return_value
 
-        targets = {"train": 10, "val": 2, "test": 2}
-        targets = Targets(**targets)
-        result = get_text_stream(targets=targets)
+        result = get_text_stream(config=dummy_config)
 
         mock_dependencies["extractor_cls"].assert_called_once()
         mock_dependencies["load_genres"].assert_called_once()
@@ -64,7 +68,7 @@ class TestGetTextStream:
         )
 
         mock_dependencies["sampler_cls"].assert_called_once_with(
-            targets, (4000, 10000), mock_dependencies["load_genres"].return_value
+            dummy_config, mock_dependencies["load_genres"].return_value
         )
 
         mock_sampler_instance.generate_stream.assert_called_once_with(
@@ -73,15 +77,13 @@ class TestGetTextStream:
 
         assert result == mock_sampler_instance.generate_stream.return_value
 
-    def test_get_text_stream_custom_extractor(self, mocker, mock_dependencies):
+    def test_get_text_stream_custom_extractor(
+        self, mocker, mock_dependencies, dummy_config
+    ):
         """Test that passing a custom extractor bypasses the default initialization."""
         custom_extractor = mocker.Mock()
 
-        targets = {"train": 5, "val": 1, "test": 1}
-        targets = Targets(**targets)
-        get_text_stream(
-            targets=targets, len_bounds=(100, 500), extractor=custom_extractor
-        )
+        get_text_stream(config=dummy_config, extractor=custom_extractor)
 
         mock_dependencies["extractor_cls"].assert_not_called()
 
@@ -90,5 +92,5 @@ class TestGetTextStream:
         )
 
         mock_dependencies["sampler_cls"].assert_called_once_with(
-            targets, (100, 500), mock_dependencies["load_genres"].return_value
+            dummy_config, mock_dependencies["load_genres"].return_value
         )

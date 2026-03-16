@@ -61,6 +61,28 @@ class TestDatasetConfig:
         assert 9999 in config1.test_matrix
         assert 9999 not in config2.test_matrix
 
+    def test_num_test_ciphers_default(self):
+        """Verify the default test matrix and ciphers_per_bin calculate correctly."""
+        config = DatasetConfig()
+
+        assert config.num_test_ciphers == 8500
+
+    def test_num_test_ciphers_custom(self):
+        """Verify the property dynamically calculates based on custom inputs."""
+        config = DatasetConfig(
+            test_matrix={10: [1, 2], 20: [3]},
+            ciphers_per_bin=50,
+        )
+        assert config.num_test_ciphers == 150
+
+    def test_num_test_ciphers_empty_matrix(self):
+        """Verify the property safely handles an empty test matrix."""
+        config = DatasetConfig(
+            test_matrix={},
+            ciphers_per_bin=100,
+        )
+        assert config.num_test_ciphers == 0
+
 
 class TestCipherConfig:
     """Test suite for the CipherConfig dataclass."""
