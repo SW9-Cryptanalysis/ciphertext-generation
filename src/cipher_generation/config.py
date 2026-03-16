@@ -53,6 +53,14 @@ class DatasetConfig:
         if round(total, 5) != 1.0:
             raise ValueError("Training distribution percentages must sum to 1.0")
 
+    @property
+    def num_test_ciphers(self) -> int:
+        """Get the total number of test ciphers across all bins."""
+        return (
+            sum(len(diffs) for diffs in self.test_matrix.values())
+            * self.ciphers_per_bin
+        )
+
 
 @dataclass
 class CipherConfig:
