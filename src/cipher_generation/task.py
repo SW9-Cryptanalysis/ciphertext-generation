@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from utils.text_splits import TextStream
+from utils.text_sampling import TextStream
 
 @dataclass
 class CipherTask:
