@@ -1,127 +1,234 @@
-from typing import Iterator, Iterable, TypedDict
-from itertools import islice
-
-from utils.constants import BOOK_IDS_VALIDATION, TOTAL_BOOKS
-from utils.text_splits import (
-    get_split,
-    get_book_chunks,
-    get_actual_take,
-    get_usable_text,
-    get_source_genres,
+import random
+from typing import Iterator, Iterable, Any, TypedDict
+from cipher_generation.config import DatasetConfig
+from utils.text_sampling import (
     TextStream,
     Book,
+    get_usable_text,
+    get_source_genres,
+    extract_specific_chunk,
 )
-
-from utils.validators import validate_typed_dict
-from parameter_validator import parameter_validator
+from utils.constants import BOOK_IDS_VALIDATION
 
 
-class Targets(TypedDict):
-    """A typed dictionary for target counts."""
+class Metadata(TypedDict):
+    """A typed dictionary for book metadata."""
 
-    train: int
-    val: int
-    test: int
+    source_id: str
+    source_name: str
+    genres: list[str]
 
 
 class CorpusSampler:
-    """Manages the stateful extraction of texts across dataset splits."""
+    """Stateful extractor using length quotas and proportional partitioning."""
 
-    @parameter_validator(targets=validate_typed_dict)
     def __init__(
         self,
-        targets: Targets,
-        len_bounds: tuple[int, int],
+        dataset_config: DatasetConfig,
         genre_map: dict[str, list[str]],
+        max_chunks_per_book: int = 50,
+        buffer_chars: int = 150,
     ) -> None:
-        """Initialize the CorpusSampler.
+        """Initialize the sampler with a dataset configuration and genre map.
 
         Args:
-            targets (dict[str, int]): The target number of samples for each split.
-            len_bounds (tuple[int, int]): The minimum and maximum length bounds.
-            genre_map (dict[str, list[str]]): The genre map to use for filtering.
+            dataset_config (DatasetConfig): Dataset configuration with cipher counts.
+            genre_map (dict[str, list[str]]): Genre map to use for filtering.
+            max_chunks_per_book (int, optional): Maximum number of chunks per book.
+                Defaults to 50.
+            buffer_chars (int, optional): Buffer size for each chunk. Defaults to 150.
 
         """
-        self.targets = targets
-        self.len_bounds = len_bounds
+        self.config = dataset_config
         self.genre_map = genre_map
+        self.max_chunks_per_book = max_chunks_per_book
+        self.buffer = buffer_chars
 
-        # State tracked across the entire stream
-        self.counts = {"train": 0, "val": 0, "test": 0}
-        self.debts = {"train": 0.0, "val": 0.0, "test": 0.0}
-        self.means = {
-            "val": targets["val"] / (TOTAL_BOOKS * 0.01),
-            "test": targets["test"] / (TOTAL_BOOKS * 0.01),
-            "train": targets["train"] / (TOTAL_BOOKS * 0.98),
+        self.test_targets = {
+            length: len(diffs) * self.config.ciphers_per_bin
+            for length, diffs in self.config.test_matrix.items()
         }
 
-    def is_complete(self) -> bool:
-        """Check if all target quotas have been met."""
-        return all(self.counts[k] >= self.targets[k] for k in self.targets)
+        self.targets = {
+            "train": self.config.training_num,
+            "val": self.config.validation_num,
+            "test": self.config.num_test_ciphers,
+        }
+
+        self.counts = {
+            "train": 0,
+            "val": 0,
+            "test": {length: 0 for length in self.test_targets},
+        }
+        self.total_test_count = 0
+
+        self.test_pool = self._build_test_pool()
+
+        self.dist_ranges = [
+            self.config.foundation_range,
+            self.config.transition_range,
+            self.config.frontier_range,
+        ]
+        self.dist_weights = [
+            self.config.foundation_pct,
+            self.config.transition_pct,
+            self.config.frontier_pct,
+        ]
+
+    def _build_test_pool(self) -> list[int]:
+        """Create a randomized pool of required lengths for the test split."""
+        pool = []
+        for length, total_needed in self.test_targets.items():
+            pool.extend([length] * total_needed)
+        random.shuffle(pool)
+        return pool
+
+    def _is_complete(self) -> bool:
+        """Check if all dataset quotas (train, val, and test lengths) are satisfied."""
+        if self.counts["train"] < self.targets["train"]:
+            return False
+        if self.counts["val"] < self.targets["val"]:
+            return False
+        return not self.total_test_count < self.targets["test"]
 
     def generate_stream(self, stream: Iterable) -> Iterator[tuple[str, TextStream]]:
-        """Yield chunks until all targets are met."""
-        for idx, book in enumerate(stream):
-            if self.is_complete():
+        """Dispatcher loop that iterates through books until quotas are met.
+
+        Args:
+            stream (Iterable): The iterable source of text chunks.
+
+        Yields:
+            Iterator[tuple[str, TextStream]]: The generated stream of text chunks.
+
+        """
+        for book in stream:
+            if self._is_complete():
                 break
 
-            book_id = str(book.get("id", ""))
-            if book_id in BOOK_IDS_VALIDATION:
+            if str(book.get("id", "")) in BOOK_IDS_VALIDATION:
                 continue
 
-            initial_split = get_split(idx)
-            split = self._get_available_split(initial_split)
+            yield from self._process_book(book)
 
+    def _get_weighted_split(self) -> str | None:
+        """Choose split based on remaining quota ratios."""
+        rem = {}
+        if (t_rem := self.targets["train"] - self.counts["train"]) > 0:
+            rem["train"] = t_rem
+        if (v_rem := self.targets["val"] - self.counts["val"]) > 0:
+            rem["val"] = v_rem
+        if (ts_rem := self.targets["test"] - self.total_test_count) > 0:
+            rem["test"] = ts_rem
+
+        return (
+            random.choices(list(rem.keys()), weights=list(rem.values()), k=1)[0]
+            if rem
+            else None
+        )
+
+    def _get_burst_targets(self) -> list[dict[str, Any]]:
+        """Plan a burst of target lengths for the current book."""
+        burst_targets: list[dict[str, Any]] = []
+
+        for _ in range(self.max_chunks_per_book):
+            split = self._get_weighted_split()
             if not split:
-                continue
+                break
 
-            yield from self._process_book(book, split)
+            target_len = self._pop_target_len(split)
+            if target_len is not None:
+                burst_targets.append({"split": split, "len": target_len})
 
-    def _get_available_split(self, initial_split: str) -> str | None:
-        """Find an available split, falling back to others if the target is full."""
-        if self.counts[initial_split] < self.targets[initial_split]:
-            return initial_split
+        return burst_targets
 
-        for backup_split in ["val", "test", "train"]:
-            if self.counts[backup_split] < self.targets[backup_split]:
-                return backup_split
+    def _pop_target_len(self, split: str) -> int | None:
+        """Handle the source of the length based on the split type."""
+        if split == "test":
+            return self.test_pool.pop() if self.test_pool else None
 
-        return None
+        bounds = random.choices(self.dist_ranges, weights=self.dist_weights, k=1)[0]
+        return random.randint(*bounds)
 
-    def _process_book(self, book: Book, split: str) -> Iterator[tuple[str, TextStream]]:
-        """Handle the extraction and debt calculation for a single book."""
-        raw_text = book["text"]
-        usable_text = get_usable_text(raw_text, self.len_bounds)
+    def _process_book(self, book: Book) -> Iterator[tuple[str, TextStream]]:
+        """Extract ciphers from a book using proportional partitioning."""
+        usable_text = get_usable_text(book["text"], self.config.frontier_range)
+        targets = self._get_burst_targets()
 
-        safe_capacity_req = int(self.len_bounds[1] * 1.5)
-        capacity = len(usable_text) // safe_capacity_req if safe_capacity_req > 0 else 0
-
-        self.debts[split] += self.means[split]
-        actual_take = get_actual_take(split, self.debts, capacity)
-
-        if actual_take == 0:
+        if not targets:
             return
 
-        take_limit = min(actual_take, self.targets[split] - self.counts[split])
+        valid_targets = self._fit_targets_to_book(targets, len(usable_text))
+        if not valid_targets:
+            return
 
-        chunks_yielded = 0
+        yield from self._extract_chunks_from_partitions(
+            usable_text,
+            valid_targets,
+            book,
+        )
 
-        for chunk, bounded_chunk in islice(
-            get_book_chunks(usable_text, actual_take, self.len_bounds),
-            take_limit,
-        ):
-            yield (
-                split,
-                {
-                    "text": chunk,
-                    "text_with_boundaries": bounded_chunk,
-                    "source_id": book.get("id", "unknown"),
-                    "source_name": book.get("metadata", {}).get("title", "unknown"),
-                    "length": len(chunk),
-                    "genres": get_source_genres(book, self.genre_map),
-                },
-            )
+    def _fit_targets_to_book(self, targets: list[dict], text_len: int) -> list[dict]:
+        """Trim the target list until it fits within the text length."""
+        total_req = sum(t["len"] for t in targets) + (len(targets) * self.buffer)
+
+        while targets and total_req > text_len:
+            removed = targets.pop()
+            total_req -= removed["len"] + self.buffer
+            if removed["split"] == "test":
+                self.test_pool.append(removed["len"])
+
+        if targets and text_len > total_req * 1.5:
+            random.shuffle(targets)
+
+        return targets
+
+    def _extract_chunks_from_partitions(
+        self,
+        text: str,
+        targets: list[dict],
+        book: Book,
+    ) -> Iterator[tuple[str, TextStream]]:
+        """Iterate through partitions and yield validated text streams."""
+        total_req = sum(t["len"] for t in targets) + (len(targets) * self.buffer)
+        scale_factor = max(1.0, len(text) / total_req)
+        cursor = 0
+
+        meta: Metadata = {
+            "source_id": str(book.get("id", "unknown")),
+            "source_name": str(book.get("metadata", {}).get("title", "unknown")),
+            "genres": get_source_genres(book, self.genre_map),
+        }
+
+        for target in targets:
+            p_size = int((target["len"] + self.buffer) * scale_factor)
+            result = extract_specific_chunk(text, target["len"], cursor, p_size)
+
+            if result:
+                yield self._record_and_format(target, result, meta)
+
+            cursor += p_size
+
+    def _record_and_format(
+        self,
+        target: dict,
+        result: tuple,
+        meta: Metadata,
+    ) -> tuple[str, TextStream]:
+        """Update internal counts and format the final stream object."""
+        chunk, bounded = result
+        split, target_len = target["split"], target["len"]
+
+        if split == "test":
+            self.counts["test"][target_len] += 1
+            self.total_test_count += 1
+        else:
             self.counts[split] += 1
-            chunks_yielded += 1
 
-        self.debts[split] -= chunks_yielded
+        stream_data: TextStream = {
+            "text": chunk,
+            "text_with_boundaries": bounded,
+            "length": len(chunk),
+            "target_length": target_len,
+            **meta,
+        }
+        return split, stream_data
