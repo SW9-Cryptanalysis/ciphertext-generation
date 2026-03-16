@@ -5,6 +5,7 @@ from typing import Iterable, Any, Literal
 from multiprocessing.queues import Queue
 import json
 from pathlib import Path
+import random
 import shutil
 from utils.constants import PROJECT_ROOT
 
@@ -250,8 +251,6 @@ class CipherManager:
                 this length are full or the length is invalid.
 
         """
-        import random
-
         if length not in self.test_tracker:
             log.warning(f"Length {length} not found in test matrix.")
             return None
