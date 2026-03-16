@@ -1,31 +1,29 @@
 import os
 from utils.logging import get_logger
 from cipher_generation.cipher_manager import CipherManager
+from cipher_generation.config import DatasetConfig, CipherConfig
 from typing import Iterator
 
 from fetching.dataset_extractor import DatasetExtractor
-from fetching.corpus_sampler import CorpusSampler, Targets
+from fetching.corpus_sampler import CorpusSampler
 from utils.genres import load_existing_genre_map
-from utils.text_splits import randomize_stream, TextStream
+from utils.text_sampling import randomize_stream, TextStream
 from utils.constants import (
     NUM_TRAINING_CIPHERS,
     NUM_VALIDATION_CIPHERS,
-    NUM_TEST_CIPHERS,
     GENRE_MAP_PATH,
     DATASETS,
 )
 
 
 def get_text_stream(
-    targets: Targets,
-    len_bounds: tuple[int, int] = (4000, 10000),
+    config: DatasetConfig,
     extractor: DatasetExtractor | None = None,
 ) -> Iterator[tuple[str, TextStream]]:
     """Initialize dependencies and return the randomized text stream.
 
     Args:
-        targets (dict[str, int]): Target counts for train, val, and test splits.
-        len_bounds (tuple[int, int], optional): Min and max length bounds.
+        config (DatasetConfig): The dataset configuration.
         extractor (DatasetExtractor | None, optional): The dataset extractor instance.
 
     Returns:
@@ -38,7 +36,7 @@ def get_text_stream(
     genre_map = load_existing_genre_map(GENRE_MAP_PATH, None)
     full_stream = randomize_stream(extractor.get_full_stream())
 
-    sampler = CorpusSampler(targets, len_bounds, genre_map)
+    sampler = CorpusSampler(config, genre_map)
 
     return sampler.generate_stream(full_stream)
 
@@ -72,22 +70,41 @@ if __name__ == "__main__":
         load_folder_ids()
     )
 
-    targets = Targets(
-        {
-            "train": NUM_TRAINING_CIPHERS,
-            "val": NUM_VALIDATION_CIPHERS,
-            "test": NUM_TEST_CIPHERS,
+    dataset_config = DatasetConfig(
+        training_num=NUM_TRAINING_CIPHERS,
+        validation_num=NUM_VALIDATION_CIPHERS,
+        foundation_pct=0.10,
+        foundation_range=(350, 1000),
+        transition_pct=0.20,
+        transition_range=(1000, 4000),
+        frontier_pct=0.70,
+        frontier_range=(4000, 10000),
+        test_matrix={
+            350: [5, 10, 15, 0],
+            400: [5, 10, 15, 20, 0],
+            450: [5, 10, 15, 20, 25, 0],
+            600: [5, 10, 15, 20, 25, 30, 0],
+            800: [5, 10, 15, 20, 25, 30, 0],
+            1000: [5, 10, 15, 20, 25, 30, 0],
+            2000: [5, 10, 15, 20, 25, 30, 50, 0],
+            4000: [5, 10, 15, 20, 25, 30, 50, 100, 0],
+            6000: [5, 10, 15, 20, 25, 30, 50, 100, 150, 0],
+            8000: [5, 10, 15, 20, 25, 30, 50, 100, 200, 300, 0],
+            10000: [5, 10, 15, 20, 25, 30, 50, 100, 200, 300, 0],
         },
+        ciphers_per_bin=100,
     )
 
-    text_stream = get_text_stream(targets=targets)
+    text_stream = get_text_stream(dataset_config)
 
-    config = {
-        "train": {"folder_id": folder_id_train, "count": NUM_TRAINING_CIPHERS},
-        "val": {"folder_id": folder_id_val, "count": NUM_VALIDATION_CIPHERS},
-        "test": {"folder_id": folder_id_test, "count": NUM_TEST_CIPHERS},
-        "metadata": {"folder_id": folder_id_metadata, "count": 0},
-    }
+    config = CipherConfig(
+        train_folder=folder_id_train,
+        val_folder=folder_id_val,
+        test_folder=folder_id_test,
+        metadata_folder=folder_id_metadata,
+        batch_size=10,
+        dataset_config=dataset_config,
+    )
 
     manager = CipherManager(
         config=config,
