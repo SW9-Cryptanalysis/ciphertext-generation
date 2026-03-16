@@ -11,6 +11,10 @@ from utils.drive import (
     upload_to_drive,
 )
 from tqdm import tqdm
+from cipher_generation.task import UploadTask
+from typing import Literal
+from pathlib import Path
+
 
 log = get_logger_tqdm("DriveUploader", 20)
 SENTINEL = "STOP"
@@ -48,7 +52,7 @@ class DriveUploader(mp.Process):
 
     def __init__(
         self,
-        upload_queue: MPQueue[Any],
+        upload_queue: MPQueue[UploadTask | Literal["STOP"]],
         config: DriveUploaderConfig,
         *args: Any,
         **kwargs: Any,
@@ -76,8 +80,8 @@ class DriveUploader(mp.Process):
         if not self._authenticate_service():
             return
 
-        val_files: list[tuple[str, int]] = []
-        test_files: list[tuple[str, int]] = []
+        val_files: list[tuple[Path, int]] = []
+        test_files: list[tuple[Path, int]] = []
 
         tqdm.set_lock(self.tqdm_lock)
 
@@ -89,28 +93,25 @@ class DriveUploader(mp.Process):
         ) as pbar:
             while True:
                 try:
-                    queue_payload = self.queue.get(timeout=5)
+                    task = self.queue.get(timeout=5)
                 except queue.Empty:
                     pbar.refresh()
                     continue
 
-                if queue_payload == SENTINEL:
-                    # The pipeline is done! Merge and upload the hoarded val/test files
+                if task == SENTINEL:
                     self._merge_and_upload("val", val_files, pbar)
                     self._merge_and_upload("test", test_files, pbar)
                     break
 
-                # Catch the MERGE signal from workers
-                if queue_payload[0] == "MERGE":
-                    self._hoard_files(queue_payload, val_files, test_files)
+                if task.split in ("val", "test"):
+                    self._hoard_files(task, val_files, test_files)
                     continue
 
-                split, filepath, filename, cipher_count = queue_payload
                 upload_item = Item(
-                    split=split,
-                    filepath=filepath,
-                    filename=filename,
-                    cipher_count=cipher_count,
+                    split=task.split,
+                    filepath=str(task.filepath),
+                    filename=str(task.filename),
+                    cipher_count=task.cipher_count,
                 )
                 self._upload_file(upload_item, pbar)
 
@@ -120,32 +121,20 @@ class DriveUploader(mp.Process):
 
     def _hoard_files(
         self,
-        queue_payload: tuple[str, str, str, int],
-        val_files: list[tuple[str, int]],
-        test_files: list[tuple[str, int]],
+        task: UploadTask,
+        val_files: list[tuple[Path, int]],
+        test_files: list[tuple[Path, int]],
     ) -> None:
-        """Extract the filepath and count from a MERGE signal and store it.
-
-        Args:
-            queue_payload (tuple[str, str, str, int]): The payload from the queue.
-            val_files (list[tuple[str, int]]): The list of val files to hoard.
-            test_files (list[tuple[str, int]]): The list of test files to hoard.
-
-        """
-        split, filepath, cipher_count = (
-            queue_payload[1],
-            queue_payload[2],
-            queue_payload[3],
-        )
-        if split == "val":
-            val_files.append((filepath, cipher_count))
-        elif split == "test":
-            test_files.append((filepath, cipher_count))
+        """Extract the filepath and count from an UploadTask and store it."""
+        if task.split == "val":
+            val_files.append((task.filepath, task.cipher_count))
+        elif task.split == "test":
+            test_files.append((task.filepath, task.cipher_count))
 
     def _merge_and_upload(
         self,
         split: str,
-        files: list[tuple[str, int]],
+        files: list[tuple[Path, int]],
         pbar: tqdm,
     ) -> None:
         """Merge multiple raw JSONL files into a single ZIP archive and upload it."""

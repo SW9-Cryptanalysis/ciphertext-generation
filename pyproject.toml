@@ -51,7 +51,6 @@ line-length = 88
 exclude = ["venv", ".venv", "__pycache__", "build", "dist", ".eggs", "*.egg", ".mypy_cache", ".pytest_cache"]
 select = ["E", "F", "W", "C90", "B", "B9", "ANN", "COM", "D", "ERA", "ISC", "N", "Q000", "S", "SIM", "TID251", "UP", "YTT", "T"]
 ignore = [
-	"W191",  # indentation contains tabs
 	"S311",  # Standard pseudo-random generators are not suitable for security/cryptographic purposes
 	"D206",  # Docstring should be indented with spaces equal to the surrounding code
 	"D100",  # Missing docstring in public module

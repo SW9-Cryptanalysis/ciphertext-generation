@@ -3,6 +3,7 @@ import re
 import pytest
 import tqdm
 from cipher_generation.cipher_manager import CipherManager
+from cipher_generation.config import CipherConfig, DatasetConfig
 from encipherment.cipher import HomophonicCipher
 from cipher_generation.cipher_producer import CipherProducer, ProducerConfig
 from cipher_generation.drive_uploader import DriveUploader, DriveUploaderConfig
@@ -28,12 +29,38 @@ def mock_cipher(mocker):
     return mock_cipher
 
 
-def test_end_to_end_pipeline_sync(mocker, tmp_path, mock_pbar, mock_cipher):
+@pytest.fixture
+def tiny_config():
+    """Provide a standardized mock CipherConfig for testing."""
+    return CipherConfig(
+        train_folder="train_folder",
+        val_folder="val_folder",
+        test_folder="test_folder",
+        metadata_folder="metadata_folder",
+        batch_size=100,
+        dataset_config=DatasetConfig(
+            training_num=1,
+            validation_num=0,
+            test_matrix={},
+            ciphers_per_bin=100,
+        ),
+        num_workers=1,
+    )
+
+
+@pytest.fixture
+def mocks(mock_pbar, mock_cipher, tiny_config):
+    """Provide a standardized set of mocked objects for testing."""
+    return (mock_pbar, mock_cipher, tiny_config)
+
+
+def test_end_to_end_pipeline_sync(mocker, tmp_path, mocks):
     """Verify the pipeline logic by executing methods sequentially in one process.
 
     This approach bypasses multiprocessing 'spawn' isolation and pickling errors
     while ensuring the entire data flow from feeder to uploader is validated.
     """
+    mock_pbar, mock_cipher, tiny_config = mocks
 
     mock_lock = mocker.MagicMock()
     mock_lock.__enter__.return_value = mock_lock
@@ -64,11 +91,6 @@ def test_end_to_end_pipeline_sync(mocker, tmp_path, mock_pbar, mock_cipher):
 
     mocker.patch("os.path.join", side_effect=mock_join)
 
-    tiny_config = {
-        "train": {"count": 1, "folder_id": "mock_folder"},
-        "metadata": {"folder_id": "mock_meta", "count": 0},
-    }
-
     def create_mock_text_stream(raw_text: str) -> dict:
         clean_text = re.sub(r"[^a-z]", "", raw_text.lower())
         return {
@@ -83,7 +105,8 @@ def test_end_to_end_pipeline_sync(mocker, tmp_path, mock_pbar, mock_cipher):
     tiny_stream = [("train", create_mock_text_stream("First text"))]
 
     manager = CipherManager(
-        config=tiny_config, text_stream_source=tiny_stream, num_workers=1
+        config=tiny_config,
+        text_stream_source=tiny_stream,
     )
 
     manager._feeder_stream(mocker.Mock())

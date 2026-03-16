@@ -27,6 +27,7 @@ class TextStream(TypedDict):
     source_id: str
     source_name: str
     length: int
+    target_length: int
     genres: list[str]
 
 

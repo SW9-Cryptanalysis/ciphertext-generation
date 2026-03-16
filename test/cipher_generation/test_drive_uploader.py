@@ -1,11 +1,13 @@
 import pytest
 import queue
-import os
 import zipfile
+import os
 from dataclasses import dataclass
 from multiprocessing.queues import Queue as MPQueue
+from pathlib import Path
 
 from cipher_generation.drive_uploader import DriveUploader, DriveUploaderConfig, Item
+from cipher_generation.task import UploadTask
 
 MOCK_SPLIT_FOLDERS = {
     "train": "mock_train_123",
@@ -97,7 +99,6 @@ class TestDriveUploaderRunLoop:
         mock_upload = mocker.patch.object(uploader, "_upload_file")
         mock_merge = mocker.patch.object(uploader, "_merge_and_upload")
 
-        # FIX: Correctly mock a context manager for tqdm
         mock_pbar = mocker.MagicMock()
         mock_pbar.__enter__.return_value = mock_pbar
         mocker.patch("cipher_generation.drive_uploader.tqdm", return_value=mock_pbar)
@@ -106,39 +107,52 @@ class TestDriveUploaderRunLoop:
             "cipher_generation.drive_uploader.tqdm.set_lock"
         )
 
-        mock_queue.get.side_effect = [
-            ("train", "path/batch_train_1.zip", "batch_train_1.zip", 10000),
-            ("MERGE", "val", "path/val_raw.jsonl", 5000),
-            ("MERGE", "test", "path/test_raw.jsonl", 5000),
-            SENTINEL,
-        ]
+        # Inject actual UploadTask dataclasses instead of tuples
+        train_task = UploadTask(
+            filepath=Path("path/batch_train_1.zip"),
+            filename=Path("batch_train_1.zip"),
+            cipher_count=10000,
+            split="train",
+        )
+        val_task = UploadTask(
+            filepath=Path("path/val_raw.jsonl"),
+            filename=Path("val_raw.jsonl"),
+            cipher_count=5000,
+            split="val",
+        )
+        test_task = UploadTask(
+            filepath=Path("path/test_raw.jsonl"),
+            filename=Path("test_raw.jsonl"),
+            cipher_count=5000,
+            split="test",
+        )
+
+        mock_queue.get.side_effect = [train_task, val_task, test_task, SENTINEL]
 
         uploader.run()
 
-        # Check lock was set
         mock_tqdm_set_lock.assert_called_once_with(uploader.tqdm_lock)
 
-        # Train should upload normally right away
+        # Train task should be immediately uploaded
         assert mock_upload.call_count == 1
         uploaded_item = mock_upload.call_args_list[0][0][0]
         assert uploaded_item.split == "train"
 
-        # Merge should be called exactly twice at the end (once for val, once for test)
+        # Val and Test should be hoarded and trigger _merge_and_upload on STOP
         assert mock_merge.call_count == 2
         val_merge_args = mock_merge.call_args_list[0][0]
         test_merge_args = mock_merge.call_args_list[1][0]
 
         assert val_merge_args[0] == "val"
-        assert val_merge_args[1] == [("path/val_raw.jsonl", 5000)]
+        assert val_merge_args[1] == [(Path("path/val_raw.jsonl"), 5000)]
         assert test_merge_args[0] == "test"
-        assert test_merge_args[1] == [("path/test_raw.jsonl", 5000)]
+        assert test_merge_args[1] == [(Path("path/test_raw.jsonl"), 5000)]
 
     def test_empty_queue_timeout_refreshes_pbar(self, mocker, uploader, mock_queue):
         """Verify empty queues catch the timeout and force a pbar refresh."""
         mocker.patch.object(uploader, "_authenticate_service", return_value=True)
         mock_upload = mocker.patch.object(uploader, "_upload_file")
 
-        # FIX: Correctly mock the context manager
         mock_pbar = mocker.MagicMock()
         mock_pbar.__enter__.return_value = mock_pbar
         mocker.patch("cipher_generation.drive_uploader.tqdm", return_value=mock_pbar)
@@ -152,7 +166,7 @@ class TestDriveUploaderRunLoop:
         uploader.run()
 
         assert mock_queue.get.call_count == 3
-        assert mock_pbar.refresh.call_count == 2  # Refreshed twice due to empty queue
+        assert mock_pbar.refresh.call_count == 2
         mock_upload.assert_not_called()
 
     def test_run_aborts_on_auth_failure(self, mocker, uploader, mock_queue):
@@ -219,7 +233,7 @@ class TestDriveUploaderDiskHelpers:
     def test_upload_file_outcomes_and_disk_cleanup(
         self, mocker, uploader, tmp_path, case: UploadTestCase
     ):
-        """Verify successful API uploads correctly delete the local file, and failures preserve it."""
+        """Verify API uploads correctly delete the local file, and failures preserve it."""
         uploader.drive_service = mocker.Mock()
         mock_log = mocker.patch("cipher_generation.drive_uploader.log")
         mock_upload_to_drive = mocker.patch(
@@ -228,7 +242,6 @@ class TestDriveUploaderDiskHelpers:
         )
         mock_pbar = mocker.Mock()
 
-        # Create a real temporary file on disk for the test
         dummy_file = tmp_path / "test_file.zip"
         dummy_file.write_bytes(b"dummy_zip_data")
 
@@ -242,7 +255,7 @@ class TestDriveUploaderDiskHelpers:
         uploader._upload_file(test_item, mock_pbar)
 
         assert uploader.uploaded_count == case.expected_count_increase
-        assert os.path.exists(str(dummy_file)) != case.expect_file_deleted
+        assert dummy_file.exists() != case.expect_file_deleted
 
         if case.expect_file_deleted:
             mock_upload_to_drive.assert_called_once_with(
@@ -275,43 +288,42 @@ class TestDriveUploaderDiskHelpers:
 
         uploader._upload_file(test_item, mocker.Mock())
 
-        # Assert caught gracefully
         mock_log.error.assert_called_once()
         assert "FATAL: Unexpected error" in mock_log.error.call_args[0][0]
-
-        # Assert file was preserved on disk so it isn't lost
         assert dummy_file.exists()
 
     def test_merge_and_upload_logic(self, mocker, uploader, tmp_path):
         """Verify multiple raw files are merged into one zip and then passed to _upload_file."""
         mock_upload = mocker.patch.object(uploader, "_upload_file")
 
-        # FIX: Intercept os.path.join to force writing into the tmp_path sandbox instead of project root
+        # --- THE FIX: Use a safe, conditional mock to prevent infinite pathlib recursion ---
         original_join = os.path.join
 
-        def mock_join(*args):
-            if args[0] == "temp_ciphers":
+        def safe_mock_join(*args):
+            if args and args[0] == "temp_ciphers":
                 return str(tmp_path / args[1])
             return original_join(*args)
 
-        mocker.patch("os.path.join", side_effect=mock_join)
+        mocker.patch("os.path.join", side_effect=safe_mock_join)
 
-        # Create two raw files to merge
+        # Create dummy temp_ciphers directory in our tmp_path to route os.path.join calls safely
+        temp_dir = tmp_path / "temp_ciphers"
+        temp_dir.mkdir()
+
+
         file1 = tmp_path / "raw1.jsonl"
         file1.write_text("cipher1")
         file2 = tmp_path / "raw2.jsonl"
         file2.write_text("cipher2")
 
-        files_to_merge = [(str(file1), 5), (str(file2), 10)]
+        # Pass Path objects directly, mimicking the new hoard logic
+        files_to_merge = [(file1, 5), (file2, 10)]
 
-        # Run merge
         uploader._merge_and_upload("val", files_to_merge, mocker.Mock())
 
-        # Check that the raw files were deleted after merging
         assert not file1.exists()
         assert not file2.exists()
 
-        # Check that _upload_file was called with a newly created ZIP item
         mock_upload.assert_called_once()
         upload_item = mock_upload.call_args[0][0]
 
@@ -319,7 +331,6 @@ class TestDriveUploaderDiskHelpers:
         assert upload_item.cipher_count == 15
         assert upload_item.filename == "val_final.zip"
 
-        # Verify the ZIP actually contains the combined data
         with zipfile.ZipFile(upload_item.filepath, "r") as zf:
             assert "val_merged.jsonl" in zf.namelist()
             with zf.open("val_merged.jsonl") as f:

@@ -5,22 +5,58 @@ from dataclasses import dataclass
 from unittest.mock import MagicMock
 from pathlib import Path
 
+from cipher_generation.config import CipherConfig, DatasetConfig
 from cipher_generation.cipher_manager import CipherManager
+from cipher_generation.task import UploadTask, CipherTask
 from dataset_stats import DatasetStatsAggregator
 
 
 @pytest.fixture
-def base_config():
+def manager_config():
     """Provide a standard configuration dictionary for manager initialization."""
-    return {
-        "train": {"count": 70, "folder_id": "train_folder"},
-        "val": {"count": 30, "folder_id": "val_folder"},
-        "metadata": {"folder_id": "metadata_folder", "count": 0},
-    }
+    dataset_config = DatasetConfig(
+        training_num=100,
+        validation_num=10,
+        test_matrix={
+            4000: [5, 10, 15, 20, 25, 30, 50, 100, 200, 300, 0],
+            5000: [5, 10, 15, 20, 25, 30, 50, 100, 200, 300, 0],
+            6500: [5, 10, 15, 20, 25, 30, 50, 100, 200, 300, 0],
+            8000: [5, 10, 15, 20, 25, 30, 50, 100, 200, 300, 0],
+        },
+        ciphers_per_bin=100,
+    )
+    return CipherConfig(
+        train_folder="train_folder",
+        val_folder="val_folder",
+        test_folder="test_folder",
+        metadata_folder="metadata_folder",
+        batch_size=10,
+        dataset_config=dataset_config,
+    )
 
 
 @pytest.fixture
-def mock_mp_manager(mocker):
+def manager_config_no_test():
+    """Provide a standard configuration dictionary for manager initialization."""
+    dataset_config = DatasetConfig(
+        training_num=3,
+        validation_num=0,
+        test_matrix={},
+        ciphers_per_bin=100,
+    )
+    return CipherConfig(
+        train_folder="train_folder",
+        val_folder="val_folder",
+        test_folder="test_folder",
+        metadata_folder="metadata_folder",
+        num_workers=4,
+        batch_size=10,
+        dataset_config=dataset_config,
+    )
+
+
+@pytest.fixture
+def mock_mp_queue(mocker):
     """Patch multiprocessing.Queue and RLock to inject mocks."""
     mock_queue_cls = mocker.patch("multiprocessing.Queue")
 
@@ -87,18 +123,28 @@ execute_cases = [
 
 
 class TestCipherManagerInitialization:
-    def test_initialization(self, mocker, mock_mp_manager, base_config):
-        _, mock_job_q, mock_result_q, mock_stats_q = mock_mp_manager
+    def test_initialization(self, mocker, mock_mp_queue, manager_config):
+        _, mock_job_q, mock_result_q, mock_stats_q = mock_mp_queue
         mocker.patch("os.cpu_count", return_value=6)
 
-        manager = CipherManager(config=base_config, text_stream_source=[])
+        manager = CipherManager(config=manager_config, text_stream_source=[])
 
         assert manager.split_folders == {
             "train": "train_folder",
             "val": "val_folder",
+            "test": "test_folder",
             "metadata": "metadata_folder",
         }
-        assert manager.total_count == 100
+        test_bins = sum(
+            len(diffs) for diffs in manager_config.dataset_config.test_matrix.values()
+        )
+        test_count = test_bins * manager_config.dataset_config.ciphers_per_bin
+        expected_total_count = (
+            manager_config.dataset_config.training_num
+            + manager_config.dataset_config.validation_num
+            + test_count
+        )
+        assert manager.total_count == expected_total_count
         assert manager.num_workers == 4
 
         assert manager.job_queue == mock_job_q
@@ -106,18 +152,18 @@ class TestCipherManagerInitialization:
         assert manager.stats_queue == mock_stats_q
         assert isinstance(manager.master_stats, DatasetStatsAggregator)
 
-    def test_initialization_low_cpu(self, mocker, mock_mp_manager, base_config):
+    def test_initialization_low_cpu(self, mocker, mock_mp_queue, manager_config):
         mocker.patch("os.cpu_count", return_value=2)
-        manager = CipherManager(base_config, [])
+        manager = CipherManager(manager_config, [])
         assert manager.num_workers == 1
 
 
 class TestCipherManagerExecution:
     @pytest.mark.parametrize("case", execute_cases, ids=lambda c: c.id)
     def test_execute_outcomes(
-        self, mocker, mock_mp_manager, base_config, case: ExecuteCase
+        self, mocker, mock_mp_queue, manager_config, case: ExecuteCase
     ):
-        _, mock_job_q, mock_result_q, _ = mock_mp_manager
+        _, mock_job_q, mock_result_q, _ = mock_mp_queue
 
         mock_log = mocker.patch("cipher_generation.cipher_manager.log")
         mocker.patch("os.cpu_count", return_value=4)
@@ -133,7 +179,7 @@ class TestCipherManagerExecution:
         mock_pbar.__enter__.return_value = mock_pbar
         mocker.patch("tqdm.tqdm", return_value=mock_pbar)
 
-        manager = CipherManager(base_config, StreamSimulator(case.stream_mode))
+        manager = CipherManager(manager_config, StreamSimulator(case.stream_mode))
 
         mocker.patch.object(
             manager.stats_queue, "get", return_value=DatasetStatsAggregator()
@@ -159,7 +205,7 @@ class TestCipherManagerExecution:
         assert kwargs["upload_queue"] == mock_result_q
         assert "tqdm_lock" in kwargs["config"].__dict__
 
-    def test_execute_logging_progress(self, mocker, mock_mp_manager):
+    def test_execute_logging_progress(self, mocker, manager_config, mock_mp_queue):
         mock_log = mocker.patch("cipher_generation.cipher_manager.log")
 
         mock_pbar = MagicMock()
@@ -168,9 +214,7 @@ class TestCipherManagerExecution:
 
         mock_stream = [("train", {"text": "A"}) for _ in range(11)]
 
-        manager = CipherManager(
-            {"train": {"folder_id": "dummy", "count": 11}}, mock_stream
-        )
+        manager = CipherManager(manager_config, mock_stream)
         manager._logging_interval = 10
 
         mocker.patch("cipher_generation.cipher_manager.DriveUploader")
@@ -182,16 +226,14 @@ class TestCipherManagerExecution:
         manager.execute()
         mock_log.debug.assert_any_call("Crossed 10 texts milestone...")
 
-    def test_feeder_stream_respects_total_count(self, mocker, mock_mp_manager):
-        _, mock_job_q, _, _ = mock_mp_manager
+    def test_feeder_stream_respects_total_count(
+        self, mocker, mock_mp_queue, manager_config_no_test
+    ):
+        _, mock_job_q, _, _ = mock_mp_queue
 
         large_stream = [("train", {"text": f"text_{i}"}) for i in range(10)]
-        test_config = {
-            "train": {"folder_id": "dummy", "count": 3},
-            "metadata": {"folder_id": "dummy", "count": 0},
-        }
 
-        manager = CipherManager(test_config, large_stream)
+        manager = CipherManager(manager_config_no_test, large_stream)
         mock_log = mocker.patch("cipher_generation.cipher_manager.log")
 
         mock_pbar = MagicMock()
@@ -205,12 +247,30 @@ class TestCipherManagerExecution:
         assert mock_job_q.put.call_count == 3
         mock_log.info.assert_any_call("Target of 3 reached. Stopping feeder.")
 
+    def test_merge_stats_receives_stop_signal(
+        self, mocker, mock_mp_queue, manager_config
+    ):
+        """Ensure _merge_stats breaks early if a STOP signal is received."""
+        _, _, _, mock_stats_q = mock_mp_queue
+
+        manager = CipherManager(manager_config, [])
+        manager.num_workers = 3
+
+        mock_valid_stats = mocker.Mock(spec=DatasetStatsAggregator)
+        mock_stats_q.get.side_effect = [mock_valid_stats, "STOP", mock_valid_stats]
+        mock_merge = mocker.patch.object(manager.master_stats, "merge")
+
+        manager._merge_stats()
+
+        assert mock_stats_q.get.call_count == 2
+        mock_merge.assert_called_once_with(mock_valid_stats)
+
 
 class TestCipherManagerPeakUpload:
     def test_manager_writes_and_queues_metadata(
-        self, mocker, mock_mp_manager, tmp_path
+        self, mocker, mock_mp_queue, tmp_path, manager_config
     ):
-        _, _, mock_result_q, _ = mock_mp_manager
+        _, _, mock_result_q, _ = mock_mp_queue
 
         mocker.patch("cipher_generation.cipher_manager.DriveUploader")
         mocker.patch("cipher_generation.cipher_manager.CipherProducer")
@@ -221,11 +281,11 @@ class TestCipherManagerPeakUpload:
         mock_pbar.__enter__.return_value = mock_pbar
         mocker.patch("tqdm.tqdm", return_value=mock_pbar)
 
-        dummy_config = {"train": {"folder_id": "dummy_folder_abc", "count": 1}}
         dummy_stream = [("train", {"text": "hello", "source_id": "1"})]
 
         manager = CipherManager(
-            config=dummy_config, text_stream_source=dummy_stream, num_workers=1
+            config=manager_config,
+            text_stream_source=dummy_stream,
         )
 
         expected_peak = 2501
@@ -247,16 +307,107 @@ class TestCipherManagerPeakUpload:
         put_calls = mock_result_q.put.call_args_list
         metadata_payload = put_calls[-2][0][0]
 
-        assert len(metadata_payload) == 4
-        split_name, filepath, filename, cipher_count = metadata_payload
+        assert isinstance(metadata_payload, UploadTask)
+        assert metadata_payload.split == "metadata"
+        assert metadata_payload.filename == Path("metadata.json")
+        assert metadata_payload.cipher_count == 0
 
-        assert split_name == "metadata"
-        assert filename == Path("metadata.json")
-        assert cipher_count == 0
+        assert os.path.exists(metadata_payload.filepath)
 
-        assert os.path.exists(filepath)
-
-        with open(filepath, encoding="utf-8") as f:
+        with open(metadata_payload.filepath, encoding="utf-8") as f:
             payload = json.load(f)
 
         assert payload["max_symbol_id"] == expected_peak
+
+
+class TestCipherManagerRouting:
+    """Tests focusing on the test-matrix bin routing and CipherTask payloads."""
+
+    def test_assign_test_difficulty_valid(self, manager_config):
+        """Ensure the manager assigns valid difficulties and increments the tracker."""
+        manager = CipherManager(manager_config, [])
+
+        diff = manager._assign_test_difficulty(4000)
+
+        assert diff is not None
+        assert diff in manager_config.dataset_config.test_matrix[4000]
+        assert manager.test_tracker[4000][diff] == 1
+
+    def test_assign_test_difficulty_exhausted(self, manager_config):
+        """Ensure the manager returns None when all bins for a length are full."""
+        manager = CipherManager(manager_config, [])
+        manager.test_samples_per_bin = 2
+
+        for diff in manager.test_tracker[4000]:
+            manager.test_tracker[4000][diff] = 2
+
+        assert manager._assign_test_difficulty(4000) is None
+
+    def test_assign_test_difficulty_invalid_length(self, mocker, manager_config):
+        """Ensure invalid lengths are caught and logged."""
+        mock_log = mocker.patch("cipher_generation.cipher_manager.log")
+        manager = CipherManager(manager_config, [])
+
+        result = manager._assign_test_difficulty(99999)
+
+        assert result is None
+        mock_log.warning.assert_called_once_with(
+            "Length 99999 not found in test matrix."
+        )
+
+    def test_feeder_stream_payloads(self, mocker, mock_mp_queue, manager_config):
+        """Ensure the stream generates correct CipherTask dataclasses for each split."""
+        _, mock_job_q, _, _ = mock_mp_queue
+
+        stream = [
+            ("train", {"text": "A", "target_length": 4000}),
+            ("val", {"text": "B", "target_length": 5000}),
+            ("test", {"text": "C", "target_length": 6500}),
+        ]
+
+        manager = CipherManager(manager_config, stream)
+        mock_lock = mocker.Mock()
+        mocker.patch("tqdm.tqdm", return_value=mocker.MagicMock())
+
+        manager._feeder_stream(mock_lock)
+
+        assert mock_job_q.put.call_count == 3
+        calls = mock_job_q.put.call_args_list
+
+        train_task = calls[0][0][0]
+        assert isinstance(train_task, CipherTask)
+        assert train_task.split == "train"
+        assert train_task.target_difficulty is None
+
+        val_task = calls[1][0][0]
+        assert val_task.split == "val"
+        assert val_task.target_difficulty is None
+
+        test_task = calls[2][0][0]
+        assert test_task.split == "test"
+
+        assert isinstance(test_task.target_difficulty, int)
+        assert (
+            test_task.target_difficulty
+            in manager_config.dataset_config.test_matrix[6500]
+        )
+
+    def test_feeder_stream_skips_exhausted_test_bins(
+        self, mocker, mock_mp_queue, manager_config
+    ):
+        """Ensure the stream skips pushing tasks to the queue if the test bin is full."""
+        _, mock_job_q, _, _ = mock_mp_queue
+
+        stream = [("test", {"text": "D", "target_length": 8000})]
+
+        manager = CipherManager(manager_config, stream)
+
+        for diff in manager.test_tracker[8000]:
+            manager.test_tracker[8000][diff] = manager.test_samples_per_bin
+
+        mock_lock = mocker.Mock()
+        mocker.patch("tqdm.tqdm", return_value=mocker.MagicMock())
+
+        manager._feeder_stream(mock_lock)
+
+        assert mock_job_q.put.call_count == 0

@@ -1,16 +1,65 @@
 import pytest
 import queue
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
 
-from encipherment.cipher import HomophonicCipher
 from cipher_generation.cipher_producer import CipherProducer, ProducerConfig
+from cipher_generation.task import CipherTask, UploadTask
 
 
 @pytest.fixture
 def valid_text_stream():
     """Provide a standardized mock text stream dictionary."""
-    return {"text": "mock_text", "source_id": "1"}
+    return {
+        "text": "mocktext",
+        "source_id": "1",
+        "target_length": 8,
+        "genres": ["Sci-Fi"],
+        "text_with_boundaries": "mock_text",
+        "source_name": "Test",
+        "length": 8,
+    }
+
+
+@pytest.fixture
+def valid_train_task(valid_text_stream):
+    """Provide a standardized mock CipherTask for training."""
+    return CipherTask(
+        split="train",
+        text_data=valid_text_stream,
+        target_difficulty=None,
+    )
+
+
+@pytest.fixture
+def valid_val_task(valid_text_stream):
+    """Provide a standardized mock CipherTask for validation."""
+    return CipherTask(
+        split="val",
+        text_data=valid_text_stream,
+        target_difficulty=None,
+    )
+
+
+@pytest.fixture
+def valid_test_task(valid_text_stream):
+    """Provide a standardized mock CipherTask for testing."""
+    return CipherTask(
+        split="test",
+        text_data=valid_text_stream,
+        target_difficulty=20,
+    )
+
+
+@pytest.fixture
+def valid_tasks(valid_train_task, valid_val_task, valid_test_task):
+    """Provide a standardized mock CipherTask for testing."""
+    return {
+        "train": valid_train_task,
+        "val": valid_val_task,
+        "test": valid_test_task,
+    }
 
 
 @pytest.fixture
@@ -27,11 +76,7 @@ def mock_cipher(mocker):
 
 @pytest.fixture
 def producer(mocker, tmp_path):
-    """Provide a standard CipherProducer configured with a small batch size of 2.
-
-    Uses pytest's tmp_path to prevent writing actual files to the project
-    directory during testing.
-    """
+    """Provide a standard CipherProducer configured with a small batch size."""
     mock_input_queue = mocker.Mock()
     mock_output_queue = mocker.Mock()
     mock_stats_queue = mocker.Mock()
@@ -48,20 +93,13 @@ def producer(mocker, tmp_path):
         config=config,
         name="TestProducer",
     )
-    # Redirect file operations to the isolated test directory
     p.temp_dir = tmp_path / "temp_ciphers"
     return p
 
 
 @dataclass
 class CipherErrorCase:
-    """Defines the parameters for testing various cipher generation failures.
-
-    Attributes:
-            id (str): The test case identifier.
-            exception (Exception): The exception raised during generation.
-            expected_log (str): The expected error log message.
-    """
+    """Defines the parameters for testing various cipher generation failures."""
 
     id: str
     exception: Exception
@@ -89,13 +127,13 @@ class TestCipherProducerRunLoop:
         self,
         mocker,
         producer,
-        valid_text_stream,
+        valid_train_task,
         mock_cipher,
     ):
         """Verify the producer streams to disk and zips exactly at the batch size."""
         producer.input_queue.get.side_effect = [
-            ("train", valid_text_stream),
-            ("train", valid_text_stream),
+            valid_train_task,
+            valid_train_task,
             "STOP",
         ]
 
@@ -103,73 +141,70 @@ class TestCipherProducerRunLoop:
 
         producer.run()
 
-        # Output queue should receive the zipped train file
         assert producer.output_queue.put.call_count == 1
 
-        call_args = producer.output_queue.put.call_args[0][0]
-        split, zip_filepath, archive_name, cipher_count = call_args
+        upload_task = producer.output_queue.put.call_args[0][0]
 
-        assert split == "train"
-        assert archive_name.startswith("batch_train_")
-        assert archive_name.endswith(".zip")
-        assert cipher_count == 2
-
-        # Verify the zip file exists on disk and the raw file was deleted
-        assert os.path.exists(zip_filepath)
-        assert not os.path.exists(zip_filepath.with_suffix(".jsonl"))
+        assert isinstance(upload_task, UploadTask)
+        assert upload_task.split == "train"
+        assert str(upload_task.filename).startswith("batch_train_")
+        assert str(upload_task.filename).endswith(".zip")
+        assert upload_task.cipher_count == 2
+        assert os.path.exists(upload_task.filepath)
+        assert not os.path.exists(upload_task.filepath.with_suffix(".jsonl"))
 
     def test_cleanup_orphan_train_batch(
         self,
         mocker,
         producer,
-        valid_text_stream,
+        valid_train_task,
         mock_cipher,
     ):
         """Verify that STOP forces a zip of an incomplete train batch."""
-        producer.input_queue.get.side_effect = [("train", valid_text_stream), "STOP"]
+        producer.input_queue.get.side_effect = [valid_train_task, "STOP"]
         mocker.patch.object(producer, "generate_cipher", return_value=mock_cipher)
 
         producer.run()
 
         assert producer.output_queue.put.call_count == 1
-        call_args = producer.output_queue.put.call_args[0][0]
-        split, zip_filepath, archive_name, cipher_count = call_args
+        upload_task = producer.output_queue.put.call_args[0][0]
 
-        assert split == "train"
-        assert archive_name.endswith(".zip")
-        assert cipher_count == 1
-        assert os.path.exists(zip_filepath)
+        assert upload_task.split == "train"
+        assert str(upload_task.filename).endswith(".zip")
+        assert upload_task.cipher_count == 1
+        assert os.path.exists(upload_task.filepath)
 
-    def test_cleanup_val_test_merge_signal(
+    def test_cleanup_val_test_hoard_signal(
         self,
         mocker,
         producer,
-        valid_text_stream,
+        valid_tasks,
         mock_cipher,
     ):
-        """Verify that val and test splits close cleanly and send the MERGE signal."""
+        """Verify that val and test splits output JSONL tasks for the uploader to merge."""
         producer.input_queue.get.side_effect = [
-            ("val", valid_text_stream),
-            ("test", valid_text_stream),
+            valid_tasks["val"],
+            valid_tasks["test"],
             "STOP",
         ]
         mocker.patch.object(producer, "generate_cipher", return_value=mock_cipher)
 
         producer.run()
 
-        # Should put two MERGE signals into the output queue (one for val, one for test)
         assert producer.output_queue.put.call_count == 2
 
-        val_call_args = producer.output_queue.put.call_args_list[0][0][0]
-        signal, split, filepath, count = val_call_args
+        val_task = producer.output_queue.put.call_args_list[0][0][0]
+        test_task = producer.output_queue.put.call_args_list[1][0][0]
 
-        assert signal == "MERGE"
-        assert split == "val"
-        assert filepath.with_suffix(".jsonl")
-        assert count == 1
+        assert isinstance(val_task, UploadTask)
+        assert val_task.split == "val"
+        assert str(val_task.filename).endswith(".jsonl")
+        assert val_task.cipher_count == 1
+        assert os.path.exists(val_task.filepath)
 
-        # Ensure the raw JSONL file is left intact for the Uploader to merge
-        assert os.path.exists(filepath)
+        assert isinstance(test_task, UploadTask)
+        assert test_task.split == "test"
+        assert str(test_task.filename).endswith(".jsonl")
 
     def test_empty_queue_timeout(self, producer):
         """Verify the producer survives queue timeouts and continues listening."""
@@ -190,9 +225,9 @@ class TestCipherProducerRunLoop:
         assert "Queue disconnect" in mock_log.error.call_args[0][0]
         assert producer.input_queue.get.call_count == 2
 
-    def test_run_skips_invalid_cipher(self, mocker, producer, valid_text_stream):
+    def test_run_skips_invalid_cipher(self, mocker, producer, valid_train_task):
         """Verify the loop skips to the next item if cipher generation returns None."""
-        producer.input_queue.get.side_effect = [("train", valid_text_stream), "STOP"]
+        producer.input_queue.get.side_effect = [valid_train_task, "STOP"]
         mocker.patch.object(producer, "generate_cipher", return_value=None)
 
         producer.run()
@@ -201,22 +236,64 @@ class TestCipherProducerRunLoop:
         producer.output_queue.put.assert_not_called()
 
 
-class TestGenerateCipherLogic:
-    """Tests covering the internal instantiation and error handling of HomophonicCipher."""
+@dataclass
+class CipherSuccessCase:
+    """Defines the parameters for testing successful cipher generation routing."""
 
-    def test_generate_cipher_success(self, mocker, producer, valid_text_stream):
-        """Verify the cipher is instantiated, generated, and enciphered correctly."""
-        mock_cipher_instance = mocker.Mock(spec=HomophonicCipher)
-        mocked_homophonic_cipher = mocker.patch(
-            "cipher_generation.cipher_producer.HomophonicCipher",
+    id: str
+    target_difficulty: float | int | None
+    mock_target: str
+    expected_kwargs: dict[str, Any] = field(default_factory=dict)
+    mock_random: float | None = None
+
+
+cipher_success_cases = [
+    CipherSuccessCase(
+        id="continuous_homophonic",
+        target_difficulty=None,
+        mock_target="cipher_generation.cipher_producer.HomophonicCipher",
+        expected_kwargs={},
+    ),
+    CipherSuccessCase(
+        id="discrete_homophonic",
+        target_difficulty=25,
+        mock_target="cipher_generation.cipher_producer.HomophonicCipher",
+        expected_kwargs={"difficulty": 25},
+    ),
+    CipherSuccessCase(
+        id="monoalphabetic",
+        target_difficulty=0,
+        mock_target="cipher_generation.cipher_producer.MonoalphabeticCipher",
+        expected_kwargs={},
+    ),
+]
+
+
+class TestGenerateCipherLogic:
+    """Tests covering the discrete and continuous routing of the cipher engines."""
+
+    @pytest.mark.parametrize("case", cipher_success_cases, ids=lambda c: c.id)
+    def test_generate_cipher_success_routing(
+        self, mocker, producer, valid_text_stream, case: CipherSuccessCase
+    ):
+        """Verify that specific difficulties cleanly route to the correct cipher class."""
+        mock_cipher_instance = mocker.Mock()
+        mocked_cipher_class = mocker.patch(
+            case.mock_target,
             return_value=mock_cipher_instance,
         )
 
-        cipher = producer.generate_cipher(valid_text_stream)
+        cipher = producer.generate_cipher(
+            valid_text_stream, target_difficulty=case.target_difficulty
+        )
 
-        mocked_homophonic_cipher.assert_called_once_with(valid_text_stream)
+        mocked_cipher_class.assert_called_once_with(
+            valid_text_stream, **case.expected_kwargs
+        )
+
         mock_cipher_instance.generate_key.assert_called_once()
         mock_cipher_instance.encipher.assert_called_once()
+
         assert cipher == mock_cipher_instance
 
     @pytest.mark.parametrize("case", cipher_error_cases, ids=lambda c: c.id)
@@ -231,7 +308,7 @@ class TestGenerateCipherLogic:
             side_effect=case.exception,
         )
 
-        result = producer.generate_cipher(valid_text_stream)
+        result = producer.generate_cipher(valid_text_stream, target_difficulty=20)
 
         assert result is None
         mock_log.error.assert_called_once()
