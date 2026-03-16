@@ -69,7 +69,7 @@ class CipherManager:
         }
 
         self.test_tracker: dict[int, dict[int, int]] = {
-            length: {difficulty: 0 for difficulty in diffs}
+            length: {redundancy: 0 for redundancy in diffs}
             for length, diffs in config.dataset_config.test_matrix.items()
         }
         self.test_samples_per_bin = config.dataset_config.ciphers_per_bin
@@ -216,17 +216,17 @@ class CipherManager:
             leave=True,
         ) as pbar:
             for count_fed, (split, text_data) in enumerate(self.stream, start=1):
-                target_difficulty = None
+                target_redundancy = None
                 if split == "test":
                     length = text_data.get("target_length", 0)
-                    target_difficulty = self._assign_test_difficulty(length)
-                    if target_difficulty is None:
+                    target_redundancy = self._assign_test_redundancy(length)
+                    if target_redundancy is None:
                         continue
 
                 task = CipherTask(
                     split=split,
                     text_data=text_data,
-                    target_difficulty=target_difficulty,
+                    target_redundancy=target_redundancy,
                 )
                 self.job_queue.put(task)
                 pbar.update(1)
@@ -240,14 +240,14 @@ class CipherManager:
 
         return count_fed
 
-    def _assign_test_difficulty(self, length: int) -> int | None:
-        """Find an available difficulty bin for a given test length.
+    def _assign_test_redundancy(self, length: int) -> int | None:
+        """Find an available redundancy bin for a given test length.
 
         Args:
             length (int): The sequence length of the test sample.
 
         Returns:
-            int | None: The assigned difficulty, or None if all bins for
+            int | None: The assigned redundancy, or None if all bins for
                 this length are full or the length is invalid.
 
         """

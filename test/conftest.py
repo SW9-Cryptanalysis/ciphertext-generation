@@ -195,31 +195,31 @@ def mock_records():
         {
             "length": 4018,
             "homophones": 213,
-            "difficulty": 5,
+            "redundancy": 5,
             "genres": ["Sci-Fi & Fantasy"],
         },
         {
             "length": 5051,
             "homophones": 59,
-            "difficulty": 25,
+            "redundancy": 25,
             "genres": ["Romance", "Classic & General Literature"],
         },
         {
             "length": 6518,
             "homophones": 32,
-            "difficulty": 15,
+            "redundancy": 15,
             "genres": ["Romance", "Classic & General Literature"],
         },
         {
             "length": 8000,
             "homophones": 100,
-            "difficulty": 10,
+            "redundancy": 10,
             "genres": ["Romance"],
         },
         {
             "length": 6618,
             "homophones": 45,
-            "difficulty": 25,
+            "redundancy": 25,
             "genres": ["Sci-Fi & Fantasy"],
         },
     ]

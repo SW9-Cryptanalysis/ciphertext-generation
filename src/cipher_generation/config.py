@@ -5,13 +5,13 @@ from dataclasses import dataclass, field
 class DatasetConfig:
     """Configuration for the cipher dataset generation.
 
-    A difficulty value of 0 denotes the monoalphabetic baseline for that length.
+    A redundancy value of 0 denotes the monoalphabetic baseline for that length.
 
     Attributes:
         foundation_pct (float): The percentage of ciphers to use as the foundation.
         transition_pct (float): The percentage of ciphers to use as transitions.
         frontier_pct (float): The percentage of ciphers to use as the frontier.
-        test_matrix (Dict[int, List[int]]): A mapping of length to difficulty levels.
+        test_matrix (Dict[int, List[int]]): A mapping of length to redundancy levels.
 
     """
 

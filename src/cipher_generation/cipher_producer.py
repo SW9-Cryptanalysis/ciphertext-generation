@@ -102,7 +102,7 @@ class CipherProducer(mp.Process):
                     log.info(f"{process_name} received STOP signal.")
                     break
 
-                cipher = self.generate_cipher(item.text_data, item.target_difficulty)
+                cipher = self.generate_cipher(item.text_data, item.target_redundancy)
 
                 if cipher is None:
                     continue
@@ -111,7 +111,7 @@ class CipherProducer(mp.Process):
                     split=item.split,
                     length=len(cipher.plaintext),
                     homophones=cipher.num_symbols,
-                    difficulty=cipher.difficulty or 0,
+                    redundancy=cipher.redundancy or 0,
                     genres=cipher.genres,
                 )
 
@@ -220,15 +220,15 @@ class CipherProducer(mp.Process):
     def generate_cipher(
         self,
         text: TextStream,
-        target_difficulty: int | None,
+        target_redundancy: int | None,
     ) -> SubstitutionCipher | None:
-        """Generate a cipher from the provided text string, applying difficulty limits.
+        """Generate a cipher from the provided text string, applying redundancy limits.
 
         Args:
             text (TextStream): The text stream to generate the cipher from.
-            target_difficulty (float | int | None): The specific difficulty to hit,
+            target_redundancy (float | int | None): The specific redundancy to hit,
                 0 for monoalphabetic, or None to generate a random continuous
-                difficulty.
+                redundancy.
 
         Returns:
             SubstitutionCipher | None: The generated cipher, or None if an error
@@ -236,14 +236,14 @@ class CipherProducer(mp.Process):
 
         """
         try:
-            if target_difficulty == 0:
+            if target_redundancy == 0:
                 cipher = MonoalphabeticCipher(text)
 
-            elif target_difficulty is None:
+            elif target_redundancy is None:
                 cipher = HomophonicCipher(text)
 
             else:
-                cipher = HomophonicCipher(text, difficulty=target_difficulty)
+                cipher = HomophonicCipher(text, redundancy=target_redundancy)
 
             cipher.generate_key()
             cipher.encipher()

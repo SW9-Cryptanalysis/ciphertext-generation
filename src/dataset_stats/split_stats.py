@@ -66,7 +66,7 @@ class SplitStats:
         self,
         length: int,
         homophones: int,
-        difficulty: int,
+        redundancy: int,
         genres: list[str],
     ) -> None:
         """Update the dataset statistics with a new item (cipher).
@@ -74,7 +74,7 @@ class SplitStats:
         Args:
             length (int): The length of the cipher.
             homophones (int): The number of homophones in the cipher.
-            difficulty (int): The difficulty level of the cipher.
+            redundancy (int): The redundancy level of the cipher.
             genres (list[str]): The genres of the book used to generate the
                 cipher.
 
@@ -87,7 +87,7 @@ class SplitStats:
             self._get_bucket(homophones, self._bucket_sizes.homophones)
         ] += 1
         self.redundancy_distribution[
-            self._get_bucket(difficulty, self._bucket_sizes.redundancy)
+            self._get_bucket(redundancy, self._bucket_sizes.redundancy)
         ] += 1
 
         self.min_length = min(self.min_length, length)

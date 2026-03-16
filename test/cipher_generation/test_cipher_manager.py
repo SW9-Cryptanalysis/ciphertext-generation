@@ -323,17 +323,17 @@ class TestCipherManagerPeakUpload:
 class TestCipherManagerRouting:
     """Tests focusing on the test-matrix bin routing and CipherTask payloads."""
 
-    def test_assign_test_difficulty_valid(self, manager_config):
+    def test_assign_test_redundancy_valid(self, manager_config):
         """Ensure the manager assigns valid difficulties and increments the tracker."""
         manager = CipherManager(manager_config, [])
 
-        diff = manager._assign_test_difficulty(4000)
+        diff = manager._assign_test_redundancy(4000)
 
         assert diff is not None
         assert diff in manager_config.dataset_config.test_matrix[4000]
         assert manager.test_tracker[4000][diff] == 1
 
-    def test_assign_test_difficulty_exhausted(self, manager_config):
+    def test_assign_test_redundancy_exhausted(self, manager_config):
         """Ensure the manager returns None when all bins for a length are full."""
         manager = CipherManager(manager_config, [])
         manager.test_samples_per_bin = 2
@@ -341,14 +341,14 @@ class TestCipherManagerRouting:
         for diff in manager.test_tracker[4000]:
             manager.test_tracker[4000][diff] = 2
 
-        assert manager._assign_test_difficulty(4000) is None
+        assert manager._assign_test_redundancy(4000) is None
 
-    def test_assign_test_difficulty_invalid_length(self, mocker, manager_config):
+    def test_assign_test_redundancy_invalid_length(self, mocker, manager_config):
         """Ensure invalid lengths are caught and logged."""
         mock_log = mocker.patch("cipher_generation.cipher_manager.log")
         manager = CipherManager(manager_config, [])
 
-        result = manager._assign_test_difficulty(99999)
+        result = manager._assign_test_redundancy(99999)
 
         assert result is None
         mock_log.warning.assert_called_once_with(
@@ -377,18 +377,18 @@ class TestCipherManagerRouting:
         train_task = calls[0][0][0]
         assert isinstance(train_task, CipherTask)
         assert train_task.split == "train"
-        assert train_task.target_difficulty is None
+        assert train_task.target_redundancy is None
 
         val_task = calls[1][0][0]
         assert val_task.split == "val"
-        assert val_task.target_difficulty is None
+        assert val_task.target_redundancy is None
 
         test_task = calls[2][0][0]
         assert test_task.split == "test"
 
-        assert isinstance(test_task.target_difficulty, int)
+        assert isinstance(test_task.target_redundancy, int)
         assert (
-            test_task.target_difficulty
+            test_task.target_redundancy
             in manager_config.dataset_config.test_matrix[6500]
         )
 

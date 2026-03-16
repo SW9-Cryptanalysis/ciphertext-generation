@@ -24,7 +24,7 @@ class SubstitutionCipher(ABC):
             or spaces.
         plaintext_with_boundaries (str): The plaintext preserving word boundary
             underscores.
-        difficulty (int | None): The difficulty level of the cipher.
+        redundancy (int | None): The redundancy level of the cipher.
         num_symbols (int): The total number of unique symbols in the generated key.
         key (dict[str, list[int]]): A dictionary mapping each letter to its cipher
             symbols.
@@ -50,13 +50,13 @@ class SubstitutionCipher(ABC):
         self,
         text_obj: TextStream,
         *,
-        difficulty: int | None = None,
+        redundancy: int | None = None,
     ) -> None:
         """Initialize the Cipher object with common plaintext and metadata.
 
         Args:
             text_obj (TextStream): Text object containing the plaintext and metadata.
-            difficulty (int | None, optional): The difficulty level to apply.
+            redundancy (int | None, optional): The redundancy level to apply.
                 Defaults to None.
 
         Raises:
@@ -72,7 +72,7 @@ class SubstitutionCipher(ABC):
 
         self.plaintext = text_obj["text"]
         self.plaintext_with_boundaries = text_obj["text_with_boundaries"]
-        self.difficulty = difficulty
+        self.redundancy = redundancy
         self.num_symbols = 0
         self.key: dict[str, list[int]] = {}
         self.ciphertext = ""
@@ -143,7 +143,7 @@ class SubstitutionCipher(ABC):
             "plaintext_with_boundaries": self.plaintext_with_boundaries,
             "length": len(self.plaintext),
             "num_symbols": self.num_symbols,
-            "difficulty": self.difficulty,
+            "redundancy": self.redundancy,
             "key": self.key,
             "ciphertext": self.ciphertext,
             "ciphertext_with_boundaries": self.ciphertext_with_boundaries,
@@ -161,7 +161,7 @@ class SubstitutionCipher(ABC):
         """
         class_name = self.__class__.__name__
         return f'''{class_name}(Plaintext: "{self.plaintext}"
-            Difficulty: {self.difficulty}
+            Redundancy: {self.redundancy}
             Key: {self.key}
             Ciphertext: "{self.ciphertext}"
             '''
@@ -194,7 +194,7 @@ class SubstitutionCipher(ABC):
         cipher.ciphertext = data["ciphertext"]
         cipher.ciphertext_with_boundaries = data["ciphertext_with_boundaries"]
         cipher.num_symbols = data["num_symbols"]
-        cipher.difficulty = data["difficulty"]
+        cipher.redundancy = data["redundancy"]
         cipher.genres = data["genres"]
         cipher.source_id = data["source_id"]
         cipher.source_name = data["source_name"]
@@ -206,42 +206,50 @@ class HomophonicCipher(SubstitutionCipher):
     """A class representing a homophonic substitution cipher.
 
     Inherits attributes from SubstitutionCipher. Automatically calculates a continuous
-    uniform difficulty based on the text length if no specific difficulty is provided.
+    uniform redundancy based on the text length if no specific redundancy is provided.
 
     Methods:
         generate_key(): Generate a homophonic substitution cipher key based on a
-            difficulty level.
+            redundancy level.
         encipher(): Encipher the plaintext using the generated key.
-        generate_difficulty(): Generate a random difficulty level for the cipher.
+        generate_redundancy(): Generate a random redundancy level for the cipher.
 
     """
 
     @parameter_validator(
         text_obj=validate_typed_dict,
-        difficulty=all_of(
+        redundancy=all_of(
             in_range(MIN_DIFFICULTY, MAX_DIFFICULTY),
             strongly_typed_optional,
         ),
     )
-    def __init__(self, text_obj: TextStream, *, difficulty: int | None = None) -> None:
+    def __init__(self, text_obj: TextStream, *, redundancy: int | None = None) -> None:
         """Initialize the HomophonicCipher object.
 
         Args:
             text_obj (TextStream): Text object containing the plaintext and metadata.
-            difficulty (int | None, optional): The difficulty level of the cipher.
-                If None, a random continuous difficulty will be calculated and assigned.
+            redundancy (int | None, optional): The redundancy level of the cipher.
+                If None, a random continuous redundancy will be calculated and assigned.
 
         Raises:
-            ValueError: If the provided difficulty falls outside the allowed bounds.
+            ValueError: If the provided redundancy falls outside the allowed bounds.
 
         """
-        super().__init__(text_obj, difficulty=difficulty)
+        super().__init__(text_obj, redundancy=redundancy)
 
-        if not self.difficulty:
-            self.difficulty = self.generate_difficulty()
+        if self.redundancy is None:
+            self.redundancy = self.generate_redundancy()
+
+        self.redundancy = self._clamp_redundancy(self.redundancy)
+
+    def _clamp_redundancy(self, value: int) -> int:
+        """Clamps the redundancy to the physical limits of the current plaintext."""
+        unique_letters = len(set(self.plaintext))
+        max_redundancy = len(self.plaintext) // max(1, unique_letters)
+        return min(value, max_redundancy)
 
     def generate_key(self) -> dict:
-        """Generate a homophonic substitution cipher key based on a difficulty level.
+        """Generate a homophonic substitution cipher key based on a redundancy level.
 
         Key is a dictionary mapping each letter to a list of its homophones.
         Each letter is assigned a number of homophones proportional to its frequency in
@@ -254,7 +262,7 @@ class HomophonicCipher(SubstitutionCipher):
             dict: A dictionary mapping each letter to a list of its homophones.
 
         """
-        symbols: int = round(len(self.plaintext) / self.difficulty)
+        symbols: int = round(len(self.plaintext) / self.redundancy)
 
         letter_frequencies = frequencies(self.plaintext)
 
@@ -298,11 +306,11 @@ class HomophonicCipher(SubstitutionCipher):
         self._apply_recurrence_and_remap_key()
         return self.ciphertext
 
-    def generate_difficulty(self) -> int:
-        """Generate a random difficulty level.
+    def generate_redundancy(self) -> int:
+        """Generate a random redundancy level.
 
         Returns:
-            int: Difficulty level bounded by MIN_DIFFICULTY and MAX_DIFFICULTY.
+            int: Redundancy level bounded by MIN_DIFFICULTY and MAX_DIFFICULTY.
 
         """
         return random.randint(MIN_DIFFICULTY, MAX_DIFFICULTY)
@@ -311,7 +319,7 @@ class HomophonicCipher(SubstitutionCipher):
 class MonoalphabeticCipher(SubstitutionCipher):
     """A monoalphabetic substitution cipher.
 
-    Inherits attributes from SubstitutionCipher. Hardcodes the difficulty to 1,
+    Inherits attributes from SubstitutionCipher. Hardcodes the redundancy to 1,
     as every letter maps to exactly one unique symbol.
 
     Methods:
@@ -330,7 +338,7 @@ class MonoalphabeticCipher(SubstitutionCipher):
             text_obj (TextStream): Text object containing the plaintext and metadata.
 
         """
-        super().__init__(text_obj, difficulty=1)
+        super().__init__(text_obj, redundancy=1)
         self.key = self.generate_key()
         self.encipher()
 

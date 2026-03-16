@@ -61,7 +61,7 @@ class TestSplitStatsUpdate:
                 "input": {
                     "length": 4018,
                     "homophones": 213,
-                    "difficulty": 5,
+                    "redundancy": 5,
                     "genres": ["Sci-Fi & Fantasy"],
                 },
                 "expected": {
@@ -80,7 +80,7 @@ class TestSplitStatsUpdate:
                 "input": {
                     "length": 5051,
                     "homophones": 59,
-                    "difficulty": 25,
+                    "redundancy": 25,
                     "genres": ["Romance"],
                 },
                 "expected": {
@@ -99,7 +99,7 @@ class TestSplitStatsUpdate:
                 "input": {
                     "length": 6518,
                     "homophones": 32,
-                    "difficulty": 15,
+                    "redundancy": 15,
                     "genres": ["Romance", "Classic & General Literature"],
                 },
                 "expected": {
