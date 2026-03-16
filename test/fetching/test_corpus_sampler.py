@@ -1,6 +1,6 @@
 import pytest
 from cipher_generation.config import DatasetConfig
-from fetching.corpus_sampler import CorpusSampler, Metadata
+from fetching.corpus_sampler import CorpusSampler, Metadata, Target
 from utils.text_sampling import Book
 from dataclasses import dataclass
 
@@ -252,7 +252,7 @@ class TestCorpusSamplerFitTargets:
         sampler = CorpusSampler(dummy_config, default_genre_map, buffer_chars=100)
         sampler.test_pool = []
 
-        targets = [
+        targets: list[Target] = [
             {"split": "train", "len": 1000},
             {"split": "test", "len": 500},
         ]
@@ -269,7 +269,7 @@ class TestCorpusSamplerFitTargets:
     ):
         sampler = CorpusSampler(dummy_config, default_genre_map, buffer_chars=10)
         mock_shuffle = mocker.patch("random.shuffle")
-        targets = [{"split": "train", "len": 100}]
+        targets: list[Target]= [{"split": "train", "len": 100}]
 
         sampler._fit_targets_to_book(targets, 1000)
 
@@ -331,7 +331,7 @@ class TestCorpusSamplerExtractAndFormat:
             source_type="",
             fallback_genres=[],
         )
-        targets = [{"split": "train", "len": 100}]
+        targets: list[Target] = [{"split": "train", "len": 100}]
 
         results = list(sampler._extract_chunks_from_partitions("dummy", targets, book))
 
@@ -342,7 +342,7 @@ class TestCorpusSamplerExtractAndFormat:
         self, dummy_config, default_genre_map
     ):
         sampler = CorpusSampler(dummy_config, default_genre_map)
-        target = {"split": "test", "len": 350}
+        target: Target = {"split": "test", "len": 350}
         result = ("clean_text", "clean_text_bounds")
         meta: Metadata = {
             "source_id": "1",
@@ -363,7 +363,7 @@ class TestCorpusSamplerExtractAndFormat:
     ):
         """Verify that the 'else' block correctly updates counts for non-test splits."""
         sampler = CorpusSampler(dummy_config, default_genre_map)
-        target = {"split": "train", "len": 200}
+        target: Target = {"split": "train", "len": 200}
         result = ("train_text", "train_text_bounds")
         meta: Metadata = {
             "source_id": "2",

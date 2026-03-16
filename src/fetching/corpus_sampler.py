@@ -1,5 +1,5 @@
 import random
-from typing import Iterator, Iterable, Any, TypedDict
+from typing import Iterator, Iterable, TypedDict
 from cipher_generation.config import DatasetConfig
 from utils.text_sampling import (
     TextStream,
@@ -17,6 +17,13 @@ class Metadata(TypedDict):
     source_id: str
     source_name: str
     genres: list[str]
+
+
+class Target(TypedDict):
+    """A typed dictionary for target lengths."""
+
+    split: str
+    len: int
 
 
 class CorpusSampler:
@@ -89,7 +96,7 @@ class CorpusSampler:
             return False
         if self.counts["val"] < self.targets["val"]:
             return False
-        return not self.total_test_count < self.targets["test"]
+        return self.total_test_count >= self.targets["test"]
 
     def generate_stream(self, stream: Iterable) -> Iterator[tuple[str, TextStream]]:
         """Dispatcher loop that iterates through books until quotas are met.
@@ -126,9 +133,9 @@ class CorpusSampler:
             else None
         )
 
-    def _get_burst_targets(self) -> list[dict[str, Any]]:
+    def _get_burst_targets(self) -> list[Target]:
         """Plan a burst of target lengths for the current book."""
-        burst_targets: list[dict[str, Any]] = []
+        burst_targets: list[Target] = []
 
         for _ in range(self.max_chunks_per_book):
             split = self._get_weighted_split()
@@ -167,7 +174,11 @@ class CorpusSampler:
             book,
         )
 
-    def _fit_targets_to_book(self, targets: list[dict], text_len: int) -> list[dict]:
+    def _fit_targets_to_book(
+        self,
+        targets: list[Target],
+        text_len: int,
+    ) -> list[Target]:
         """Trim the target list until it fits within the text length."""
         total_req = sum(t["len"] for t in targets) + (len(targets) * self.buffer)
 
@@ -185,7 +196,7 @@ class CorpusSampler:
     def _extract_chunks_from_partitions(
         self,
         text: str,
-        targets: list[dict],
+        targets: list[Target],
         book: Book,
     ) -> Iterator[tuple[str, TextStream]]:
         """Iterate through partitions and yield validated text streams."""
@@ -210,7 +221,7 @@ class CorpusSampler:
 
     def _record_and_format(
         self,
-        target: dict,
+        target: Target,
         result: tuple,
         meta: Metadata,
     ) -> tuple[str, TextStream]:
