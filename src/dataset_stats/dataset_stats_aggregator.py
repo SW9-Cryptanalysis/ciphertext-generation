@@ -8,7 +8,7 @@ class UpdateStats(TypedDict):
 
     length: int
     homophones: int
-    difficulty: int
+    redundancy: int
     genres: list[str]
 
 

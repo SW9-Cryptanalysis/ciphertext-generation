@@ -15,7 +15,7 @@ To generate data and upload to Google Drive, run `uv run src/gen_training.py`
     "plaintext_with_boundaries": "some_thing",
     "length": 9,
     "num_symbols": 9,
-    "difficulty": 1,
+    "redundancy": 1,
     "key": {
         "a": [],
         "b": [],

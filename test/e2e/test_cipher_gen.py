@@ -24,7 +24,7 @@ def mock_cipher(mocker):
     mock_cipher.__json__.return_value = {"mock_key": "mock_value"}
     mock_cipher.plaintext = "abc"
     mock_cipher.num_symbols = 3
-    mock_cipher.difficulty = 1
+    mock_cipher.redundancy = 1
     mock_cipher.genres = ["Fiction"]
     return mock_cipher
 

@@ -28,7 +28,7 @@ def valid_train_task(valid_text_stream):
     return CipherTask(
         split="train",
         text_data=valid_text_stream,
-        target_difficulty=None,
+        target_redundancy=None,
     )
 
 
@@ -38,7 +38,7 @@ def valid_val_task(valid_text_stream):
     return CipherTask(
         split="val",
         text_data=valid_text_stream,
-        target_difficulty=None,
+        target_redundancy=None,
     )
 
 
@@ -48,7 +48,7 @@ def valid_test_task(valid_text_stream):
     return CipherTask(
         split="test",
         text_data=valid_text_stream,
-        target_difficulty=20,
+        target_redundancy=20,
     )
 
 
@@ -67,7 +67,7 @@ def mock_cipher(mocker):
     """Mock a SubstitutionCipher with a valid __json__ return value."""
     mock = mocker.Mock()
     mock.plaintext = "a" * 10
-    mock.difficulty = 5
+    mock.redundancy = 5
     mock.num_symbols = 3
     mock.genres = ["Sci-Fi"]
     mock.__json__ = mocker.Mock(return_value={"mock_key": "mock_value"})
@@ -241,7 +241,7 @@ class CipherSuccessCase:
     """Defines the parameters for testing successful cipher generation routing."""
 
     id: str
-    target_difficulty: float | int | None
+    target_redundancy: float | int | None
     mock_target: str
     expected_kwargs: dict[str, Any] = field(default_factory=dict)
     mock_random: float | None = None
@@ -250,19 +250,19 @@ class CipherSuccessCase:
 cipher_success_cases = [
     CipherSuccessCase(
         id="continuous_homophonic",
-        target_difficulty=None,
+        target_redundancy=None,
         mock_target="cipher_generation.cipher_producer.HomophonicCipher",
         expected_kwargs={},
     ),
     CipherSuccessCase(
         id="discrete_homophonic",
-        target_difficulty=25,
+        target_redundancy=25,
         mock_target="cipher_generation.cipher_producer.HomophonicCipher",
-        expected_kwargs={"difficulty": 25},
+        expected_kwargs={"redundancy": 25},
     ),
     CipherSuccessCase(
         id="monoalphabetic",
-        target_difficulty=0,
+        target_redundancy=0,
         mock_target="cipher_generation.cipher_producer.MonoalphabeticCipher",
         expected_kwargs={},
     ),
@@ -284,7 +284,7 @@ class TestGenerateCipherLogic:
         )
 
         cipher = producer.generate_cipher(
-            valid_text_stream, target_difficulty=case.target_difficulty
+            valid_text_stream, target_redundancy=case.target_redundancy
         )
 
         mocked_cipher_class.assert_called_once_with(
@@ -308,7 +308,7 @@ class TestGenerateCipherLogic:
             side_effect=case.exception,
         )
 
-        result = producer.generate_cipher(valid_text_stream, target_difficulty=20)
+        result = producer.generate_cipher(valid_text_stream, target_redundancy=20)
 
         assert result is None
         mock_log.error.assert_called_once()

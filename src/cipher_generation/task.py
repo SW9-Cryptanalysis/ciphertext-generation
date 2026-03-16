@@ -9,14 +9,14 @@ class CipherTask:
     Attributes:
         split (str): The split the cipher is being generated for.
         text_data (dict[str, Any]): The text data to be encrypted.
-        target_difficulty (float | int | None, optional): The difficulty level for the
-            cipher. Defaults to None (use random difficulty).
+        target_redundancy (float | int | None, optional): The redundancy level for the
+            cipher. Defaults to None (use random redundancy).
 
     """
 
     split: str
     text_data: TextStream
-    target_difficulty: int | None = None
+    target_redundancy: int | None = None
 
 
 @dataclass
