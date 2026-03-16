@@ -5,9 +5,6 @@ from fetching.dataset_extractor import DatasetConfig
 
 MIN_DIFFICULTY = 4
 MAX_DIFFICULTY = 300
-MIN_PLAINTEXT_LENGTH = 4000
-MAX_PLAINTEXT_LENGTH = 6000
-NUM_CIPHERS = 100000
 ALPHABET = "abcdefghijklmnopqrstuvwxyz"
 
 NUM_TRAINING_CIPHERS = 1_000_000
@@ -16,11 +13,6 @@ NUM_TEST_CIPHERS = 10_000
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 GENRE_MAP_PATH = PROJECT_ROOT / "data" / "book_genres.jsonl"
-
-BATCH_SIZE = 10000
-
-DIFFICULTIES = [5, 10, 15, 20, 25, 30]
-LENGTHS = [400, 800, 4000, 6000, 10000]
 
 BOOK_IDS_VALIDATION = [
     "7241",  # Fables of La Fontaine
