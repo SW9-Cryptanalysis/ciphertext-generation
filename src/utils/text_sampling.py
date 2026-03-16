@@ -1,5 +1,3 @@
-import random
-from typing import Iterator
 from typing_extensions import TypedDict
 from datasets.iterable_dataset import IterableDataset
 
@@ -29,6 +27,47 @@ class TextStream(TypedDict):
     length: int
     target_length: int
     genres: list[str]
+
+
+def extract_specific_chunk(
+    text: str,
+    target_len: int,
+    start_idx: int,
+    partition_size: int,
+) -> tuple[str, str] | None:
+    """Extract a chunk of text with exactly target_len alphabetic characters.
+
+    Args:
+        text (str): The raw usable text string.
+        target_len (int): The exact number of a-z characters required.
+        start_idx (int): The starting cursor for the partition.
+        partition_size (int): The total character budget for this search zone.
+
+    Returns:
+        tuple[str, str] | None: (spaceless_text, underscored_text) or None if fails.
+
+    """
+    raw_window = text[start_idx : start_idx + partition_size]
+    if not raw_window:
+        return None
+
+    formatted_window = format_text(raw_window)
+
+    if len(clean_spaces(formatted_window)) < target_len:
+        return None
+
+    spaced_target_idx = find_spaceless_target_index(formatted_window, target_len)
+
+    final_start, final_end = find_boundaries(formatted_window, 0, spaced_target_idx)
+
+    final_chunk = formatted_window[final_start:final_end]
+    unbounded = clean_spaces(final_chunk).strip()
+    bounded = final_chunk.strip().replace(" ", "_")
+
+    if not unbounded or not bounded:
+        return None
+
+    return unbounded, bounded
 
 
 def find_boundaries(
@@ -98,117 +137,6 @@ def find_spaceless_target_index(spaced_text: str, target_len: int) -> int:
             return i
 
     return len(spaced_text)
-
-
-def extract_random_chunk(
-    text: str,
-    zone_start: int,
-    zone_size: int,
-    len_bounds: tuple[int, int],
-) -> tuple[str, str]:
-    """Extract a random chunk of text dynamically with and without word boundaries.
-
-    Args:
-        text (str): The raw text to extract the chunk from.
-        zone_start (int): The start index of the zone to extract the chunk from.
-        zone_size (int): The size of the zone to extract the chunk from.
-        len_bounds (tuple[int, int]): The minimum and maximum length bounds.
-
-    Returns:
-        tuple[str, str]: A tuple containing the cleaned chunk of text both with
-                spaces replaced with underscores and the spaces removed.
-
-    """
-    min_len, max_len = len_bounds
-    target_len = random.randint(min_len + 50, max_len - 50)
-
-    max_start = max(0, zone_size - target_len)
-    raw_start = zone_start + random.randint(0, max_start)
-
-    spaced_window = ""
-    raw_end = min(len(text), raw_start + (target_len * 2))
-
-    while True:
-        raw_window = text[raw_start:raw_end]
-        spaced_window = format_text(raw_window)
-
-        if len(clean_spaces(spaced_window)) >= target_len + 200 or raw_end >= len(text):
-            break
-
-        raw_end = min(len(text), raw_end + target_len)
-
-    if len(clean_spaces(spaced_window)) < min_len:
-        return clean_spaces(spaced_window).strip(), spaced_window.strip().replace(
-            " ",
-            "_",
-        )
-
-    spaced_target_len = find_spaceless_target_index(spaced_window, target_len)
-    start_idx, end_idx = find_boundaries(spaced_window, 0, spaced_target_len)
-
-    final_chunk = spaced_window[start_idx:end_idx]
-
-    unbounded_text = clean_spaces(final_chunk).strip()
-    bounded_text = final_chunk.strip().replace(" ", "_")
-
-    return unbounded_text, bounded_text
-
-
-def get_split(idx: int) -> str:
-    """Get the split for a given index.
-
-    Args:
-        idx (int): The index to get the split for.
-
-    Returns:
-        str: The split for the index.
-
-    """
-    if idx % 100 == 0:
-        return "val"
-    elif idx % 100 == 1:
-        return "test"
-    else:
-        return "train"
-
-
-def get_book_chunks(
-    text: str,
-    actual_take: int,
-    len_bounds: tuple[int, int],
-) -> Iterator[tuple[str, str]]:
-    """Extract a random chunk of text from the provided book text.
-
-    Args:
-        text (str): String to extract the chunk from.
-        actual_take (int): The number of chunks to extract.
-        len_bounds (tuple[int, int]): The minimum and maximum length bounds.
-
-    Yields:
-        Iterator[tuple[str, str]]: An iterator of text chunks with the clean text
-                with spaces replaced with underscores and the spaces removed.
-
-    """
-    zone_size = len(text) // actual_take
-
-    for i in range(actual_take):
-        chunk, bounded_chunk = extract_random_chunk(
-            text,
-            i * zone_size,
-            zone_size,
-            len_bounds,
-        )
-
-        chunk_len = len(chunk)
-
-        if len_bounds[0] - 0.05 * len_bounds[0] <= chunk_len <= len_bounds[1]:
-            yield chunk, bounded_chunk
-
-
-def get_actual_take(split: str, debts: dict[str, float], capacity: int) -> int:
-    """Get the actual take for a given split."""
-    actual_take = max(min(int(debts[split]), capacity), 1) if capacity > 0 else 0
-    return actual_take
 
 
 def get_usable_text(raw_text: str, len_bounds: tuple[int, int]) -> str:
